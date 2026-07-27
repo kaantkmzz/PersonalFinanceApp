@@ -1,6 +1,14 @@
 ﻿using PersonalFinanceApp.Data;
+using PersonalFinanceApp.Helpers;
 
 Console.WriteLine("=== Kişisel Finans Takip Sistemi ===");
+
+// ---- GEÇİCİ TEŞHİS KODU ----
+var config = ConfigReader.Load();
+string cs = config.ConnectionString;
+Console.WriteLine($"TAM BAĞLANTI STRINGI: [{cs}]");
+// ---- TEŞHİS KODU SONU ----
+
 Console.WriteLine("Veritabanı bağlantısı test ediliyor...\n");
 
 bool isConnected = DatabaseHelper.TestConnection();

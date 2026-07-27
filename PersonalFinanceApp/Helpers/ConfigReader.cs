@@ -13,7 +13,7 @@ namespace PersonalFinanceApp.Helpers
             {
                 ConnectionString = !string.IsNullOrEmpty(conn)
                     ? conn
-                    : "Host=localhost;Username=postgres;Password=postgres;Database=postgres"
+                    : "Host=localhost;Username=postgres;Password=admin123;Database=postgres"
             };
         }
     }
