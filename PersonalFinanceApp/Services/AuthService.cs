@@ -2,11 +2,19 @@
 using PersonalFinanceApp.Data;
 using PersonalFinanceApp.Models;
 using System;
+using System.Text.RegularExpressions;
 
 namespace PersonalFinanceApp.Services
 {
     public class AuthService
     {
+        // Basit e-posta format kontrolü için regex
+        private static readonly Regex EmailRegex = new Regex(
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+            RegexOptions.Compiled);
+
+        private const int MinPasswordLength = 6;
+
         /// <summary>
         /// Yeni kullanıcı kaydı oluşturur. Şifreyi BCrypt ile hash'leyerek kaydeder.
         /// </summary>
@@ -17,6 +25,18 @@ namespace PersonalFinanceApp.Services
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
                 errorMessage = "Tüm alanların doldurulması zorunludur.";
+                return false;
+            }
+
+            if (!EmailRegex.IsMatch(email))
+            {
+                errorMessage = "Geçerli bir e-posta adresi giriniz.";
+                return false;
+            }
+
+            if (password.Length < MinPasswordLength)
+            {
+                errorMessage = $"Şifre en az {MinPasswordLength} karakter olmalıdır.";
                 return false;
             }
 
@@ -36,7 +56,7 @@ namespace PersonalFinanceApp.Services
                         checkCmd.Parameters.AddWithValue("@username", username);
                         checkCmd.Parameters.AddWithValue("@email", email);
 
-                        long count = (long)(checkCmd.ExecuteScalar() ?? 0);
+                        long count = (long)(checkCmd.ExecuteScalar() ?? 0L);
                         if (count > 0)
                         {
                             errorMessage = "Bu kullanıcı adı veya e-posta adresi zaten kullanımda.";
@@ -88,7 +108,8 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT id, username, email, password_hash, created_at FROM users WHERE username = @input OR email = @input";
+                    // Not: kolon adı şemamıza uygun şekilde "user_id" olarak düzeltildi
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -97,7 +118,14 @@ namespace PersonalFinanceApp.Services
                         {
                             if (reader.Read())
                             {
-                                string storedHash = reader.GetString(3);
+                                // Magic number yerine kolon adına göre okuma (daha güvenli ve okunabilir)
+                                int idOrdinal = reader.GetOrdinal("user_id");
+                                int usernameOrdinal = reader.GetOrdinal("username");
+                                int emailOrdinal = reader.GetOrdinal("email");
+                                int passwordHashOrdinal = reader.GetOrdinal("password_hash");
+                                int createdAtOrdinal = reader.GetOrdinal("created_at");
+
+                                string storedHash = reader.GetString(passwordHashOrdinal);
 
                                 // BCrypt ile şifre doğrulama
                                 bool isPasswordValid = BCrypt.Net.BCrypt.Verify(password, storedHash);
@@ -106,11 +134,11 @@ namespace PersonalFinanceApp.Services
                                 {
                                     return new User
                                     {
-                                        Id = reader.GetInt32(0),
-                                        Username = reader.GetString(1),
-                                        Email = reader.GetString(2),
+                                        Id = reader.GetInt32(idOrdinal),
+                                        Username = reader.GetString(usernameOrdinal),
+                                        Email = reader.GetString(emailOrdinal),
                                         PasswordHash = storedHash,
-                                        CreatedAt = reader.GetDateTime(4)
+                                        CreatedAt = reader.GetDateTime(createdAtOrdinal)
                                     };
                                 }
                             }
