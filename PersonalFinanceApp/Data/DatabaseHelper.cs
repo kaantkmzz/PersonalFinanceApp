@@ -1,13 +1,12 @@
 ﻿using Npgsql;
+using PersonalFinanceApp.Helpers;
 using System;
 
 namespace PersonalFinanceApp.Data
 {
     public static class DatabaseHelper
     {
-        // ⚠️ DİKKAT: "Password=1234;" kısmındaki şifreyi PostgreSQL kurulumunda koyduğun şifreyle değiştir!
-        private static readonly string ConnectionString =
-            "Host=localhost;Port=5432;Database=PersonalFinanceDb;Username=postgres;Password=kaanderya0212;";
+        private static readonly string ConnectionString = ConfigReader.Load().ConnectionString;
 
         /// <summary>
         /// Veri tabanına yeni bir bağlantı nesnesi döndürür.
