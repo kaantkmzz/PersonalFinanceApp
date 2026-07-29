@@ -1,20 +1,28 @@
-﻿using System;
+﻿using System.Text.Json;
 
 namespace PersonalFinanceApp.Helpers
 {
-    public class ConfigReader
+    public class AppConfig
     {
         public string ConnectionString { get; set; } = string.Empty;
+    }
 
-        public static ConfigReader Load()
+    public static class ConfigReader
+    {
+        public static AppConfig Load()
         {
-            var conn = Environment.GetEnvironmentVariable("CONNECTION_STRING");
-            return new ConfigReader
-            {
-                ConnectionString = !string.IsNullOrEmpty(conn)
-                    ? conn
-                    : "Host=localhost;Username=postgres;Password=REDACTED;Database=postgres"
-            };
+            string path = Path.Combine(AppContext.BaseDirectory, "config.json");
+
+            if (!File.Exists(path))
+                throw new FileNotFoundException("config.json bulunamadı. Lütfen proje köküne ekleyin.");
+
+            string json = File.ReadAllText(path);
+            var config = JsonSerializer.Deserialize<AppConfig>(json);
+
+            if (config == null)
+                throw new InvalidOperationException("config.json okunamadı veya boş.");
+
+            return config;
         }
     }
 }
