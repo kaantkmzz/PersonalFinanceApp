@@ -16,7 +16,8 @@ namespace PersonalFinanceApp.Services
         private const int MinPasswordLength = 6;
 
         /// <summary>
-        /// Yeni kullanıcı kaydı oluşturur. Şifreyi BCrypt ile hash'leyerek kaydeder.
+        /// Yeni kullanıcı kaydı oluşturur. Şifreyi BCrypt ile hash'leyerek kaydeder
+        /// ve kullanıcı için varsayılan kategorileri otomatik oluşturur.
         /// </summary>
         public bool Register(string username, string email, string password, out string errorMessage)
         {
@@ -45,6 +46,8 @@ namespace PersonalFinanceApp.Services
 
             try
             {
+                int newUserId;
+
                 using (var conn = DatabaseHelper.GetConnection())
                 {
                     conn.Open();
@@ -64,10 +67,11 @@ namespace PersonalFinanceApp.Services
                         }
                     }
 
-                    // Yeni kullanıcı ekleme
+                    // Yeni kullanıcı ekleme — RETURNING ile eklenen satırın ID'sini geri alıyoruz
                     string insertQuery = @"
                         INSERT INTO users (username, email, password_hash, created_at) 
-                        VALUES (@username, @email, @passwordHash, @createdAt)";
+                        VALUES (@username, @email, @passwordHash, @createdAt)
+                        RETURNING user_id";
 
                     using (var insertCmd = new NpgsqlCommand(insertQuery, conn))
                     {
@@ -76,9 +80,13 @@ namespace PersonalFinanceApp.Services
                         insertCmd.Parameters.AddWithValue("@passwordHash", hashedPassword);
                         insertCmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow);
 
-                        insertCmd.ExecuteNonQuery();
+                        newUserId = (int)(insertCmd.ExecuteScalar() ?? 0);
                     }
                 }
+
+                // Kullanıcı başarıyla oluşturuldu, şimdi varsayılan kategorilerini ekleyelim
+                var categoryService = new CategoryService();
+                categoryService.CreateDefaultCategories(newUserId);
 
                 return true;
             }
@@ -108,7 +116,6 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    // Not: kolon adı şemamıza uygun şekilde "user_id" olarak düzeltildi
                     string selectQuery = "SELECT user_id, username, email, password_hash, created_at FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
@@ -118,7 +125,6 @@ namespace PersonalFinanceApp.Services
                         {
                             if (reader.Read())
                             {
-                                // Magic number yerine kolon adına göre okuma (daha güvenli ve okunabilir)
                                 int idOrdinal = reader.GetOrdinal("user_id");
                                 int usernameOrdinal = reader.GetOrdinal("username");
                                 int emailOrdinal = reader.GetOrdinal("email");
@@ -127,7 +133,6 @@ namespace PersonalFinanceApp.Services
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
-                                // BCrypt ile şifre doğrulama
                                 bool isPasswordValid = BCrypt.Net.BCrypt.Verify(password, storedHash);
 
                                 if (isPasswordValid)
