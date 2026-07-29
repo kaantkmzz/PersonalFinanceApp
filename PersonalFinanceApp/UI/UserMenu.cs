@@ -27,16 +27,13 @@ namespace PersonalFinanceApp.UI
                 switch (choice)
                 {
                     case "1":
-                        Console.WriteLine("\nGelir/Gider İşlemleri — yakında eklenecek.");
-                        Pause();
+                        TransactionMenu.Run(user);
                         break;
-                    case "2":
-                        Console.WriteLine("\nKategoriler — yakında eklenecek.");
-                        Pause();
+                    case "2": // Menünde kategori işlemleri hangi sıradaysa o case numarasını kullan
+                        CategoryMenu.Run(user);
                         break;
                     case "3":
-                        Console.WriteLine("\nAylık Rapor — yakında eklenecek.");
-                        Pause();
+                        ReportMenu.Run(user);
                         break;
                     case "4":
                         Console.WriteLine("\nTasarruf Hedefleri — yakında eklenecek.");
