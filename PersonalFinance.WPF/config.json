@@ -1,0 +1,3 @@
+{
+  "ConnectionString": "Host=localhost;Port=5432;Database=PersonalFinanceDb;Username=postgres;Password=admin123"
+}
