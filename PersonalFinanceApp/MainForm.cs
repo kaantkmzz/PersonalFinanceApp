@@ -6,15 +6,14 @@ namespace PersonalFinanceApp
     {
         private readonly User _user;
 
-        private Label lblWelcome = new Label();
-        private Button btnTransactions = new Button();
-        private Button btnCategories = new Button();
-        private Button btnReports = new Button();
-        private Button btnSavingsGoals = new Button();
-        private Button btnNotes = new Button();
-        private Button btnReminders = new Button();
-        private Button btnChangePassword = new Button();
-        private Button btnLogout = new Button();
+        private static readonly Color SidebarColor = Color.FromArgb(33, 37, 51);
+        private static readonly Color SidebarHoverColor = Color.FromArgb(52, 58, 79);
+        private static readonly Color DividerColor = Color.FromArgb(55, 60, 80);
+        private static readonly Color ContentBackColor = Color.FromArgb(230, 232, 242);
+        private static readonly Color LogoutColor = Color.FromArgb(230, 100, 100);
+
+        private Panel pnlSidebar = new Panel();
+        private Panel pnlContent = new Panel();
 
         public MainForm(User user)
         {
@@ -25,96 +24,159 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
-            this.AutoScaleMode = AutoScaleMode.None;
-            this.Font = new Font("Segoe UI", 9F);
             this.Text = "Kişisel Finans Takip Sistemi";
-            this.Width = 420;
-            this.Height = 560;
-            this.StartPosition = FormStartPosition.CenterScreen;
+            this.WindowState = FormWindowState.Maximized;
+            this.MinimumSize = new Size(1000, 650);
+            this.Font = new Font("Segoe UI", 9F);
+            this.BackColor = ContentBackColor;
 
-            lblWelcome.Text = $"Hoş geldin, {_user.Username}!";
-            lblWelcome.Left = 30;
-            lblWelcome.Top = 20;
-            lblWelcome.Width = 340;
-            lblWelcome.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblWelcome.AutoSize = true;
+            pnlSidebar.Dock = DockStyle.Left;
+            pnlSidebar.Width = 240;
+            pnlSidebar.BackColor = SidebarColor;
 
-            int buttonWidth = 340;
-            int buttonHeight = 40;
-            int startTop = 70;
-            int gap = 50;
+            Label lblLogo = new Label
+            {
+                Text = "Finans Takip",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Left = 20,
+                Top = 25,
+                AutoSize = true
+            };
+            pnlSidebar.Controls.Add(lblLogo);
 
-            SetupButton(btnTransactions, "Gelir / Gider İşlemleri", startTop, buttonWidth, buttonHeight);
-            SetupButton(btnCategories, "Kategoriler", startTop + gap, buttonWidth, buttonHeight);
-            SetupButton(btnReports, "Aylık Rapor", startTop + gap * 2, buttonWidth, buttonHeight);
-            SetupButton(btnSavingsGoals, "Tasarruf Hedefleri", startTop + gap * 3, buttonWidth, buttonHeight);
-            SetupButton(btnNotes, "Notlar", startTop + gap * 4, buttonWidth, buttonHeight);
-            SetupButton(btnReminders, "Hatırlatıcılar", startTop + gap * 5, buttonWidth, buttonHeight);
-            SetupButton(btnChangePassword, "Şifre Değiştir", startTop + gap * 6, buttonWidth, buttonHeight);
+            string[] menuItems =
+            {
+                "Gelir / Gider İşlemleri",
+                "Kategoriler",
+                "Aylık Rapor",
+                "Tasarruf Hedefleri",
+                "Notlar",
+                "Hatırlatıcılar",
+                "Şifre Değiştir"
+            };
 
-            btnLogout.Text = "Çıkış Yap";
-            btnLogout.Left = 30;
-            btnLogout.Top = startTop + gap * 7 + 10;
-            btnLogout.Width = buttonWidth;
-            btnLogout.Height = buttonHeight;
-            btnLogout.ForeColor = Color.DarkRed;
-            btnLogout.Click += BtnLogout_Click;
+            int menuTop = 90;
+            foreach (var item in menuItems)
+            {
+                Button btn = CreateSidebarButton(item, menuTop);
+                pnlSidebar.Controls.Add(btn);
 
-            btnTransactions.Click += BtnTransactions_Click;
-            btnCategories.Click += BtnCategories_Click;
-            btnReports.Click += BtnReports_Click;
-            btnSavingsGoals.Click += BtnPlaceholder_Click;
-            btnNotes.Click += BtnPlaceholder_Click;
-            btnReminders.Click += BtnPlaceholder_Click;
-            btnChangePassword.Click += BtnPlaceholder_Click;
+                Panel divider = new Panel
+                {
+                    Left = 20,
+                    Top = menuTop + 48,
+                    Width = 200,
+                    Height = 1,
+                    BackColor = DividerColor
+                };
+                pnlSidebar.Controls.Add(divider);
 
-            this.Controls.Add(lblWelcome);
-            this.Controls.Add(btnTransactions);
-            this.Controls.Add(btnCategories);
-            this.Controls.Add(btnReports);
-            this.Controls.Add(btnSavingsGoals);
-            this.Controls.Add(btnNotes);
-            this.Controls.Add(btnReminders);
-            this.Controls.Add(btnChangePassword);
-            this.Controls.Add(btnLogout);
+                menuTop += 55;
+            }
+
+            // Çıkış Yap artık en son menü öğesinin hemen altında
+            Button btnLogout = new Button
+            {
+                Text = "   Çıkış Yap",
+                TextAlign = ContentAlignment.MiddleLeft,
+                Left = 0,
+                Top = menuTop + 20,
+                Width = 240,
+                Height = 48,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = SidebarColor,
+                ForeColor = LogoutColor,
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.MouseEnter += (s, e) => btnLogout.BackColor = SidebarHoverColor;
+            btnLogout.MouseLeave += (s, e) => btnLogout.BackColor = SidebarColor;
+            btnLogout.Click += (s, e) => this.Close();
+            pnlSidebar.Controls.Add(btnLogout);
+
+            pnlContent.Dock = DockStyle.Fill;
+            pnlContent.BackColor = ContentBackColor;
+
+            ShowWelcomeContent();
+
+            this.Controls.Add(pnlContent);
+            this.Controls.Add(pnlSidebar);
         }
 
-        // Tekrarlanan buton kurulum kodunu tek bir yerde topluyoruz
-        private void SetupButton(Button btn, string text, int top, int width, int height)
+        private Button CreateSidebarButton(string text, int top)
         {
-            btn.Text = text;
-            btn.Left = 30;
-            btn.Top = top;
-            btn.Width = width;
-            btn.Height = height;
+            Button btn = new Button
+            {
+                Text = "   " + text,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Left = 0,
+                Top = top,
+                Width = 240,
+                Height = 48,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = SidebarColor,
+                ForeColor = Color.Gainsboro,
+                Font = new Font("Segoe UI", 10.5F),
+                Cursor = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderSize = 0;
+
+            btn.MouseEnter += (s, e) => btn.BackColor = SidebarHoverColor;
+            btn.MouseLeave += (s, e) => btn.BackColor = SidebarColor;
+            btn.Click += (s, e) => HandleMenuClick(text);
+
+            return btn;
         }
 
-        private void BtnTransactions_Click(object? sender, EventArgs e)
+        // Seçilen modülü, sağdaki içerik alanına gömer (yeni pencere açmak yerine)
+        private void ShowContent(Control control)
         {
-            // İleride TransactionForm buraya bağlanacak
-            MessageBox.Show("Gelir/Gider İşlemleri ekranı yakında eklenecek.", "Bilgi");
+            pnlContent.Controls.Clear();
+            control.Dock = DockStyle.Fill;
+            pnlContent.Controls.Add(control);
         }
 
-        private void BtnCategories_Click(object? sender, EventArgs e)
+        private void ShowWelcomeContent()
         {
-            // İleride CategoryForm buraya bağlanacak
-            MessageBox.Show("Kategoriler ekranı yakında eklenecek.", "Bilgi");
+            pnlContent.Controls.Clear();
+
+            Label lblWelcome = new Label
+            {
+                Text = $"Hoş geldin, {_user.Username}",
+                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 40, 40),
+                AutoSize = true,
+                Left = 50,
+                Top = 50
+            };
+
+            Label lblSubtitle = new Label
+            {
+                Text = "Sol menüden bir işlem seçerek başlayabilirsin.",
+                Font = new Font("Segoe UI", 11F),
+                ForeColor = Color.FromArgb(90, 90, 100),
+                AutoSize = true,
+                Left = 50,
+                Top = 120
+            };
+
+            pnlContent.Controls.Add(lblWelcome);
+            pnlContent.Controls.Add(lblSubtitle);
         }
 
-        private void BtnReports_Click(object? sender, EventArgs e)
+        private void HandleMenuClick(string menuText)
         {
-            // İleride ReportForm buraya bağlanacak
-            MessageBox.Show("Aylık Rapor ekranı yakında eklenecek.", "Bilgi");
-        }
-
-        private void BtnPlaceholder_Click(object? sender, EventArgs e)
-        {
-            MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
-        }
-
-        private void BtnLogout_Click(object? sender, EventArgs e)
-        {
-            this.Close();
+            switch (menuText)
+            {
+                case "Gelir / Gider İşlemleri":
+                    ShowContent(new TransactionControl(_user));
+                    break;
+                default:
+                    MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
+                    break;
+            }
         }
     }
 }

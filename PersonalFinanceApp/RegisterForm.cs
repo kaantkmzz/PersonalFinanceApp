@@ -6,6 +6,7 @@ namespace PersonalFinanceApp
     {
         private readonly AuthService _authService = new AuthService();
 
+        private Panel pnlCard = new Panel();
         private TextBox txtUsername = new TextBox();
         private TextBox txtEmail = new TextBox();
         private TextBox txtPassword = new TextBox();
@@ -20,56 +21,87 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
-            this.AutoScaleMode = AutoScaleMode.None;
-            this.Font = new Font("Segoe UI", 9F);
             this.Text = "Kayıt Ol";
-            this.Width = 460;
-            this.Height = 460;
-            this.StartPosition = FormStartPosition.CenterScreen;
+            this.WindowState = FormWindowState.Maximized;
+            this.MinimumSize = new Size(900, 600);
+            this.BackColor = Color.FromArgb(230, 232, 242);
+            this.Font = new Font("Segoe UI", 10F);
 
-            Label lblUsername = new Label { Text = "Kullanıcı Adı:", Left = 30, Top = 30, Width = 250, AutoSize = true };
-            txtUsername.Left = 30;
-            txtUsername.Top = 55;
-            txtUsername.Width = 340;
+            pnlCard.Width = 460;
+            pnlCard.Height = 460;
+            pnlCard.BackColor = Color.White;
+            pnlCard.BorderStyle = BorderStyle.FixedSingle;
 
-            Label lblEmail = new Label { Text = "E-posta:", Left = 30, Top = 95, Width = 250, AutoSize = true };
-            txtEmail.Left = 30;
-            txtEmail.Top = 120;
-            txtEmail.Width = 340;
+            Label lblTitle = new Label
+            {
+                Text = "Yeni Hesap Oluştur",
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 40, 40),
+                AutoSize = true,
+                Left = 40,
+                Top = 30
+            };
 
-            Label lblPassword = new Label { Text = "Şifre (en az 6 karakter):", Left = 30, Top = 160, Width = 250, AutoSize = true };
-            txtPassword.Left = 30;
-            txtPassword.Top = 185;
-            txtPassword.Width = 340;
+            Label lblUsername = new Label { Text = "Kullanıcı Adı:", Left = 40, Top = 90, Font = new Font("Segoe UI", 11F), AutoSize = true };
+            txtUsername.Left = 40;
+            txtUsername.Top = 115;
+            txtUsername.Width = 380;
+            txtUsername.Font = new Font("Segoe UI", 11F);
+
+            Label lblEmail = new Label { Text = "E-posta:", Left = 40, Top = 160, Font = new Font("Segoe UI", 11F), AutoSize = true };
+            txtEmail.Left = 40;
+            txtEmail.Top = 185;
+            txtEmail.Width = 380;
+            txtEmail.Font = new Font("Segoe UI", 11F);
+
+            Label lblPassword = new Label { Text = "Şifre (en az 6 karakter):", Left = 40, Top = 230, Font = new Font("Segoe UI", 11F), AutoSize = true };
+            txtPassword.Left = 40;
+            txtPassword.Top = 255;
+            txtPassword.Width = 380;
+            txtPassword.Font = new Font("Segoe UI", 11F);
             txtPassword.PasswordChar = '*';
 
             btnRegister.Text = "Kayıt Ol";
-            btnRegister.Left = 30;
-            btnRegister.Top = 230;
-            btnRegister.Width = 160;
-            btnRegister.Height = 35;
+            btnRegister.Left = 40;
+            btnRegister.Top = 305;
+            btnRegister.Width = 380;
+            btnRegister.Height = 42;
+            btnRegister.Font = new Font("Segoe UI", 10.5F);
             btnRegister.Click += BtnRegister_Click;
 
-            lblStatus.Left = 30;
-            lblStatus.Top = 275;
-            lblStatus.Width = 400;
-            lblStatus.Height = 60;
+            lblStatus.Left = 40;
+            lblStatus.Top = 360;
+            lblStatus.Width = 380;
+            lblStatus.Height = 80;
             lblStatus.ForeColor = Color.Red;
+            lblStatus.Font = new Font("Segoe UI", 9.5F);
+            lblStatus.TextAlign = ContentAlignment.MiddleCenter;
 
-            this.Controls.Add(lblUsername);
-            this.Controls.Add(txtUsername);
-            this.Controls.Add(lblEmail);
-            this.Controls.Add(txtEmail);
-            this.Controls.Add(lblPassword);
-            this.Controls.Add(txtPassword);
-            this.Controls.Add(btnRegister);
-            this.Controls.Add(lblStatus);
+            pnlCard.Controls.Add(lblTitle);
+            pnlCard.Controls.Add(lblUsername);
+            pnlCard.Controls.Add(txtUsername);
+            pnlCard.Controls.Add(lblEmail);
+            pnlCard.Controls.Add(txtEmail);
+            pnlCard.Controls.Add(lblPassword);
+            pnlCard.Controls.Add(txtPassword);
+            pnlCard.Controls.Add(btnRegister);
+            pnlCard.Controls.Add(lblStatus);
+
+            this.Controls.Add(pnlCard);
 
             this.AcceptButton = btnRegister;
             SetupEnterNavigation();
+
+            this.Resize += (s, e) => CenterCard();
+            CenterCard();
         }
 
-        // Enter tuşu ile alanlar arası geçişi ve son alanda kayıt işlemini tetikleme
+        private void CenterCard()
+        {
+            pnlCard.Left = (this.ClientSize.Width - pnlCard.Width) / 2;
+            pnlCard.Top = (this.ClientSize.Height - pnlCard.Height) / 2;
+        }
+
         private void SetupEnterNavigation()
         {
             txtUsername.PreviewKeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) e.IsInputKey = true; };

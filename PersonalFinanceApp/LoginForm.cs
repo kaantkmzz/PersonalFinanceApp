@@ -7,6 +7,7 @@ namespace PersonalFinanceApp
     {
         private readonly AuthService _authService = new AuthService();
 
+        private Panel pnlCard = new Panel();
         private TextBox txtUsernameOrEmail = new TextBox();
         private TextBox txtPassword = new TextBox();
         private Button btnLogin = new Button();
@@ -21,60 +22,74 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
-            this.AutoScaleMode = AutoScaleMode.None;
-            this.Font = new Font("Segoe UI", 9F);
             this.Text = "Kişisel Finans Takip Sistemi";
-            this.Width = 420;
-            this.Height = 320;
-            this.StartPosition = FormStartPosition.CenterScreen;
+            this.WindowState = FormWindowState.Maximized;
+            this.MinimumSize = new Size(900, 600);
+            this.BackColor = Color.FromArgb(230, 232, 242);
+            this.Font = new Font("Segoe UI", 10F);
 
-            int controlWidth = 340;
-            int centerLeft = (this.ClientSize.Width - controlWidth) / 2;
+            pnlCard.Width = 460;
+            pnlCard.Height = 380;
+            pnlCard.BackColor = Color.White;
+            pnlCard.BorderStyle = BorderStyle.FixedSingle;
 
-            Label lblUsername = new Label { Text = "Kullanıcı Adı / E-posta:", Left = centerLeft, Top = 30, Width = controlWidth, AutoSize = true };
-            txtUsernameOrEmail.Left = centerLeft;
-            txtUsernameOrEmail.Top = 55;
-            txtUsernameOrEmail.Width = controlWidth;
+            Label lblTitle = new Label
+            {
+                Text = "Kişisel Finans Takip Sistemi",
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 40, 40),
+                AutoSize = true,
+                Left = 40,
+                Top = 30
+            };
 
-            Label lblPassword = new Label { Text = "Şifre:", Left = centerLeft, Top = 95, Width = controlWidth, AutoSize = true };
-            txtPassword.Left = centerLeft;
-            txtPassword.Top = 120;
-            txtPassword.Width = controlWidth;
+            Label lblUsername = new Label { Text = "Kullanıcı Adı / E-posta:", Left = 40, Top = 90, Font = new Font("Segoe UI", 11F), AutoSize = true };
+            txtUsernameOrEmail.Left = 40;
+            txtUsernameOrEmail.Top = 115;
+            txtUsernameOrEmail.Width = 380;
+            txtUsernameOrEmail.Font = new Font("Segoe UI", 11F);
+
+            Label lblPassword = new Label { Text = "Şifre:", Left = 40, Top = 160, Font = new Font("Segoe UI", 11F), AutoSize = true };
+            txtPassword.Left = 40;
+            txtPassword.Top = 185;
+            txtPassword.Width = 380;
+            txtPassword.Font = new Font("Segoe UI", 11F);
             txtPassword.PasswordChar = '*';
 
-            int buttonWidth = 160;
-            int buttonGap = 20;
-            int totalButtonsWidth = buttonWidth * 2 + buttonGap;
-            int buttonsStartLeft = (this.ClientSize.Width - totalButtonsWidth) / 2;
-
             btnLogin.Text = "Giriş Yap";
-            btnLogin.Left = buttonsStartLeft;
-            btnLogin.Top = 165;
-            btnLogin.Width = buttonWidth;
-            btnLogin.Height = 35;
+            btnLogin.Left = 40;
+            btnLogin.Top = 235;
+            btnLogin.Width = 180;
+            btnLogin.Height = 42;
+            btnLogin.Font = new Font("Segoe UI", 10.5F);
             btnLogin.Click += BtnLogin_Click;
 
             btnGoToRegister.Text = "Kayıt Ol";
-            btnGoToRegister.Left = buttonsStartLeft + buttonWidth + buttonGap;
-            btnGoToRegister.Top = 165;
-            btnGoToRegister.Width = buttonWidth;
-            btnGoToRegister.Height = 35;
+            btnGoToRegister.Left = 240;
+            btnGoToRegister.Top = 235;
+            btnGoToRegister.Width = 180;
+            btnGoToRegister.Height = 42;
+            btnGoToRegister.Font = new Font("Segoe UI", 10.5F);
             btnGoToRegister.Click += BtnGoToRegister_Click;
 
-            lblStatus.Left = centerLeft;
-            lblStatus.Top = 215;
-            lblStatus.Width = controlWidth;
+            lblStatus.Left = 40;
+            lblStatus.Top = 295;
+            lblStatus.Width = 380;
             lblStatus.Height = 60;
             lblStatus.ForeColor = Color.Red;
+            lblStatus.Font = new Font("Segoe UI", 9.5F);
             lblStatus.TextAlign = ContentAlignment.MiddleCenter;
 
-            this.Controls.Add(lblUsername);
-            this.Controls.Add(txtUsernameOrEmail);
-            this.Controls.Add(lblPassword);
-            this.Controls.Add(txtPassword);
-            this.Controls.Add(btnLogin);
-            this.Controls.Add(btnGoToRegister);
-            this.Controls.Add(lblStatus);
+            pnlCard.Controls.Add(lblTitle);
+            pnlCard.Controls.Add(lblUsername);
+            pnlCard.Controls.Add(txtUsernameOrEmail);
+            pnlCard.Controls.Add(lblPassword);
+            pnlCard.Controls.Add(txtPassword);
+            pnlCard.Controls.Add(btnLogin);
+            pnlCard.Controls.Add(btnGoToRegister);
+            pnlCard.Controls.Add(lblStatus);
+
+            this.Controls.Add(pnlCard);
 
             this.AcceptButton = btnLogin;
 
@@ -98,6 +113,15 @@ namespace PersonalFinanceApp
                     btnLogin.PerformClick();
                 }
             };
+
+            this.Resize += (s, e) => CenterCard();
+            CenterCard();
+        }
+
+        private void CenterCard()
+        {
+            pnlCard.Left = (this.ClientSize.Width - pnlCard.Width) / 2;
+            pnlCard.Top = (this.ClientSize.Height - pnlCard.Height) / 2;
         }
 
         private void BtnLogin_Click(object? sender, EventArgs e)

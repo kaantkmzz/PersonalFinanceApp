@@ -37,19 +37,20 @@ namespace PersonalFinanceApp.Data
             return categories;
         }
 
-        public void Add(Category category)
+        public int Add(Category category)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "INSERT INTO categories (user_id, name, type) VALUES (@userId, @name, @type)";
+                string query = "INSERT INTO categories (user_id, name, type) VALUES (@userId, @name, @type) RETURNING category_id";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", category.UserId);
                     cmd.Parameters.AddWithValue("@name", category.Name);
                     cmd.Parameters.AddWithValue("@type", category.Type);
-                    cmd.ExecuteNonQuery();
+
+                    return (int)(cmd.ExecuteScalar() ?? 0);
                 }
             }
         }
