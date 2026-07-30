@@ -3,6 +3,7 @@ using PersonalFinanceApp.Data;
 using PersonalFinanceApp.Models;
 using System;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace PersonalFinanceApp.Services
 {
@@ -12,6 +13,50 @@ namespace PersonalFinanceApp.Services
         private static readonly Regex EmailRegex = new Regex(
             @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
             RegexOptions.Compiled);
+        private static readonly string[] CommonDomains =
+{
+    "gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "live.com"
+};
+
+        // İki kelime arasındaki "düzenleme mesafesini" (kaç harf farkı olduğunu) hesaplar
+        private static int LevenshteinDistance(string s, string t)
+        {
+            int[,] d = new int[s.Length + 1, t.Length + 1];
+            for (int i = 0; i <= s.Length; i++) d[i, 0] = i;
+            for (int j = 0; j <= t.Length; j++) d[0, j] = j;
+
+            for (int i = 1; i <= s.Length; i++)
+            {
+                for (int j = 1; j <= t.Length; j++)
+                {
+                    int cost = (s[i - 1] == t[j - 1]) ? 0 : 1;
+                    d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+                }
+            }
+            return d[s.Length, t.Length];
+        }
+
+        // Girilen e-postanın domain kısmı, bilinen bir sağlayıcıya (1-2 harf farkla) çok yakınsa öneri döndürür
+        private static string? SuggestDomainCorrection(string email)
+        {
+            int atIndex = email.LastIndexOf('@');
+            if (atIndex < 0 || atIndex == email.Length - 1) return null;
+
+            string domain = email.Substring(atIndex + 1).ToLower();
+
+            if (CommonDomains.Contains(domain)) return null; // zaten doğru yazılmış
+
+            foreach (var known in CommonDomains)
+            {
+                int distance = LevenshteinDistance(domain, known);
+                if (distance > 0 && distance <= 2)
+                {
+                    return known;
+                }
+            }
+
+            return null;
+        }
 
         private const int MinPasswordLength = 6;
 
@@ -32,6 +77,12 @@ namespace PersonalFinanceApp.Services
             if (!EmailRegex.IsMatch(email))
             {
                 errorMessage = "Geçerli bir e-posta adresi giriniz.";
+                return false;
+            }
+            string? domainSuggestion = SuggestDomainCorrection(email);
+            if (domainSuggestion != null)
+            {
+                errorMessage = $"'{email}' geçerli bir e-posta gibi görünmüyor. '{domainSuggestion}' mi demek istediniz?";
                 return false;
             }
 

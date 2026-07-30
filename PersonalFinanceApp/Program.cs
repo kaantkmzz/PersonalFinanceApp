@@ -1,3 +1,12 @@
-﻿using PersonalFinanceApp.UI;
-
-MainMenu.Run();
+﻿namespace PersonalFinanceApp
+{
+    internal static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            ApplicationConfiguration.Initialize();
+            Application.Run(new LoginForm());
+        }
+    }
+}
