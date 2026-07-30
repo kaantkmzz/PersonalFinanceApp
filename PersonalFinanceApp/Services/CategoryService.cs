@@ -81,5 +81,22 @@ namespace PersonalFinanceApp.Services
             _repository.Update(categoryId, userId, newName);
             return true;
         }
+        // İsme göre kategori arar; yoksa otomatik oluşturur (kullanıcı serbestçe kategori adı yazabilsin diye)
+        public Category GetOrCreateCategory(int userId, string name, string type)
+        {
+            var existing = GetUserCategoriesByType(userId, type)
+                .FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var newCategory = new Category { UserId = userId, Name = name, Type = type };
+            int newId = _repository.Add(newCategory);
+            newCategory.Id = newId;
+
+            return newCategory;
+        }
     }
 }
