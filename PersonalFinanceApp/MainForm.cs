@@ -1,16 +1,21 @@
 ﻿using PersonalFinanceApp.Models;
+using PersonalFinanceApp.Helpers;
 
 namespace PersonalFinanceApp
 {
     public partial class MainForm : Form
     {
         private readonly User _user;
+        private Button? _activeButton; 
+        private bool _isLoggingOut = false;
 
-        private static readonly Color SidebarColor = Color.FromArgb(33, 37, 51);
-        private static readonly Color SidebarHoverColor = Color.FromArgb(52, 58, 79);
-        private static readonly Color DividerColor = Color.FromArgb(55, 60, 80);
-        private static readonly Color ContentBackColor = Color.FromArgb(230, 232, 242);
-        private static readonly Color LogoutColor = Color.FromArgb(230, 100, 100);
+        private static readonly Color SidebarColor = Color.FromArgb(24, 27, 38);
+        private static readonly Color SidebarHoverColor = Color.FromArgb(45, 49, 68);
+        private static readonly Color ActiveColor = Color.FromArgb(99, 102, 241);
+        private static readonly Color DividerColor = Color.FromArgb(50, 54, 74);
+        private static readonly Color ContentBackColor = Color.FromArgb(31, 34, 48);
+        private static readonly Color LogoutColor = Color.FromArgb(230, 170, 100);
+        private static readonly Color ExitColor = Color.FromArgb(230, 100, 100);
 
         private Panel pnlSidebar = new Panel();
         private Panel pnlContent = new Panel();
@@ -24,6 +29,7 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             this.Text = "Kişisel Finans Takip Sistemi";
             this.WindowState = FormWindowState.Maximized;
             this.MinimumSize = new Size(1000, 650);
@@ -75,34 +81,60 @@ namespace PersonalFinanceApp
                 menuTop += 55;
             }
 
-            // Çıkış Yap artık en son menü öğesinin hemen altında
             Button btnLogout = new Button
             {
-                Text = "   Çıkış Yap",
+                Text = "   Oturumu Kapat",
                 TextAlign = ContentAlignment.MiddleLeft,
                 Left = 0,
                 Top = menuTop + 20,
                 Width = 240,
-                Height = 48,
+                Height = 44,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = SidebarColor,
                 ForeColor = LogoutColor,
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10.5F),
                 Cursor = Cursors.Hand
             };
             btnLogout.FlatAppearance.BorderSize = 0;
             btnLogout.MouseEnter += (s, e) => btnLogout.BackColor = SidebarHoverColor;
             btnLogout.MouseLeave += (s, e) => btnLogout.BackColor = SidebarColor;
-            btnLogout.Click += (s, e) => this.Close();
+            btnLogout.Click += (s, e) =>
+            {
+                _isLoggingOut = true;
+                RememberMeHelper.Clear();
+                this.Close();
+            };
             pnlSidebar.Controls.Add(btnLogout);
+
+            Button btnExit = new Button
+            {
+                Text = "   Çıkış Yap",
+                TextAlign = ContentAlignment.MiddleLeft,
+                Left = 0,
+                Top = menuTop + 66,
+                Width = 240,
+                Height = 44,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = SidebarColor,
+                ForeColor = ExitColor,
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnExit.FlatAppearance.BorderSize = 0;
+            btnExit.MouseEnter += (s, e) => btnExit.BackColor = SidebarHoverColor;
+            btnExit.MouseLeave += (s, e) => btnExit.BackColor = SidebarColor;
+            btnExit.Click += (s, e) => { _isLoggingOut = true; Application.Exit(); }; // uygulamayı tamamen kapatır
+            pnlSidebar.Controls.Add(btnExit);
 
             pnlContent.Dock = DockStyle.Fill;
             pnlContent.BackColor = ContentBackColor;
+            pnlContent.Padding = new Padding(30);
 
             ShowWelcomeContent();
 
             this.Controls.Add(pnlContent);
             this.Controls.Add(pnlSidebar);
+            this.FormClosing += MainForm_FormClosing;
         }
 
         private Button CreateSidebarButton(string text, int top)
@@ -123,14 +155,33 @@ namespace PersonalFinanceApp
             };
             btn.FlatAppearance.BorderSize = 0;
 
-            btn.MouseEnter += (s, e) => btn.BackColor = SidebarHoverColor;
-            btn.MouseLeave += (s, e) => btn.BackColor = SidebarColor;
-            btn.Click += (s, e) => HandleMenuClick(text);
+            // Fare üzerine gelince, sadece aktif (seçili) buton değilse renk değiştir
+            btn.MouseEnter += (s, e) => { if (btn != _activeButton) btn.BackColor = SidebarHoverColor; };
+            btn.MouseLeave += (s, e) => { if (btn != _activeButton) btn.BackColor = SidebarColor; };
+
+            btn.Click += (s, e) =>
+            {
+                SetActiveButton(btn);
+                HandleMenuClick(text);
+            };
 
             return btn;
         }
 
-        // Seçilen modülü, sağdaki içerik alanına gömer (yeni pencere açmak yerine)
+        // Hangi menü öğesinin şu an seçili/aktif olduğunu görsel olarak vurguluyoruz
+        private void SetActiveButton(Button btn)
+        {
+            if (_activeButton != null)
+            {
+                _activeButton.BackColor = SidebarColor;
+                _activeButton.ForeColor = Color.Gainsboro;
+            }
+
+            btn.BackColor = ActiveColor;
+            btn.ForeColor = Color.White;
+            _activeButton = btn;
+        }
+
         private void ShowContent(Control control)
         {
             pnlContent.Controls.Clear();
@@ -146,20 +197,20 @@ namespace PersonalFinanceApp
             {
                 Text = $"Hoş geldin, {_user.Username}",
                 Font = new Font("Segoe UI", 22F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White,
                 AutoSize = true,
-                Left = 50,
-                Top = 50
+                Left = 20,
+                Top = 20
             };
 
             Label lblSubtitle = new Label
             {
                 Text = "Sol menüden bir işlem seçerek başlayabilirsin.",
                 Font = new Font("Segoe UI", 11F),
-                ForeColor = Color.FromArgb(90, 90, 100),
+                ForeColor = Color.FromArgb(170, 173, 190),
                 AutoSize = true,
-                Left = 50,
-                Top = 120
+                Left = 20,
+                Top = 90
             };
 
             pnlContent.Controls.Add(lblWelcome);
@@ -173,9 +224,36 @@ namespace PersonalFinanceApp
                 case "Gelir / Gider İşlemleri":
                     ShowContent(new TransactionControl(_user));
                     break;
+                case "Aylık Rapor":
+                    ShowContent(new ReportControl(_user));
+                    break;
                 default:
                     MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
                     break;
+            }
+        }
+
+        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+        {
+            // Eğer kapatma işlemi bizim "Oturumu Kapat" ya da "Çıkış Yap" butonlarımızdan geldiyse, tekrar sormuyoruz
+            if (_isLoggingOut)
+            {
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "Uygulamadan çıkmak istediğinize emin misiniz?",
+                "Çıkış Onayı",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (result == DialogResult.No)
+            {
+                e.Cancel = true;
+            }
+            else
+            {
+                Environment.Exit(0);
             }
         }
     }
