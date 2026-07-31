@@ -8,8 +8,17 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly CategoryService _categoryService = new CategoryService();
+        private CheckBox chkHideAmounts = new CheckBox();
+        private List<Transaction> _cachedTransactions = new List<Transaction>();
+        private bool _amountsHidden = false;
 
-        private static readonly Color ContentBackColor = Color.FromArgb(230, 232, 242);
+        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
+        private static readonly Color TextLight = Color.White;
+        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
+        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
+        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static readonly Color IncomeColor = Color.FromArgb(60, 180, 110);
+        private static readonly Color ExpenseColor = Color.FromArgb(230, 100, 100);
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
@@ -36,72 +45,83 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
-            this.BackColor = ContentBackColor;
+            this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
-            // --- Üst panel: başlık + form alanları (sabit yükseklik) ---
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 220;
-            pnlTop.BackColor = ContentBackColor;
+            pnlTop.Height = 260;
+            pnlTop.BackColor = AppBackColor;
 
             Label lblTitle = new Label
             {
                 Text = "Gelir / Gider İşlemleri",
                 Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(40, 40, 40),
-                Left = 40,
-                Top = 20,
+                ForeColor = TextLight,
+                Left = 20,
+                Top = 15,
                 AutoSize = true
             };
 
-            Label lblType = new Label { Text = "Tip:", Left = 40, Top = 80, AutoSize = true };
-            cmbType.Left = 40;
+            Label lblType = new Label { Text = "Tip:", Left = 20, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            cmbType.Left = 20;
             cmbType.Top = 100;
             cmbType.Width = 140;
+            cmbType.Font = new Font("Segoe UI", 9.5F);
             cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbType.Items.Add("Gelir");
             cmbType.Items.Add("Gider");
             cmbType.SelectedIndex = 1;
             cmbType.SelectedIndexChanged += (s, e) => LoadCategorySuggestions();
 
-            Label lblCategory = new Label { Text = "Kategori:", Left = 200, Top = 80, AutoSize = true };
-            cmbCategory.Left = 200;
+            Label lblCategory = new Label { Text = "Kategori:", Left = 180, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            cmbCategory.Left = 180;
             cmbCategory.Top = 100;
             cmbCategory.Width = 200;
+            cmbCategory.Font = new Font("Segoe UI", 9.5F);
             cmbCategory.DropDownStyle = ComboBoxStyle.DropDown;
             cmbCategory.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cmbCategory.AutoCompleteSource = AutoCompleteSource.ListItems;
 
-            Label lblAmount = new Label { Text = "Tutar:", Left = 420, Top = 80, AutoSize = true };
-            txtAmount.Left = 420;
+            Label lblAmount = new Label { Text = "Tutar:", Left = 400, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            txtAmount.Left = 400;
             txtAmount.Top = 100;
             txtAmount.Width = 100;
+            txtAmount.Font = new Font("Segoe UI", 9.5F);
 
-            Label lblDate = new Label { Text = "Tarih:", Left = 540, Top = 80, AutoSize = true };
-            dtpDate.Left = 540;
+            Label lblDate = new Label { Text = "Tarih:", Left = 520, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            dtpDate.Left = 520;
             dtpDate.Top = 100;
             dtpDate.Width = 160;
+            dtpDate.Font = new Font("Segoe UI", 9.5F);
             dtpDate.Format = DateTimePickerFormat.Short;
             dtpDate.Value = DateTime.Today;
 
-            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 40, Top = 135, AutoSize = true };
-            txtDescription.Left = 40;
-            txtDescription.Top = 155;
+            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 150, ForeColor = TextMuted, AutoSize = true };
+            txtDescription.Left = 20;
+            txtDescription.Top = 180;
             txtDescription.Width = 500;
+            txtDescription.Font = new Font("Segoe UI", 9.5F);
 
             btnAdd.Text = "İşlem Ekle";
-            btnAdd.Left = 560;
-            btnAdd.Top = 153;
+            btnAdd.Left = 540;
+            btnAdd.Top = 178;
             btnAdd.Width = 140;
             btnAdd.Height = 30;
+            btnAdd.FlatStyle = FlatStyle.Flat;
+            btnAdd.FlatAppearance.BorderSize = 0;
+            btnAdd.BackColor = AccentColor;
+            btnAdd.ForeColor = Color.White;
+            btnAdd.Cursor = Cursors.Hand;
             btnAdd.Click += BtnAdd_Click;
 
-            lblStatus.Left = 40;
-            lblStatus.Top = 190;
+            lblStatus.Left = 20;
+            lblStatus.Top = 225;
             lblStatus.Width = 660;
             lblStatus.Height = 25;
-            lblStatus.ForeColor = Color.Red;
+            lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+            lblStatus.Font = new Font("Segoe UI", 9F);
 
             pnlTop.Controls.Add(lblTitle);
             pnlTop.Controls.Add(lblType);
@@ -117,37 +137,97 @@ namespace PersonalFinanceApp
             pnlTop.Controls.Add(btnAdd);
             pnlTop.Controls.Add(lblStatus);
 
-            // --- Orta panel: tablo, kalan alanı otomatik doldurur ---
+            // --- Orta panel: tablo ---
             pnlGrid.Dock = DockStyle.Fill;
-            pnlGrid.Padding = new Padding(40, 0, 40, 0);
-            pnlGrid.BackColor = ContentBackColor;
+            pnlGrid.Padding = new Padding(20, 0, 20, 0);
+            pnlGrid.BackColor = AppBackColor;
 
             dgvTransactions.Dock = DockStyle.Fill;
             dgvTransactions.ReadOnly = true;
             dgvTransactions.AllowUserToAddRows = false;
             dgvTransactions.AllowUserToDeleteRows = false;
+            dgvTransactions.AllowUserToResizeColumns = false;
+            dgvTransactions.AllowUserToResizeRows = false;
             dgvTransactions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvTransactions.MultiSelect = false;
             dgvTransactions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvTransactions.BackgroundColor = Color.White;
+            dgvTransactions.BorderStyle = BorderStyle.None;
+            dgvTransactions.RowHeadersVisible = false;
+            dgvTransactions.GridColor = Color.FromArgb(230, 230, 235);
+            dgvTransactions.Font = new Font("Segoe UI", 9.5F);
+            dgvTransactions.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 246, 250);
+            dgvTransactions.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(60, 60, 70);
+            dgvTransactions.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            dgvTransactions.ColumnHeadersHeight = 36;
+            dgvTransactions.EnableHeadersVisualStyles = false;
+            dgvTransactions.RowTemplate.Height = 30;
+            dgvTransactions.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 250, 253);
+
+            // Sert mor seçim rengini kaldırıp, hafif/nötr bir vurgu kullanıyoruz
+            dgvTransactions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(238, 239, 246);
+
+            dgvTransactions.DataBindingComplete += (s, e) =>
+            {
+                foreach (DataGridViewRow row in dgvTransactions.Rows)
+                {
+                    Color rowColor = row.Cells["Tip"].Value?.ToString() == "Gelir" ? IncomeColor : ExpenseColor;
+                    row.DefaultCellStyle.ForeColor = rowColor;
+                    row.DefaultCellStyle.SelectionForeColor = rowColor;
+                }
+            };
+
+            // Gelir satırlarını yeşil, gider satırlarını kırmızı yazı rengiyle gösteriyoruz
+            dgvTransactions.DataBindingComplete += (s, e) =>
+            {
+                foreach (DataGridViewRow row in dgvTransactions.Rows)
+                {
+                    if (row.Cells["Tip"].Value?.ToString() == "Gelir")
+                    {
+                        row.DefaultCellStyle.ForeColor = IncomeColor;
+                    }
+                    else
+                    {
+                        row.DefaultCellStyle.ForeColor = ExpenseColor;
+                    }
+                }
+            };
 
             pnlGrid.Controls.Add(dgvTransactions);
 
-            // --- Alt panel: silme butonu, hep en altta sabit ---
+            // --- Alt panel ---
             pnlBottom.Dock = DockStyle.Bottom;
             pnlBottom.Height = 60;
-            pnlBottom.BackColor = ContentBackColor;
+            pnlBottom.BackColor = AppBackColor;
 
             btnDelete.Text = "Seçili İşlemi Sil";
-            btnDelete.Left = 40;
+            btnDelete.Left = 20;
             btnDelete.Top = 12;
             btnDelete.Width = 160;
             btnDelete.Height = 35;
+            btnDelete.FlatStyle = FlatStyle.Flat;
+            btnDelete.FlatAppearance.BorderSize = 1;
+            btnDelete.FlatAppearance.BorderColor = DangerColor;
+            btnDelete.BackColor = AppBackColor;
+            btnDelete.ForeColor = DangerColor;
+            btnDelete.Cursor = Cursors.Hand;
             btnDelete.Click += BtnDelete_Click;
+            chkHideAmounts.Text = "Tutarları Gizle";
+            chkHideAmounts.Left = 200;
+            chkHideAmounts.Top = 20;
+            chkHideAmounts.AutoSize = true;
+            chkHideAmounts.ForeColor = TextMuted;
+            chkHideAmounts.CheckedChanged += (s, e) =>
+            {
+                _amountsHidden = chkHideAmounts.Checked;
+                RefreshGrid();
+            };
+
+            pnlBottom.Controls.Add(btnDelete);
+            pnlBottom.Controls.Add(chkHideAmounts);
 
             pnlBottom.Controls.Add(btnDelete);
 
-            // Sıra önemli: Fill önce, sonra Bottom, en son Top (WinForms docking mantığı için)
             this.Controls.Add(pnlGrid);
             this.Controls.Add(pnlBottom);
             this.Controls.Add(pnlTop);
@@ -175,17 +255,24 @@ namespace PersonalFinanceApp
             cmbCategory.AutoCompleteCustomSource = autoCompleteList;
         }
 
+
+
         private void LoadTransactions()
         {
-            var transactions = _transactionService.GetUserTransactions(_user.Id);
+            _cachedTransactions = _transactionService.GetUserTransactions(_user.Id);
+            RefreshGrid();
+        }
 
-            var displayList = transactions.Select(t => new
+        // Veritabanına tekrar gitmeden, sadece görünümü (gizli/açık) günceller
+        private void RefreshGrid()
+        {
+            var displayList = _cachedTransactions.Select(t => new
             {
                 ID = t.Id,
                 Tarih = t.TransactionDate.ToString("dd.MM.yyyy"),
                 Tip = t.Type == "income" ? "Gelir" : "Gider",
                 Kategori = t.CategoryName,
-                Tutar = t.Amount.ToString("0.00") + " ₺",
+                Tutar = _amountsHidden ? "••••••" : t.Amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR")) + " ₺",
                 Açıklama = t.Description
             }).ToList();
 
@@ -219,7 +306,7 @@ namespace PersonalFinanceApp
 
             if (success)
             {
-                lblStatus.ForeColor = Color.Green;
+                lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                 lblStatus.Text = "İşlem başarıyla eklendi.";
                 txtAmount.Clear();
                 txtDescription.Clear();
@@ -228,7 +315,7 @@ namespace PersonalFinanceApp
             }
             else
             {
-                lblStatus.ForeColor = Color.Red;
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                 lblStatus.Text = errorMessage;
             }
         }
@@ -237,12 +324,12 @@ namespace PersonalFinanceApp
         {
             if (dgvTransactions.CurrentRow == null)
             {
-                lblStatus.ForeColor = Color.Red;
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                 lblStatus.Text = "Lütfen silmek için bir işlem seçin.";
                 return;
             }
 
-            int transactionId = (int)dgvTransactions.CurrentRow.Cells["ID"].Value;
+            int transactionId = Convert.ToInt32(dgvTransactions.CurrentRow.Cells["ID"].Value);
 
             var confirm = MessageBox.Show("Bu işlemi silmek istediğinize emin misiniz?", "Onay",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -253,13 +340,13 @@ namespace PersonalFinanceApp
 
                 if (success)
                 {
-                    lblStatus.ForeColor = Color.Green;
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                     lblStatus.Text = "İşlem silindi.";
                     LoadTransactions();
                 }
                 else
                 {
-                    lblStatus.ForeColor = Color.Red;
+                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                     lblStatus.Text = errorMessage;
                 }
             }

@@ -6,10 +6,17 @@ namespace PersonalFinanceApp
     {
         private readonly AuthService _authService = new AuthService();
 
+        private static readonly Color AppBackColor = Color.FromArgb(24, 27, 38);
+        private static readonly Color CardBackColor = Color.FromArgb(37, 41, 59);
+        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
+        private static readonly Color TextLight = Color.White;
+        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
+
         private Panel pnlCard = new Panel();
         private TextBox txtUsername = new TextBox();
         private TextBox txtEmail = new TextBox();
         private TextBox txtPassword = new TextBox();
+        private CheckBox chkShowPassword = new CheckBox();
         private Button btnRegister = new Button();
         private Label lblStatus = new Label();
 
@@ -21,59 +28,92 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Text = "Kayıt Ol";
             this.WindowState = FormWindowState.Maximized;
             this.MinimumSize = new Size(900, 600);
-            this.BackColor = Color.FromArgb(230, 232, 242);
+            this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 10F);
 
-            pnlCard.Width = 460;
-            pnlCard.Height = 460;
-            pnlCard.BackColor = Color.White;
-            pnlCard.BorderStyle = BorderStyle.FixedSingle;
+            // --- Sol üstte, LoginForm'a geri dönüş linki ---
+            Button btnBackToLogin = new Button
+            {
+                Text = "← Giriş Ekranına Dön",
+                Left = 30,
+                Top = 25,
+                Width = 200,
+                Height = 32,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = AppBackColor,
+                ForeColor = TextMuted,
+                Font = new Font("Segoe UI", 9.5F),
+                Cursor = Cursors.Hand
+            };
+            btnBackToLogin.FlatAppearance.BorderSize = 0;
+            btnBackToLogin.Click += (s, e) => this.Close();
+            this.Controls.Add(btnBackToLogin);
+
+            pnlCard.Width = 520;
+            pnlCard.Height = 520;
+            pnlCard.BackColor = CardBackColor;
 
             Label lblTitle = new Label
             {
                 Text = "Yeni Hesap Oluştur",
-                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(40, 40, 40),
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = TextLight,
                 AutoSize = true,
-                Left = 40,
-                Top = 30
+                Left = 45,
+                Top = 35
             };
 
-            Label lblUsername = new Label { Text = "Kullanıcı Adı:", Left = 40, Top = 90, Font = new Font("Segoe UI", 11F), AutoSize = true };
-            txtUsername.Left = 40;
-            txtUsername.Top = 115;
-            txtUsername.Width = 380;
+            Label lblUsername = new Label { Text = "Kullanıcı Adı:", Left = 45, Top = 100, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, AutoSize = true };
+            txtUsername.Left = 45;
+            txtUsername.Top = 135;
+            txtUsername.Width = 430;
             txtUsername.Font = new Font("Segoe UI", 11F);
 
-            Label lblEmail = new Label { Text = "E-posta:", Left = 40, Top = 160, Font = new Font("Segoe UI", 11F), AutoSize = true };
-            txtEmail.Left = 40;
-            txtEmail.Top = 185;
-            txtEmail.Width = 380;
+            Label lblEmail = new Label { Text = "E-posta:", Left = 45, Top = 180, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, AutoSize = true };
+            txtEmail.Left = 45;
+            txtEmail.Top = 210;
+            txtEmail.Width = 430;
             txtEmail.Font = new Font("Segoe UI", 11F);
 
-            Label lblPassword = new Label { Text = "Şifre (en az 6 karakter):", Left = 40, Top = 230, Font = new Font("Segoe UI", 11F), AutoSize = true };
-            txtPassword.Left = 40;
-            txtPassword.Top = 255;
-            txtPassword.Width = 380;
+            Label lblPassword = new Label { Text = "Şifre (en az 6 karakter):", Left = 45, Top = 255, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, AutoSize = true };
+            txtPassword.Left = 45;
+            txtPassword.Top = 285;
+            txtPassword.Width = 430;
             txtPassword.Font = new Font("Segoe UI", 11F);
             txtPassword.PasswordChar = '*';
 
+            chkShowPassword.Text = "Şifreyi göster";
+            chkShowPassword.Left = 45;
+            chkShowPassword.Top = 320;
+            chkShowPassword.AutoSize = true;
+            chkShowPassword.ForeColor = TextMuted;
+            chkShowPassword.CheckedChanged += (s, e) =>
+            {
+                txtPassword.PasswordChar = chkShowPassword.Checked ? '\0' : '*';
+            };
+
             btnRegister.Text = "Kayıt Ol";
-            btnRegister.Left = 40;
-            btnRegister.Top = 305;
-            btnRegister.Width = 380;
-            btnRegister.Height = 42;
+            btnRegister.Left = 45;
+            btnRegister.Top = 360;
+            btnRegister.Width = 430;
+            btnRegister.Height = 44;
             btnRegister.Font = new Font("Segoe UI", 10.5F);
+            btnRegister.FlatStyle = FlatStyle.Flat;
+            btnRegister.FlatAppearance.BorderSize = 0;
+            btnRegister.BackColor = AccentColor;
+            btnRegister.ForeColor = Color.White;
+            btnRegister.Cursor = Cursors.Hand;
             btnRegister.Click += BtnRegister_Click;
 
-            lblStatus.Left = 40;
-            lblStatus.Top = 360;
-            lblStatus.Width = 380;
-            lblStatus.Height = 80;
-            lblStatus.ForeColor = Color.Red;
+            lblStatus.Left = 45;
+            lblStatus.Top = 415;
+            lblStatus.Width = 430;
+            lblStatus.Height = 90;
+            lblStatus.ForeColor = Color.FromArgb(255, 120, 120);
             lblStatus.Font = new Font("Segoe UI", 9.5F);
             lblStatus.TextAlign = ContentAlignment.MiddleCenter;
 
@@ -84,6 +124,7 @@ namespace PersonalFinanceApp
             pnlCard.Controls.Add(txtEmail);
             pnlCard.Controls.Add(lblPassword);
             pnlCard.Controls.Add(txtPassword);
+            pnlCard.Controls.Add(chkShowPassword);
             pnlCard.Controls.Add(btnRegister);
             pnlCard.Controls.Add(lblStatus);
 
@@ -147,12 +188,12 @@ namespace PersonalFinanceApp
 
             if (success)
             {
-                lblStatus.ForeColor = Color.Green;
-                lblStatus.Text = "Kayıt başarılı! Bu pencereyi kapatıp giriş yapabilirsiniz.";
+                lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                lblStatus.Text = "Kayıt başarılı! Giriş ekranına dönüp giriş yapabilirsiniz.";
             }
             else
             {
-                lblStatus.ForeColor = Color.Red;
+                lblStatus.ForeColor = Color.FromArgb(255, 120, 120);
                 lblStatus.Text = errorMessage;
             }
         }
