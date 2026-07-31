@@ -227,6 +227,9 @@ namespace PersonalFinanceApp
                 case "Aylık Rapor":
                     ShowContent(new ReportControl(_user));
                     break;
+                case "Kategoriler":
+                    ShowContent(new CategoryControl(_user));
+                    break;
                 default:
                     MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
                     break;
