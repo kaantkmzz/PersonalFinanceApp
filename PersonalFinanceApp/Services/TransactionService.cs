@@ -7,14 +7,17 @@ namespace PersonalFinanceApp.Services
     {
         private readonly TransactionRepository _repository = new TransactionRepository();
         private readonly CategoryRepository _categoryRepository = new CategoryRepository();
+        private readonly AccountService _accountService = new AccountService();   // ← BURAYA TAŞINDI
 
         public List<Transaction> GetUserTransactions(int userId)
         {
             return _repository.GetByUserId(userId);
         }
 
+        
+
         public bool AddTransaction(int userId, int categoryId, decimal amount, string type,
-            string? description, DateTime transactionDate, out string errorMessage)
+    string? description, out string errorMessage)
         {
             errorMessage = string.Empty;
 
@@ -30,7 +33,6 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            // Kategorinin gerçekten bu kullanıcıya ait olduğunu ve tipinin uyuştuğunu doğruluyoruz
             var userCategories = _categoryRepository.GetByUserId(userId);
             var category = userCategories.FirstOrDefault(c => c.Id == categoryId);
 
@@ -46,6 +48,17 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
+            // Gider ise, cüzdanda yeterli bakiye var mı kontrol ediyoruz
+            if (type == "expense")
+            {
+                var (wallet, _) = _accountService.GetBalances(userId);
+                if (amount > wallet)
+                {
+                    errorMessage = "Cüzdanınızda yeterli bakiye yok.";
+                    return false;
+                }
+            }
+
             var transaction = new Transaction
             {
                 UserId = userId,
@@ -53,10 +66,14 @@ namespace PersonalFinanceApp.Services
                 Amount = amount,
                 Type = type,
                 Description = description,
-                TransactionDate = transactionDate
+                TransactionDate = DateTime.Today
             };
 
             _repository.Add(transaction);
+
+            decimal delta = type == "income" ? amount : -amount;
+            _accountService.AdjustWalletBalance(userId, delta);
+
             return true;
         }
 
@@ -72,7 +89,16 @@ namespace PersonalFinanceApp.Services
             }
 
             _repository.Delete(transactionId, userId);
+
+            decimal delta = existing.Type == "income" ? -existing.Amount : existing.Amount;
+            _accountService.AdjustWalletBalance(userId, delta);
+
             return true;
+        }
+
+        public Dictionary<int, decimal> GetCategoryTotals(int userId)
+        {
+            return _repository.GetTotalsByCategory(userId);
         }
 
         public bool UpdateTransaction(int transactionId, int userId, int categoryId, decimal amount,

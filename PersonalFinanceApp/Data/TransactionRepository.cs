@@ -223,5 +223,38 @@ namespace PersonalFinanceApp.Data
 
             return results;
         }
+
+        // Her kategori için, o kategoriye ait tüm işlemlerin toplam tutarını hesaplar
+        public Dictionary<int, decimal> GetTotalsByCategory(int userId)
+        {
+            var totals = new Dictionary<int, decimal>();
+
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+            SELECT category_id, SUM(amount) AS total
+            FROM transactions
+            WHERE user_id = @userId
+            GROUP BY category_id";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            int categoryId = reader.GetInt32(reader.GetOrdinal("category_id"));
+                            decimal total = reader.GetDecimal(reader.GetOrdinal("total"));
+                            totals[categoryId] = total;
+                        }
+                    }
+                }
+            }
+
+            return totals;
+        }
     }
 }

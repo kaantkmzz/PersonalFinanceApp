@@ -83,8 +83,8 @@ namespace PersonalFinanceApp
             txtPassword.Left = 45;
             txtPassword.Top = 285;
             txtPassword.Width = 430;
+            txtPassword.UseSystemPasswordChar = true;
             txtPassword.Font = new Font("Segoe UI", 11F);
-            txtPassword.PasswordChar = '*';
 
             chkShowPassword.Text = "Şifreyi göster";
             chkShowPassword.Left = 45;
@@ -93,7 +93,7 @@ namespace PersonalFinanceApp
             chkShowPassword.ForeColor = TextMuted;
             chkShowPassword.CheckedChanged += (s, e) =>
             {
-                txtPassword.PasswordChar = chkShowPassword.Checked ? '\0' : '*';
+                txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
             };
 
             btnRegister.Text = "Kayıt Ol";

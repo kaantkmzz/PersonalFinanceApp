@@ -8,6 +8,7 @@ namespace PersonalFinanceApp
     {
         private readonly User _user;
         private readonly ReportService _reportService = new ReportService();
+        private readonly AccountService _accountService = new AccountService();
 
         private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
         private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
@@ -16,18 +17,25 @@ namespace PersonalFinanceApp
         private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
         private static readonly Color IncomeColor = Color.FromArgb(60, 180, 110);
         private static readonly Color ExpenseColor = Color.FromArgb(230, 100, 100);
+        private static readonly Color WalletColor = Color.FromArgb(120, 220, 150);
+        private static readonly Color SafeColor = Color.FromArgb(120, 180, 255);
+        private static readonly Color IdleColor = Color.FromArgb(230, 200, 80);
+        private static readonly Color SliceBorderColor = Color.FromArgb(24, 26, 38);
 
         private ComboBox cmbMonth = new ComboBox();
         private NumericUpDown nudYear = new NumericUpDown();
         private Button btnView = new Button();
+        private Button btnExportReport = new Button();
+        private MonthlyReport? _currentReport;
 
         private Label lblIncome = new Label();
         private Label lblExpense = new Label();
         private Label lblNet = new Label();
-        private Label lblTopCategory = new Label();
+        private Label lblWalletBalance = new Label();
+        private Label lblSafeBalance = new Label();
 
-        private FlowLayoutPanel pnlMessages = new FlowLayoutPanel();
         private Chart chart = new Chart();
+        private int _hoveredPointIndex = -1;
 
         public ReportControl(User user)
         {
@@ -41,12 +49,21 @@ namespace PersonalFinanceApp
         {
             this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1400, 800);
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
+            // --- Sol taraf: başlık + grafik, kalan alanı otomatik dolduruyor ---
+            Panel pnlLeft = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = AppBackColor,
+                Padding = new Padding(20, 70, 20, 20)
+            };
+
             Label lblTitle = new Label
             {
-                Text = "Aylık Rapor",
+                Text = "Rapor",
                 Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = TextLight,
                 Left = 20,
@@ -54,58 +71,12 @@ namespace PersonalFinanceApp
                 AutoSize = true
             };
 
-            string[] months = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
-            cmbMonth.Items.AddRange(months);
-            cmbMonth.SelectedIndex = DateTime.Today.Month - 1;
-            cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbMonth.Left = 20;
-            cmbMonth.Top = 70;
-            cmbMonth.Width = 140;
-
-            nudYear.Minimum = 2000;
-            nudYear.Maximum = 2100;
-            nudYear.Value = DateTime.Today.Year;
-            nudYear.Left = 170;
-            nudYear.Top = 70;
-            nudYear.Width = 90;
-
-            btnView.Text = "Görüntüle";
-            btnView.Left = 280;
-            btnView.Top = 68;
-            btnView.Width = 120;
-            btnView.Height = 30;
-            btnView.FlatStyle = FlatStyle.Flat;
-            btnView.FlatAppearance.BorderSize = 0;
-            btnView.BackColor = AccentColor;
-            btnView.ForeColor = Color.White;
-            btnView.Cursor = Cursors.Hand;
-            btnView.Click += (s, e) => LoadReport();
-
-            Panel pnlSummary = new Panel { Left = 20, Top = 115, Width = 500, Height = 110, BackColor = CardBackColor };
-            lblIncome.Left = 20; lblIncome.Top = 15; lblIncome.AutoSize = true; lblIncome.ForeColor = IncomeColor; lblIncome.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            lblExpense.Left = 20; lblExpense.Top = 45; lblExpense.AutoSize = true; lblExpense.ForeColor = ExpenseColor; lblExpense.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            lblNet.Left = 20; lblNet.Top = 75; lblNet.AutoSize = true; lblNet.ForeColor = TextLight; lblNet.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            lblTopCategory.Left = 260; lblTopCategory.Top = 15; lblTopCategory.AutoSize = true; lblTopCategory.ForeColor = TextMuted; lblTopCategory.Font = new Font("Segoe UI", 9.5F); lblTopCategory.MaximumSize = new Size(220, 0);
-            pnlSummary.Controls.Add(lblIncome);
-            pnlSummary.Controls.Add(lblExpense);
-            pnlSummary.Controls.Add(lblNet);
-            pnlSummary.Controls.Add(lblTopCategory);
-
-            Label lblMessagesTitle = new Label { Text = "Geçen Aya Göre Değişimler", Left = 20, Top = 240, AutoSize = true, ForeColor = TextLight, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
-            pnlMessages.Left = 20;
-            pnlMessages.Top = 270;
-            pnlMessages.Width = 500;
-            pnlMessages.Height = 220;
-            pnlMessages.FlowDirection = FlowDirection.TopDown;
-            pnlMessages.WrapContents = false;
-            pnlMessages.AutoScroll = true;
-            pnlMessages.BackColor = AppBackColor;
-
-            chart.Left = 540;
-            chart.Top = 70;
-            chart.Width = 420;
-            chart.Height = 420;
+            chart.Size = new Size(600, 500);
+            chart.Dock = DockStyle.Fill;
             chart.BackColor = AppBackColor;
+            chart.MouseMove += Chart_MouseMove;
+            chart.MouseLeave += (s, e) => ClearHover();
+            chart.MouseClick += Chart_MouseClick;
 
             ChartArea chartArea = new ChartArea("main");
             chartArea.BackColor = AppBackColor;
@@ -114,14 +85,103 @@ namespace PersonalFinanceApp
             Legend legend = new Legend("legend") { BackColor = AppBackColor, ForeColor = TextLight, Docking = Docking.Bottom };
             chart.Legends.Add(legend);
 
-            this.Controls.Add(lblTitle);
-            this.Controls.Add(cmbMonth);
-            this.Controls.Add(nudYear);
-            this.Controls.Add(btnView);
-            this.Controls.Add(pnlSummary);
-            this.Controls.Add(lblMessagesTitle);
-            this.Controls.Add(pnlMessages);
-            this.Controls.Add(chart);
+            pnlLeft.Controls.Add(chart);
+            pnlLeft.Controls.Add(lblTitle);
+
+            // --- Sağ taraf: tarih + özet kartlar, sabit genişlikte, hep sağda kalır ---
+            Panel pnlRight = new Panel
+            {
+                Dock = DockStyle.Right,
+                Width = 460,
+                BackColor = AppBackColor,
+                Padding = new Padding(20, 15, 20, 20)
+            };
+
+            string[] months = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
+            cmbMonth.Items.AddRange(months);
+            cmbMonth.SelectedIndex = DateTime.Today.Month - 1;
+            cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbMonth.Left = 0;
+            cmbMonth.Top = 0;
+            cmbMonth.Width = 130;
+
+            nudYear.Minimum = 2000;
+            nudYear.Maximum = 2100;
+            nudYear.Value = DateTime.Today.Year;
+            nudYear.Left = 140;
+            nudYear.Top = 0;
+            nudYear.Width = 90;
+
+            btnView.Text = "Görüntüle";
+            btnView.Left = 240;
+            btnView.Top = -2;
+            btnView.Width = 110;
+            btnView.Height = 30;
+            btnView.FlatStyle = FlatStyle.Flat;
+            btnView.FlatAppearance.BorderSize = 0;
+            btnView.BackColor = AccentColor;
+            btnView.ForeColor = Color.White;
+            btnView.Cursor = Cursors.Hand;
+            btnView.Click += (s, e) => LoadReport();
+
+            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 50, IncomeColor, lblIncome);
+            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 50, ExpenseColor, lblExpense);
+            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 155, TextLight, lblNet);
+            Panel cardWallet = CreateSummaryCard("Cüzdan", 210, 155, WalletColor, lblWalletBalance);
+            Panel cardSafe = CreateSummaryCard("Kasa", 0, 260, SafeColor, lblSafeBalance);
+            
+            btnExportReport.Text = "Raporu CSV'ye Aktar";
+            btnExportReport.Left = 0;
+            btnExportReport.Top = 360;
+            btnExportReport.Width = 405;
+            btnExportReport.Height = 34;
+            btnExportReport.FlatStyle = FlatStyle.Flat;
+            btnExportReport.FlatAppearance.BorderSize = 1;
+            btnExportReport.FlatAppearance.BorderColor = TextMuted;
+            btnExportReport.BackColor = AppBackColor;
+            btnExportReport.ForeColor = TextLight;
+            btnExportReport.Cursor = Cursors.Hand;
+            btnExportReport.Click += BtnExportReport_Click;
+
+            pnlRight.Controls.Add(cmbMonth);
+            pnlRight.Controls.Add(nudYear);
+            pnlRight.Controls.Add(btnView);
+            pnlRight.Controls.Add(cardIncome);
+            pnlRight.Controls.Add(cardExpense);
+            pnlRight.Controls.Add(cardNet);
+            pnlRight.Controls.Add(cardWallet);
+            pnlRight.Controls.Add(cardSafe);
+            pnlRight.Controls.Add(btnExportReport);
+
+            // Sıra önemli: önce Fill (sol), sonra Right (sağ) — böylece sağ blok sabit genişliğini korur, sol kalanı doldurur
+            this.Controls.Add(pnlLeft);
+            this.Controls.Add(pnlRight);
+        }
+
+        private Panel CreateSummaryCard(string title, int left, int top, Color valueColor, Label valueLabel)
+        {
+            Panel card = new Panel { Left = left, Top = top, Width = 195, Height = 90, BackColor = CardBackColor };
+
+            Label lblCardTitle = new Label
+            {
+                Text = title,
+                Left = 15,
+                Top = 14,
+                AutoSize = true,
+                ForeColor = TextMuted,
+                Font = new Font("Segoe UI", 9F)
+            };
+
+            valueLabel.Left = 15;
+            valueLabel.Top = 40;
+            valueLabel.AutoSize = true;
+            valueLabel.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+            valueLabel.ForeColor = valueColor;
+
+            card.Controls.Add(lblCardTitle);
+            card.Controls.Add(valueLabel);
+
+            return card;
         }
 
         private void LoadReport()
@@ -130,64 +190,154 @@ namespace PersonalFinanceApp
             int month = cmbMonth.SelectedIndex + 1;
 
             var current = _reportService.GenerateMonthlyReport(_user.Id, year, month);
-            var previous = _reportService.GetPreviousMonthReport(_user.Id, year, month);
-
+            _currentReport = current;
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            lblIncome.Text = $"Toplam Gelir: {current.TotalIncome.ToString("#,##0", tr)} ₺";
-            lblExpense.Text = $"Toplam Gider: {current.TotalExpense.ToString("#,##0", tr)} ₺";
-            lblNet.Text = $"Net Bakiye: {current.NetBalance.ToString("#,##0", tr)} ₺";
+            lblIncome.Text = current.TotalIncome.ToString("#,##0", tr) + " ₺";
+            lblExpense.Text = current.TotalExpense.ToString("#,##0", tr) + " ₺";
+            lblNet.Text = current.NetBalance.ToString("#,##0", tr) + " ₺";
 
-            var topCategory = _reportService.GetTopExpenseCategory(current);
-            if (topCategory != null && current.TotalExpense > 0)
-            {
-                double pct = (double)(topCategory.TotalAmount / current.TotalExpense) * 100;
-                lblTopCategory.Text = $"En çok harcanan:\n{topCategory.CategoryName} (%{pct:0.0})";
-            }
-            else
-            {
-                lblTopCategory.Text = "Bu ay gider kaydı yok.";
-            }
+            var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            lblWalletBalance.Text = wallet.ToString("#,##0", tr) + " ₺";
+            lblSafeBalance.Text = safe.ToString("#,##0", tr) + " ₺";
 
-            pnlMessages.Controls.Clear();
-            var messages = _reportService.GetComparisonMessages(current, previous);
-
-            if (messages.Count == 0)
-            {
-                pnlMessages.Controls.Add(new Label
-                {
-                    Text = "Anlamlı bir değişiklik tespit edilmedi.",
-                    ForeColor = TextMuted,
-                    AutoSize = true
-                });
-            }
-            else
-            {
-                foreach (var msg in messages)
-                {
-                    pnlMessages.Controls.Add(new Label
-                    {
-                        Text = "• " + msg,
-                        ForeColor = TextMuted,
-                        AutoSize = true,
-                        MaximumSize = new Size(480, 0),
-                        Margin = new Padding(0, 0, 0, 8)
-                    });
-                }
-            }
-
+            _hoveredPointIndex = -1;
             chart.Series.Clear();
-            if (current.ExpenseBreakdown.Count > 0)
+
+            Series series = new Series("İşlemler") { ChartType = SeriesChartType.Pie };
+            series["PieLabelStyle"] = "Inside";
+            series.Label = "#PERCENT{P0}";
+            series.LabelForeColor = Color.White;
+
+            decimal categorySum = 0;
+
+            foreach (var item in current.IncomeBreakdown)
             {
-                Series series = new Series("Giderler") { ChartType = SeriesChartType.Pie };
-                foreach (var item in current.ExpenseBreakdown)
+                int index = series.Points.AddXY(item.CategoryName, item.TotalAmount);
+                series.Points[index].Color = IncomeColor;
+                series.Points[index].BorderColor = SliceBorderColor;
+                series.Points[index].BorderWidth = 2;
+                categorySum += item.TotalAmount;
+            }
+
+            foreach (var item in current.ExpenseBreakdown)
+            {
+                int index = series.Points.AddXY(item.CategoryName, item.TotalAmount);
+                series.Points[index].Color = ExpenseColor;
+                series.Points[index].BorderColor = SliceBorderColor;
+                series.Points[index].BorderWidth = 2;
+                categorySum += item.TotalAmount;
+            }
+
+            decimal idle = wallet - categorySum;
+            if (idle < 0) idle = 0;
+
+            if (idle > 0 || series.Points.Count == 0)
+            {
+                int idleIndex = series.Points.AddXY("Boşta", idle);
+                series.Points[idleIndex].Color = IdleColor;
+                series.Points[idleIndex].BorderColor = SliceBorderColor;
+                series.Points[idleIndex].BorderWidth = 2;
+            }
+
+            series.ChartArea = "main";
+            series.Legend = "legend";
+            chart.Series.Add(series);
+        }
+
+        private void Chart_MouseMove(object? sender, MouseEventArgs e)
+        {
+            var result = chart.HitTest(e.X, e.Y);
+            int newIndex = (result.ChartElementType == ChartElementType.DataPoint && result.Series != null) ? result.PointIndex : -1;
+
+            if (newIndex == _hoveredPointIndex) return;
+
+            var series = chart.Series.FirstOrDefault();
+            if (series == null) return;
+
+            if (_hoveredPointIndex >= 0 && _hoveredPointIndex < series.Points.Count)
+            {
+                series.Points[_hoveredPointIndex].BorderColor = SliceBorderColor;
+                series.Points[_hoveredPointIndex].BorderWidth = 2;
+            }
+
+            if (newIndex >= 0 && newIndex < series.Points.Count)
+            {
+                series.Points[newIndex].BorderColor = Color.White;
+                series.Points[newIndex].BorderWidth = 4;
+            }
+
+            _hoveredPointIndex = newIndex;
+        }
+
+        private void ClearHover()
+        {
+            var series = chart.Series.FirstOrDefault();
+            if (series != null && _hoveredPointIndex >= 0 && _hoveredPointIndex < series.Points.Count)
+            {
+                series.Points[_hoveredPointIndex].BorderColor = SliceBorderColor;
+                series.Points[_hoveredPointIndex].BorderWidth = 2;
+            }
+            _hoveredPointIndex = -1;
+        }
+
+        private void Chart_MouseClick(object? sender, MouseEventArgs e)
+        {
+            var result = chart.HitTest(e.X, e.Y);
+
+            if (result.ChartElementType == ChartElementType.DataPoint && result.Series != null && result.PointIndex >= 0)
+            {
+                var point = result.Series.Points[result.PointIndex];
+                double value = point.YValues[0];
+                var tr = new System.Globalization.CultureInfo("tr-TR");
+
+                MessageBox.Show(
+                    $"{point.AxisLabel}\nTutar: {value.ToString("#,##0", tr)} ₺",
+                    "Kategori Bilgisi");
+            }
+        }
+
+        private void BtnExportReport_Click(object? sender, EventArgs e)
+        {
+            if (_currentReport == null) return;
+
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
+                dialog.FileName = $"rapor_{_currentReport.Year}_{_currentReport.Month:00}.csv";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
                 {
-                    series.Points.AddXY(item.CategoryName, item.TotalAmount);
+                    try
+                    {
+                        var tr = new System.Globalization.CultureInfo("tr-TR");
+
+                        using (var writer = new StreamWriter(dialog.FileName, false, System.Text.Encoding.UTF8))
+                        {
+                            writer.WriteLine("Tip;Kategori;Tutar");
+
+                            foreach (var item in _currentReport.IncomeBreakdown)
+                            {
+                                writer.WriteLine($"Gelir;{item.CategoryName};{item.TotalAmount.ToString("0.00", tr)}");
+                            }
+                            foreach (var item in _currentReport.ExpenseBreakdown)
+                            {
+                                writer.WriteLine($"Gider;{item.CategoryName};{item.TotalAmount.ToString("0.00", tr)}");
+                            }
+
+                            writer.WriteLine();
+                            writer.WriteLine($"Toplam Gelir;;{_currentReport.TotalIncome.ToString("0.00", tr)}");
+                            writer.WriteLine($"Toplam Gider;;{_currentReport.TotalExpense.ToString("0.00", tr)}");
+                            writer.WriteLine($"Net Bakiye;;{_currentReport.NetBalance.ToString("0.00", tr)}");
+                        }
+
+                        MessageBox.Show("Rapor CSV olarak dışa aktarıldı.", "Bilgi");
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Dışa aktarma başarısız: {ex.Message}", "Hata");
+                    }
                 }
-                series["PieLabelStyle"] = "Outside";
-                series.ChartArea = "main";
-                series.Legend = "legend";
-                chart.Series.Add(series);
             }
         }
     }

@@ -31,6 +31,7 @@ namespace PersonalFinanceApp
         private DataGridView dgvCategories = new DataGridView();
         private List<Category> _cachedCategories = new List<Category>();
 
+        private readonly TransactionService _transactionService = new TransactionService();
         public CategoryControl(User user)
         {
             _user = user;
@@ -141,7 +142,7 @@ namespace PersonalFinanceApp
             dgvCategories.ColumnHeadersHeight = 36;
             dgvCategories.EnableHeadersVisualStyles = false;
             dgvCategories.RowTemplate.Height = 30;
-            dgvCategories.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 250, 253);
+            dgvCategories.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
             dgvCategories.DefaultCellStyle.SelectionBackColor = Color.FromArgb(238, 239, 246);
             dgvCategories.DefaultCellStyle.SelectionForeColor = Color.FromArgb(40, 40, 40);
             dgvCategories.SelectionChanged += (s, e) => LoadSelectedIntoRenameBox();
@@ -161,8 +162,8 @@ namespace PersonalFinanceApp
             btnRename.Text = "Yeniden Adlandır";
             btnRename.Left = 250;
             btnRename.Top = 14;
-            btnRename.Width = 150;
-            btnRename.Height = 32;
+            btnRename.Width = 180;
+            btnRename.Height = 40;
             btnRename.FlatStyle = FlatStyle.Flat;
             btnRename.FlatAppearance.BorderSize = 1;
             btnRename.FlatAppearance.BorderColor = TextMuted;
@@ -172,10 +173,10 @@ namespace PersonalFinanceApp
             btnRename.Click += BtnRename_Click;
 
             btnDelete.Text = "Seçili Kategoriyi Sil";
-            btnDelete.Left = 420;
+            btnDelete.Left = 450;
             btnDelete.Top = 14;
-            btnDelete.Width = 170;
-            btnDelete.Height = 32;
+            btnDelete.Width = 190;
+            btnDelete.Height = 40;
             btnDelete.FlatStyle = FlatStyle.Flat;
             btnDelete.FlatAppearance.BorderSize = 1;
             btnDelete.FlatAppearance.BorderColor = DangerColor;
@@ -207,14 +208,29 @@ namespace PersonalFinanceApp
                 _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, type);
             }
 
+            var totals = _transactionService.GetCategoryTotals(_user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
             var displayList = _cachedCategories.Select(c => new
             {
                 ID = c.Id,
                 Ad = c.Name,
-                Tip = c.Type == "income" ? "Gelir" : "Gider"
+                Tip = c.Type == "income" ? "Gelir" : "Gider",
+                ToplamTutar = (totals.TryGetValue(c.Id, out decimal total) ? total : 0)
+                    .ToString("#,##0", tr) + " ₺"
             }).ToList();
 
             dgvCategories.DataSource = displayList;
+
+            // ID sütununu daraltıp diğerlerine (özellikle Toplam Tutar'a) daha fazla yer açıyoruz
+            if (dgvCategories.Columns["ID"] != null)
+            {
+                dgvCategories.Columns["ID"].FillWeight = 30;
+                dgvCategories.Columns["Ad"].FillWeight = 90;
+                dgvCategories.Columns["Tip"].FillWeight = 60;
+                dgvCategories.Columns["ToplamTutar"].FillWeight = 90;
+                dgvCategories.Columns["ToplamTutar"].HeaderText = "Toplam Tutar";
+            }
         }
 
         private void LoadSelectedIntoRenameBox()
@@ -256,7 +272,19 @@ namespace PersonalFinanceApp
             }
 
             string newName = txtRename.Text.Trim();
-            int categoryId = Convert.ToInt32(dgvCategories.CurrentRow.Cells["ID"].Value);
+            var idCell = dgvCategories.CurrentRow.Cells["ID"];
+            if (idCell?.Value == null)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Geçersiz kategori seçimi.";
+                return;
+            }
+            if (!int.TryParse(idCell.Value.ToString(), out int categoryId))
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Geçersiz kategori ID.";
+                return;
+            }
 
             bool success = _categoryService.UpdateCategoryName(categoryId, _user.Id, newName, out string errorMessage);
 
@@ -288,7 +316,19 @@ namespace PersonalFinanceApp
 
             if (confirm == DialogResult.Yes)
             {
-                int categoryId = Convert.ToInt32(dgvCategories.CurrentRow.Cells["ID"].Value);
+                var idCellDel = dgvCategories.CurrentRow.Cells["ID"];
+                if (idCellDel?.Value == null)
+                {
+                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                    lblStatus.Text = "Geçersiz kategori seçimi.";
+                    return;
+                }
+                if (!int.TryParse(idCellDel.Value.ToString(), out int categoryId))
+                {
+                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                    lblStatus.Text = "Geçersiz kategori ID.";
+                    return;
+                }
 
                 try
                 {

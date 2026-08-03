@@ -8,6 +8,7 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private Button? _activeButton; 
         private bool _isLoggingOut = false;
+        private System.Windows.Forms.Timer _reminderTimer = new System.Windows.Forms.Timer();
 
         private static readonly Color SidebarColor = Color.FromArgb(24, 27, 38);
         private static readonly Color SidebarHoverColor = Color.FromArgb(45, 49, 68);
@@ -32,7 +33,7 @@ namespace PersonalFinanceApp
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.Text = "Kişisel Finans Takip Sistemi";
             this.WindowState = FormWindowState.Maximized;
-            this.MinimumSize = new Size(1000, 650);
+            this.MinimumSize = new Size(1300, 700);
             this.Font = new Font("Segoe UI", 9F);
             this.BackColor = ContentBackColor;
 
@@ -49,14 +50,20 @@ namespace PersonalFinanceApp
                 Top = 25,
                 AutoSize = true
             };
+            lblLogo.Cursor = Cursors.Hand;
+            lblLogo.Click += (s, e) =>
+            {
+                ClearActiveButton();
+                ShowContent(new HomeControl(_user));
+            };
             pnlSidebar.Controls.Add(lblLogo);
 
             string[] menuItems =
             {
-                "Gelir / Gider İşlemleri",
+                "İşlemler",
                 "Kategoriler",
-                "Aylık Rapor",
-                "Tasarruf Hedefleri",
+                "Rapor",
+                "Hedefler",
                 "Notlar",
                 "Hatırlatıcılar",
                 "Şifre Değiştir"
@@ -130,11 +137,16 @@ namespace PersonalFinanceApp
             pnlContent.BackColor = ContentBackColor;
             pnlContent.Padding = new Padding(30);
 
-            ShowWelcomeContent();
+            ShowContent(new HomeControl(_user));
 
             this.Controls.Add(pnlContent);
             this.Controls.Add(pnlSidebar);
             this.FormClosing += MainForm_FormClosing;
+            _reminderTimer.Interval = 30000; // her 30 saniyede bir kontrol ediyoruz
+            _reminderTimer.Tick += ReminderTimer_Tick;
+            _reminderTimer.Start();
+
+            this.FormClosing += (s, e) => _reminderTimer.Stop();
         }
 
         private Button CreateSidebarButton(string text, int top)
@@ -182,6 +194,15 @@ namespace PersonalFinanceApp
             _activeButton = btn;
         }
 
+        private void ClearActiveButton()
+        {
+            if (_activeButton != null)
+            {
+                _activeButton.BackColor = SidebarColor;
+                _activeButton.ForeColor = Color.Gainsboro;
+                _activeButton = null;
+            }
+        }
         private void ShowContent(Control control)
         {
             pnlContent.Controls.Clear();
@@ -221,18 +242,39 @@ namespace PersonalFinanceApp
         {
             switch (menuText)
             {
-                case "Gelir / Gider İşlemleri":
+                case "İşlemler":
                     ShowContent(new TransactionControl(_user));
                     break;
-                case "Aylık Rapor":
+                case "Rapor":
                     ShowContent(new ReportControl(_user));
                     break;
                 case "Kategoriler":
                     ShowContent(new CategoryControl(_user));
                     break;
-                default:
-                    MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
+                case "Hedefler":
+                    ShowContent(new SavingsGoalControl(_user));
                     break;
+                case "Notlar":
+                    ShowContent(new NoteControl(_user));
+                    break;
+                case "Hatırlatıcılar":
+                    ShowContent(new ReminderControl(_user));
+                    break;
+                case "Şifre Değiştir":
+                    ShowContent(new PasswordChangeControl(_user));
+                    break;
+            }
+        }
+
+        private void ReminderTimer_Tick(object? sender, EventArgs e)
+        {
+            var reminderService = new PersonalFinanceApp.Services.ReminderService();
+            var dueReminders = reminderService.GetDueUnnotified(_user.Id);
+
+            foreach (var reminder in dueReminders)
+            {
+                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                reminderService.MarkAsNotified(reminder.Id, _user.Id);
             }
         }
 
