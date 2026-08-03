@@ -7,6 +7,7 @@ namespace PersonalFinanceApp
     public partial class LoginForm : Form
     {
         private readonly AuthService _authService = new AuthService();
+        private readonly AccountService _accountService = new AccountService();
 
         private static readonly Color AppBackColor = Color.FromArgb(24, 27, 38);
         private static readonly Color CardBackColor = Color.FromArgb(37, 41, 59);
@@ -62,6 +63,8 @@ namespace PersonalFinanceApp
             txtPassword.Left = 45;
             txtPassword.Top = 210;
             txtPassword.Width = 430;
+            txtPassword.Width = 430;
+            txtPassword.UseSystemPasswordChar = true;
 
             chkShowPassword.Text = "Şifreyi göster";
             chkShowPassword.Left = 45;
@@ -70,7 +73,7 @@ namespace PersonalFinanceApp
             chkShowPassword.ForeColor = TextMuted;
             chkShowPassword.CheckedChanged += (s, e) =>
             {
-                txtPassword.PasswordChar = chkShowPassword.Checked ? '\0' : '*';
+                txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
             };
 
             chkRememberMe.Text = "Beni hatırla";
@@ -198,6 +201,31 @@ namespace PersonalFinanceApp
                 }
 
                 this.Hide();
+
+                if (!user.OnboardingCompleted)
+                {
+                    using (var onboarding = new OnboardingForm(user.Id))
+                    {
+                        onboarding.ShowDialog();
+                    }
+                    user.OnboardingCompleted = true;
+                }
+
+                bool creditedIncome = _accountService.CheckAndCreditMonthlyIncome(user.Id);
+
+                var recurringService = new RecurringTransactionService();
+                var (addedRecurring, failedRecurring) = recurringService.ProcessDueRecurring(user.Id);
+
+                var infoMessages = new List<string>();
+                if (creditedIncome) infoMessages.Add("Bu ayın gelirinizi cüzdanınıza ekledik.");
+                if (addedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklendi:\n- " + string.Join("\n- ", addedRecurring));
+                if (failedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklenemedi:\n- " + string.Join("\n- ", failedRecurring));
+
+                if (infoMessages.Count > 0)
+                {
+                    MessageBox.Show(string.Join("\n\n", infoMessages), "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+
                 MainForm mainForm = new MainForm(user);
                 mainForm.ShowDialog();
 

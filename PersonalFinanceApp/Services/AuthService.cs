@@ -13,10 +13,20 @@ namespace PersonalFinanceApp.Services
         private static readonly Regex EmailRegex = new Regex(
             @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
             RegexOptions.Compiled);
+        // Test edilebilir olması için, e-posta format kontrolünü dışarı da açıyoruz (DB'ye hiç gitmiyor)
+        public static bool IsValidEmailFormat(string email)
+        {
+            return EmailRegex.IsMatch(email);
+        }
+
+        public static string? GetEmailDomainSuggestion(string email)
+        {
+            return SuggestDomainCorrection(email);
+        }
         private static readonly string[] CommonDomains =
-{
-    "gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "live.com"
-};
+        {
+            "gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "live.com"
+        };
 
         // İki kelime arasındaki "düzenleme mesafesini" (kaç harf farkı olduğunu) hesaplar
         private static int LevenshteinDistance(string s, string t)
@@ -167,7 +177,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -188,13 +198,16 @@ namespace PersonalFinanceApp.Services
 
                                 if (isPasswordValid)
                                 {
+                                    int onboardingOrdinal = reader.GetOrdinal("onboarding_completed");
+
                                     return new User
                                     {
                                         Id = reader.GetInt32(idOrdinal),
                                         Username = reader.GetString(usernameOrdinal),
                                         Email = reader.GetString(emailOrdinal),
                                         PasswordHash = storedHash,
-                                        CreatedAt = reader.GetDateTime(createdAtOrdinal)
+                                        CreatedAt = reader.GetDateTime(createdAtOrdinal),
+                                        OnboardingCompleted = reader.GetBoolean(onboardingOrdinal)
                                     };
                                 }
                             }
@@ -211,5 +224,70 @@ namespace PersonalFinanceApp.Services
                 return null;
             }
         }
-    }
-}
+
+        public bool ChangePassword(int userId, string currentPassword, string newPassword, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            {
+                errorMessage = "Tüm alanların doldurulması zorunludur.";
+                return false;
+            }
+
+            if (newPassword.Length < MinPasswordLength)
+            {
+                errorMessage = $"Yeni şifre en az {MinPasswordLength} karakter olmalıdır.";
+                return false;
+            }
+
+            try
+            {
+                using (var conn = DatabaseHelper.GetConnection())
+                {
+                    conn.Open();
+
+                    string selectQuery = "SELECT password_hash FROM users WHERE user_id = @userId";
+                    string storedHash;
+
+                    using (var cmd = new NpgsqlCommand(selectQuery, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@userId", userId);
+                        var result = cmd.ExecuteScalar();
+
+                        if (result == null)
+                        {
+                            errorMessage = "Kullanıcı bulunamadı.";
+                            return false;
+                        }
+
+                        storedHash = (string)result;
+                    }
+
+                    if (!BCrypt.Net.BCrypt.Verify(currentPassword, storedHash))
+                    {
+                        errorMessage = "Mevcut şifre yanlış.";
+                        return false;
+                    }
+
+                    string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+                    string updateQuery = "UPDATE users SET password_hash = @newHash WHERE user_id = @userId";
+
+                    using (var cmd = new NpgsqlCommand(updateQuery, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@newHash", newHash);
+                        cmd.Parameters.AddWithValue("@userId", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Şifre değiştirilirken bir hata oluştu: {ex.Message}";
+                return false;
+            }
+        }
+    } // class
+} // namespace

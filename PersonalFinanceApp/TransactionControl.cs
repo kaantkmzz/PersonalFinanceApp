@@ -8,9 +8,7 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly CategoryService _categoryService = new CategoryService();
-        private CheckBox chkHideAmounts = new CheckBox();
-        private List<Transaction> _cachedTransactions = new List<Transaction>();
-        private bool _amountsHidden = false;
+        private readonly AccountService _accountService = new AccountService();
 
         private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
         private static readonly Color TextLight = Color.White;
@@ -27,12 +25,18 @@ namespace PersonalFinanceApp
         private ComboBox cmbType = new ComboBox();
         private ComboBox cmbCategory = new ComboBox();
         private TextBox txtAmount = new TextBox();
-        private DateTimePicker dtpDate = new DateTimePicker();
         private TextBox txtDescription = new TextBox();
         private Button btnAdd = new Button();
         private Button btnDelete = new Button();
-        private DataGridView dgvTransactions = new DataGridView();
+        private Button btnExport = new Button();
+        private Button btnRecurring = new Button();
+        private CheckBox chkHideAmounts = new CheckBox();
         private Label lblStatus = new Label();
+        private Label lblWalletBalance = new Label();
+
+        private DataGridView dgvTransactions = new DataGridView();
+        private List<Transaction> _cachedTransactions = new List<Transaction>();
+        private bool _amountsHidden = false;
 
         public TransactionControl(User user)
         {
@@ -41,6 +45,7 @@ namespace PersonalFinanceApp
             SetupUI();
             LoadCategorySuggestions();
             LoadTransactions();
+            RefreshWalletBalance();
         }
 
         private void SetupUI()
@@ -51,7 +56,7 @@ namespace PersonalFinanceApp
             this.Font = new Font("Segoe UI", 9F);
 
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 260;
+            pnlTop.Height = 230;
             pnlTop.BackColor = AppBackColor;
 
             Label lblTitle = new Label
@@ -64,9 +69,15 @@ namespace PersonalFinanceApp
                 AutoSize = true
             };
 
-            Label lblType = new Label { Text = "Tip:", Left = 20, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            lblWalletBalance.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblWalletBalance.ForeColor = Color.FromArgb(120, 220, 150);
+            lblWalletBalance.Left = 500;
+            lblWalletBalance.Top = 22;
+            lblWalletBalance.AutoSize = true;
+
+            Label lblType = new Label { Text = "Tip:", Left = 20, Top = 75, ForeColor = TextMuted, AutoSize = true };
             cmbType.Left = 20;
-            cmbType.Top = 100;
+            cmbType.Top = 105;
             cmbType.Width = 140;
             cmbType.Font = new Font("Segoe UI", 9.5F);
             cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -75,28 +86,20 @@ namespace PersonalFinanceApp
             cmbType.SelectedIndex = 1;
             cmbType.SelectedIndexChanged += (s, e) => LoadCategorySuggestions();
 
-            Label lblCategory = new Label { Text = "Kategori:", Left = 180, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Label lblCategory = new Label { Text = "Kategori:", Left = 180, Top = 75, ForeColor = TextMuted, AutoSize = true };
             cmbCategory.Left = 180;
-            cmbCategory.Top = 100;
+            cmbCategory.Top = 105;
             cmbCategory.Width = 200;
             cmbCategory.Font = new Font("Segoe UI", 9.5F);
             cmbCategory.DropDownStyle = ComboBoxStyle.DropDown;
             cmbCategory.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cmbCategory.AutoCompleteSource = AutoCompleteSource.ListItems;
 
-            Label lblAmount = new Label { Text = "Tutar:", Left = 400, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Label lblAmount = new Label { Text = "Tutar:", Left = 400, Top = 75, ForeColor = TextMuted, AutoSize = true };
             txtAmount.Left = 400;
-            txtAmount.Top = 100;
-            txtAmount.Width = 100;
+            txtAmount.Top = 105;
+            txtAmount.Width = 120;
             txtAmount.Font = new Font("Segoe UI", 9.5F);
-
-            Label lblDate = new Label { Text = "Tarih:", Left = 520, Top = 70, ForeColor = TextMuted, AutoSize = true };
-            dtpDate.Left = 520;
-            dtpDate.Top = 100;
-            dtpDate.Width = 160;
-            dtpDate.Font = new Font("Segoe UI", 9.5F);
-            dtpDate.Format = DateTimePickerFormat.Short;
-            dtpDate.Value = DateTime.Today;
 
             Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 150, ForeColor = TextMuted, AutoSize = true };
             txtDescription.Left = 20;
@@ -117,27 +120,25 @@ namespace PersonalFinanceApp
             btnAdd.Click += BtnAdd_Click;
 
             lblStatus.Left = 20;
-            lblStatus.Top = 225;
+            lblStatus.Top = 205;
             lblStatus.Width = 660;
             lblStatus.Height = 25;
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             lblStatus.Font = new Font("Segoe UI", 9F);
 
             pnlTop.Controls.Add(lblTitle);
+            pnlTop.Controls.Add(lblWalletBalance);
             pnlTop.Controls.Add(lblType);
             pnlTop.Controls.Add(cmbType);
             pnlTop.Controls.Add(lblCategory);
             pnlTop.Controls.Add(cmbCategory);
             pnlTop.Controls.Add(lblAmount);
             pnlTop.Controls.Add(txtAmount);
-            pnlTop.Controls.Add(lblDate);
-            pnlTop.Controls.Add(dtpDate);
             pnlTop.Controls.Add(lblDescription);
             pnlTop.Controls.Add(txtDescription);
             pnlTop.Controls.Add(btnAdd);
             pnlTop.Controls.Add(lblStatus);
 
-            // --- Orta panel: tablo ---
             pnlGrid.Dock = DockStyle.Fill;
             pnlGrid.Padding = new Padding(20, 0, 20, 0);
             pnlGrid.BackColor = AppBackColor;
@@ -162,11 +163,8 @@ namespace PersonalFinanceApp
             dgvTransactions.ColumnHeadersHeight = 36;
             dgvTransactions.EnableHeadersVisualStyles = false;
             dgvTransactions.RowTemplate.Height = 30;
-            dgvTransactions.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 250, 253);
-
-            // Sert mor seçim rengini kaldırıp, hafif/nötr bir vurgu kullanıyoruz
+            dgvTransactions.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
             dgvTransactions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(238, 239, 246);
-
             dgvTransactions.DataBindingComplete += (s, e) =>
             {
                 foreach (DataGridViewRow row in dgvTransactions.Rows)
@@ -177,25 +175,8 @@ namespace PersonalFinanceApp
                 }
             };
 
-            // Gelir satırlarını yeşil, gider satırlarını kırmızı yazı rengiyle gösteriyoruz
-            dgvTransactions.DataBindingComplete += (s, e) =>
-            {
-                foreach (DataGridViewRow row in dgvTransactions.Rows)
-                {
-                    if (row.Cells["Tip"].Value?.ToString() == "Gelir")
-                    {
-                        row.DefaultCellStyle.ForeColor = IncomeColor;
-                    }
-                    else
-                    {
-                        row.DefaultCellStyle.ForeColor = ExpenseColor;
-                    }
-                }
-            };
-
             pnlGrid.Controls.Add(dgvTransactions);
 
-            // --- Alt panel ---
             pnlBottom.Dock = DockStyle.Bottom;
             pnlBottom.Height = 60;
             pnlBottom.BackColor = AppBackColor;
@@ -212,6 +193,39 @@ namespace PersonalFinanceApp
             btnDelete.ForeColor = DangerColor;
             btnDelete.Cursor = Cursors.Hand;
             btnDelete.Click += BtnDelete_Click;
+
+            btnExport.Text = "CSV'ye Aktar";
+            btnExport.Left = 400;
+            btnExport.Top = 12;
+            btnExport.Width = 180;
+            btnExport.Height = 35;
+            btnExport.FlatStyle = FlatStyle.Flat;
+            btnExport.FlatAppearance.BorderSize = 1;
+            btnExport.FlatAppearance.BorderColor = TextMuted;
+            btnExport.BackColor = AppBackColor;
+            btnExport.ForeColor = TextLight;
+            btnExport.Cursor = Cursors.Hand;
+            btnExport.Click += BtnExport_Click;
+
+            btnRecurring.Text = "Tekrarlanan İşlemler";
+            btnRecurring.Left = 600;
+            btnRecurring.Top = 12;
+            btnRecurring.Width = 190;
+            btnRecurring.Height = 35;
+            btnRecurring.FlatStyle = FlatStyle.Flat;
+            btnRecurring.FlatAppearance.BorderSize = 1;
+            btnRecurring.FlatAppearance.BorderColor = TextMuted;
+            btnRecurring.BackColor = AppBackColor;
+            btnRecurring.ForeColor = TextLight;
+            btnRecurring.Cursor = Cursors.Hand;
+            btnRecurring.Click += (s, e) =>
+            {
+                using (var dialog = new RecurringTransactionDialog(_user))
+                {
+                    dialog.ShowDialog();
+                }
+            };
+
             chkHideAmounts.Text = "Tutarları Gizle";
             chkHideAmounts.Left = 200;
             chkHideAmounts.Top = 20;
@@ -225,12 +239,19 @@ namespace PersonalFinanceApp
 
             pnlBottom.Controls.Add(btnDelete);
             pnlBottom.Controls.Add(chkHideAmounts);
-
-            pnlBottom.Controls.Add(btnDelete);
+            pnlBottom.Controls.Add(btnExport);
+            pnlBottom.Controls.Add(btnRecurring);
 
             this.Controls.Add(pnlGrid);
             this.Controls.Add(pnlBottom);
             this.Controls.Add(pnlTop);
+        }
+
+        private void RefreshWalletBalance()
+        {
+            var (wallet, _) = _accountService.GetBalances(_user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            lblWalletBalance.Text = $"Cüzdan: {wallet.ToString("#,##0", tr)} ₺";
         }
 
         private string GetSelectedType()
@@ -255,24 +276,22 @@ namespace PersonalFinanceApp
             cmbCategory.AutoCompleteCustomSource = autoCompleteList;
         }
 
-
-
         private void LoadTransactions()
         {
             _cachedTransactions = _transactionService.GetUserTransactions(_user.Id);
             RefreshGrid();
         }
 
-        // Veritabanına tekrar gitmeden, sadece görünümü (gizli/açık) günceller
         private void RefreshGrid()
         {
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
             var displayList = _cachedTransactions.Select(t => new
             {
                 ID = t.Id,
-                Tarih = t.TransactionDate.ToString("dd.MM.yyyy"),
                 Tip = t.Type == "income" ? "Gelir" : "Gider",
                 Kategori = t.CategoryName,
-                Tutar = _amountsHidden ? "••••••" : t.Amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR")) + " ₺",
+                Tutar = _amountsHidden ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺",
                 Açıklama = t.Description
             }).ToList();
 
@@ -285,24 +304,25 @@ namespace PersonalFinanceApp
 
             if (string.IsNullOrWhiteSpace(categoryName))
             {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                 lblStatus.Text = "Lütfen bir kategori adı girin.";
                 return;
             }
 
             if (!decimal.TryParse(txtAmount.Text, out decimal amount))
             {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                 lblStatus.Text = "Geçersiz tutar.";
                 return;
             }
 
             string type = GetSelectedType();
             string description = txtDescription.Text;
-            DateTime date = dtpDate.Value;
 
             var category = _categoryService.GetOrCreateCategory(_user.Id, categoryName, type);
 
             bool success = _transactionService.AddTransaction(
-                _user.Id, category.Id, amount, type, description, date, out string errorMessage);
+                _user.Id, category.Id, amount, type, description, out string errorMessage);
 
             if (success)
             {
@@ -312,6 +332,7 @@ namespace PersonalFinanceApp
                 txtDescription.Clear();
                 LoadCategorySuggestions();
                 LoadTransactions();
+                RefreshWalletBalance();
             }
             else
             {
@@ -329,7 +350,19 @@ namespace PersonalFinanceApp
                 return;
             }
 
-            int transactionId = Convert.ToInt32(dgvTransactions.CurrentRow.Cells["ID"].Value);
+            var idCell = dgvTransactions.CurrentRow.Cells["ID"];
+            if (idCell?.Value == null)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Geçersiz işlem seçimi.";
+                return;
+            }
+            if (!int.TryParse(idCell.Value.ToString(), out int transactionId))
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Geçersiz işlem ID.";
+                return;
+            }
 
             var confirm = MessageBox.Show("Bu işlemi silmek istediğinize emin misiniz?", "Onay",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -343,11 +376,51 @@ namespace PersonalFinanceApp
                     lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                     lblStatus.Text = "İşlem silindi.";
                     LoadTransactions();
+                    RefreshWalletBalance();
                 }
                 else
                 {
                     lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                     lblStatus.Text = errorMessage;
+                }
+            }
+        }
+
+        private void BtnExport_Click(object? sender, EventArgs e)
+        {
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
+                dialog.FileName = $"islemler_{DateTime.Today:yyyy_MM_dd}.csv";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        var tr = new System.Globalization.CultureInfo("tr-TR");
+
+                        using (var writer = new StreamWriter(dialog.FileName, false, System.Text.Encoding.UTF8))
+                        {
+                            writer.WriteLine("Tarih;Tip;Kategori;Tutar;Açıklama");
+
+                            foreach (var t in _cachedTransactions)
+                            {
+                                string tip = t.Type == "income" ? "Gelir" : "Gider";
+                                string tarih = t.TransactionDate.ToString("dd.MM.yyyy");
+                                string tutar = t.Amount.ToString("0.00", tr);
+                                string aciklama = (t.Description ?? "").Replace(";", ",");
+                                writer.WriteLine($"{tarih};{tip};{t.CategoryName};{tutar};{aciklama}");
+                            }
+                        }
+
+                        lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                        lblStatus.Text = "İşlemler CSV olarak dışa aktarıldı.";
+                    }
+                    catch (Exception ex)
+                    {
+                        lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                        lblStatus.Text = $"Dışa aktarma başarısız: {ex.Message}";
+                    }
                 }
             }
         }
