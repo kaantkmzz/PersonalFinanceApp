@@ -1,14 +1,20 @@
-﻿using PersonalFinanceApp.Models;
-using PersonalFinanceApp.Helpers;
+﻿using PersonalFinanceApp.Helpers;
+using PersonalFinanceApp.Models;
+using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
     public partial class MainForm : Form
     {
         private readonly User _user;
-        private Button? _activeButton; 
-        private bool _isLoggingOut = false;
+        private readonly AccountService _accountService = new AccountService();
+        private Button? _activeButton;
         private System.Windows.Forms.Timer _reminderTimer = new System.Windows.Forms.Timer();
+        private Button btnHideAmounts = new Button();
+        private bool _isLoggingOut = false;
+
+        private readonly Dictionary<string, UserControl> _screenCache = new Dictionary<string, UserControl>();
+        private UserControl? _visibleControl;
 
         private static readonly Color SidebarColor = Color.FromArgb(24, 27, 38);
         private static readonly Color SidebarHoverColor = Color.FromArgb(45, 49, 68);
@@ -30,16 +36,18 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
-            this.AutoScaleMode = AutoScaleMode.Dpi;
             this.Text = "Kişisel Finans Takip Sistemi";
             this.WindowState = FormWindowState.Maximized;
             this.MinimumSize = new Size(1300, 700);
             this.Font = new Font("Segoe UI", 9F);
             this.BackColor = ContentBackColor;
 
+            EnableDoubleBuffering(this);
+
             pnlSidebar.Dock = DockStyle.Left;
             pnlSidebar.Width = 240;
             pnlSidebar.BackColor = SidebarColor;
+            EnableDoubleBuffering(pnlSidebar);
 
             Label lblLogo = new Label
             {
@@ -54,7 +62,7 @@ namespace PersonalFinanceApp
             lblLogo.Click += (s, e) =>
             {
                 ClearActiveButton();
-                ShowContent(new HomeControl(_user));
+                ShowCachedContent("home", () => new HomeControl(_user));
             };
             pnlSidebar.Controls.Add(lblLogo);
 
@@ -88,12 +96,29 @@ namespace PersonalFinanceApp
                 menuTop += 55;
             }
 
+            btnHideAmounts.TextAlign = ContentAlignment.MiddleLeft;
+            btnHideAmounts.Left = 0;
+            btnHideAmounts.Top = menuTop + 15;
+            btnHideAmounts.Width = 240;
+            btnHideAmounts.Height = 44;
+            btnHideAmounts.FlatStyle = FlatStyle.Flat;
+            btnHideAmounts.BackColor = SidebarColor;
+            btnHideAmounts.ForeColor = Color.Gainsboro;
+            btnHideAmounts.Font = new Font("Segoe UI", 10F);
+            btnHideAmounts.Cursor = Cursors.Hand;
+            btnHideAmounts.FlatAppearance.BorderSize = 0;
+            btnHideAmounts.MouseEnter += (s, e) => btnHideAmounts.BackColor = SidebarHoverColor;
+            btnHideAmounts.MouseLeave += (s, e) => btnHideAmounts.BackColor = SidebarColor;
+            btnHideAmounts.Click += BtnHideAmounts_Click;
+            UpdateHideAmountsButtonText();
+            pnlSidebar.Controls.Add(btnHideAmounts);
+
             Button btnLogout = new Button
             {
                 Text = "   Oturumu Kapat",
                 TextAlign = ContentAlignment.MiddleLeft,
                 Left = 0,
-                Top = menuTop + 20,
+                Top = menuTop + 70,
                 Width = 240,
                 Height = 44,
                 FlatStyle = FlatStyle.Flat,
@@ -118,7 +143,7 @@ namespace PersonalFinanceApp
                 Text = "   Çıkış Yap",
                 TextAlign = ContentAlignment.MiddleLeft,
                 Left = 0,
-                Top = menuTop + 66,
+                Top = menuTop + 116,
                 Width = 240,
                 Height = 44,
                 FlatStyle = FlatStyle.Flat,
@@ -130,23 +155,123 @@ namespace PersonalFinanceApp
             btnExit.FlatAppearance.BorderSize = 0;
             btnExit.MouseEnter += (s, e) => btnExit.BackColor = SidebarHoverColor;
             btnExit.MouseLeave += (s, e) => btnExit.BackColor = SidebarColor;
-            btnExit.Click += (s, e) => { _isLoggingOut = true; Application.Exit(); }; // uygulamayı tamamen kapatır
+            btnExit.Click += (s, e) => { _isLoggingOut = true; Application.Exit(); };
             pnlSidebar.Controls.Add(btnExit);
 
             pnlContent.Dock = DockStyle.Fill;
             pnlContent.BackColor = ContentBackColor;
             pnlContent.Padding = new Padding(30);
-
-            ShowContent(new HomeControl(_user));
+            EnableDoubleBuffering(pnlContent);
 
             this.Controls.Add(pnlContent);
             this.Controls.Add(pnlSidebar);
-            this.FormClosing += MainForm_FormClosing;
-            _reminderTimer.Interval = 30000; // her 30 saniyede bir kontrol ediyoruz
+
+            ShowCachedContent("home", () => new HomeControl(_user));
+
+            _reminderTimer.Interval = 30000;
             _reminderTimer.Tick += ReminderTimer_Tick;
             _reminderTimer.Start();
 
-            this.FormClosing += (s, e) => _reminderTimer.Stop();
+            this.FormClosing += MainForm_FormClosing;
+        }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
+        }
+
+        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+        {
+            _reminderTimer.Stop();
+
+            if (_isLoggingOut)
+            {
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "Pencereyi kapatırsanız oturumunuz sonlanır ve uygulamadan tamamen çıkılır. Devam etmek istiyor musunuz?",
+                "Çıkış Onayı",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (result == DialogResult.No)
+            {
+                e.Cancel = true;
+                _reminderTimer.Start();
+            }
+            else
+            {
+                Environment.Exit(0);
+            }
+        }
+
+        private void ReminderTimer_Tick(object? sender, EventArgs e)
+        {
+            var reminderService = new ReminderService();
+            var dueReminders = reminderService.GetDueUnnotified(_user.Id);
+
+            foreach (var reminder in dueReminders)
+            {
+                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                reminderService.MarkAsNotified(reminder.Id, _user.Id);
+            }
+        }
+
+        private void BtnHideAmounts_Click(object? sender, EventArgs e)
+        {
+            _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
+            _accountService.SetHideAmounts(_user.Id, _user.HideAmountsEnabled);
+            UpdateHideAmountsButtonText();
+            RefreshAllCachedScreens();
+        }
+
+        private void UpdateHideAmountsButtonText()
+        {
+            btnHideAmounts.Text = _user.HideAmountsEnabled ? "   👁  Tutarları Göster" : "   🙈  Tutarları Gizle";
+        }
+
+        // Tüm ekranları yeniden inşa etmek yerine, sadece verilerini (görünür olsun olmasın) tazeliyoruz
+        private void RefreshAllCachedScreens()
+        {
+            foreach (var control in _screenCache.Values)
+            {
+                if (control is IRefreshable refreshable)
+                {
+                    refreshable.RefreshData();
+                }
+            }
+        }
+
+        // Bir ekranı ilk kez ziyaret ediyorsak oluşturup önbelleğe alıyoruz; sonraki ziyaretlerde sadece gösteriyoruz
+        private void ShowCachedContent(string key, Func<UserControl> factory)
+        {
+            this.SuspendLayout();
+            pnlContent.SuspendLayout();
+
+            if (!_screenCache.TryGetValue(key, out var control))
+            {
+                control = factory();
+                control.Dock = DockStyle.Fill;
+                EnableDoubleBuffering(control);
+                _screenCache[key] = control;
+                pnlContent.Controls.Add(control);
+            }
+
+            foreach (Control c in pnlContent.Controls)
+            {
+                c.Visible = (c == control);
+            }
+            control.BringToFront();
+            _visibleControl = control;
+
+            pnlContent.ResumeLayout(true);
+            this.ResumeLayout(true);
         }
 
         private Button CreateSidebarButton(string text, int top)
@@ -167,7 +292,6 @@ namespace PersonalFinanceApp
             };
             btn.FlatAppearance.BorderSize = 0;
 
-            // Fare üzerine gelince, sadece aktif (seçili) buton değilse renk değiştir
             btn.MouseEnter += (s, e) => { if (btn != _activeButton) btn.BackColor = SidebarHoverColor; };
             btn.MouseLeave += (s, e) => { if (btn != _activeButton) btn.BackColor = SidebarColor; };
 
@@ -180,7 +304,6 @@ namespace PersonalFinanceApp
             return btn;
         }
 
-        // Hangi menü öğesinin şu an seçili/aktif olduğunu görsel olarak vurguluyoruz
         private void SetActiveButton(Button btn)
         {
             if (_activeButton != null)
@@ -203,102 +326,35 @@ namespace PersonalFinanceApp
                 _activeButton = null;
             }
         }
-        private void ShowContent(Control control)
-        {
-            pnlContent.Controls.Clear();
-            control.Dock = DockStyle.Fill;
-            pnlContent.Controls.Add(control);
-        }
-
-        private void ShowWelcomeContent()
-        {
-            pnlContent.Controls.Clear();
-
-            Label lblWelcome = new Label
-            {
-                Text = $"Hoş geldin, {_user.Username}",
-                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
-                ForeColor = Color.White,
-                AutoSize = true,
-                Left = 20,
-                Top = 20
-            };
-
-            Label lblSubtitle = new Label
-            {
-                Text = "Sol menüden bir işlem seçerek başlayabilirsin.",
-                Font = new Font("Segoe UI", 11F),
-                ForeColor = Color.FromArgb(170, 173, 190),
-                AutoSize = true,
-                Left = 20,
-                Top = 90
-            };
-
-            pnlContent.Controls.Add(lblWelcome);
-            pnlContent.Controls.Add(lblSubtitle);
-        }
 
         private void HandleMenuClick(string menuText)
         {
             switch (menuText)
             {
                 case "İşlemler":
-                    ShowContent(new TransactionControl(_user));
-                    break;
-                case "Rapor":
-                    ShowContent(new ReportControl(_user));
+                    ShowCachedContent("transactions", () => new TransactionControl(_user));
                     break;
                 case "Kategoriler":
-                    ShowContent(new CategoryControl(_user));
+                    ShowCachedContent("categories", () => new CategoryControl(_user));
+                    break;
+                case "Rapor":
+                    ShowCachedContent("report", () => new ReportControl(_user));
                     break;
                 case "Hedefler":
-                    ShowContent(new SavingsGoalControl(_user));
+                    ShowCachedContent("goals", () => new SavingsGoalControl(_user));
                     break;
                 case "Notlar":
-                    ShowContent(new NoteControl(_user));
+                    ShowCachedContent("notes", () => new NoteControl(_user));
                     break;
                 case "Hatırlatıcılar":
-                    ShowContent(new ReminderControl(_user));
+                    ShowCachedContent("reminders", () => new ReminderControl(_user));
                     break;
                 case "Şifre Değiştir":
-                    ShowContent(new PasswordChangeControl(_user));
+                    ShowCachedContent("password", () => new PasswordChangeControl(_user));
                     break;
-            }
-        }
-
-        private void ReminderTimer_Tick(object? sender, EventArgs e)
-        {
-            var reminderService = new PersonalFinanceApp.Services.ReminderService();
-            var dueReminders = reminderService.GetDueUnnotified(_user.Id);
-
-            foreach (var reminder in dueReminders)
-            {
-                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                reminderService.MarkAsNotified(reminder.Id, _user.Id);
-            }
-        }
-
-        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
-        {
-            // Eğer kapatma işlemi bizim "Oturumu Kapat" ya da "Çıkış Yap" butonlarımızdan geldiyse, tekrar sormuyoruz
-            if (_isLoggingOut)
-            {
-                return;
-            }
-
-            var result = MessageBox.Show(
-                "Uygulamadan çıkmak istediğinize emin misiniz?",
-                "Çıkış Onayı",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (result == DialogResult.No)
-            {
-                e.Cancel = true;
-            }
-            else
-            {
-                Environment.Exit(0);
+                default:
+                    MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
+                    break;
             }
         }
     }

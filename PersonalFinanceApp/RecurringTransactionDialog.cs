@@ -60,7 +60,7 @@ namespace PersonalFinanceApp
 
             Label lblInfo = new Label
             {
-                Text = "Buraya eklenen işlemler, her ay giriş yaptığınızda otomatik olarak eklenir.",
+                Text = "Eklenen işlemler her ay giriş yaptığınızda otomatik olarak eklenir.",
                 Left = 20,
                 Top = 15,
                 Width = 500,

@@ -177,7 +177,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -191,6 +191,8 @@ namespace PersonalFinanceApp.Services
                                 int emailOrdinal = reader.GetOrdinal("email");
                                 int passwordHashOrdinal = reader.GetOrdinal("password_hash");
                                 int createdAtOrdinal = reader.GetOrdinal("created_at");
+                                int onboardingOrdinal = reader.GetOrdinal("onboarding_completed");
+                                int hideAmountsOrdinal = reader.GetOrdinal("hide_amounts");
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
@@ -198,8 +200,6 @@ namespace PersonalFinanceApp.Services
 
                                 if (isPasswordValid)
                                 {
-                                    int onboardingOrdinal = reader.GetOrdinal("onboarding_completed");
-
                                     return new User
                                     {
                                         Id = reader.GetInt32(idOrdinal),
@@ -207,7 +207,8 @@ namespace PersonalFinanceApp.Services
                                         Email = reader.GetString(emailOrdinal),
                                         PasswordHash = storedHash,
                                         CreatedAt = reader.GetDateTime(createdAtOrdinal),
-                                        OnboardingCompleted = reader.GetBoolean(onboardingOrdinal)
+                                        OnboardingCompleted = reader.GetBoolean(onboardingOrdinal),
+                                        HideAmountsEnabled = reader.GetBoolean(hideAmountsOrdinal)
                                     };
                                 }
                             }
