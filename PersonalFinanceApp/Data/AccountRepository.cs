@@ -191,5 +191,21 @@ namespace PersonalFinanceApp.Data
 
             return (0, 0);
         }
+
+        public void SetHideAmounts(int userId, bool hideAmounts)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET hide_amounts = @hideAmounts WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@hideAmounts", hideAmounts);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }

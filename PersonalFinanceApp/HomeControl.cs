@@ -3,7 +3,7 @@ using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class HomeControl : UserControl
+    public partial class HomeControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly AccountService _accountService = new AccountService();
@@ -121,12 +121,26 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblStatus);
         }
 
+        public void RefreshData()
+        {
+            RefreshBalances();
+        }
+
         private void RefreshBalances()
         {
             var (wallet, safe) = _accountService.GetBalances(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
-            lblWalletAmount.Text = wallet.ToString("#,##0", tr) + " ₺";
-            lblSafeAmount.Text = safe.ToString("#,##0", tr) + " ₺";
+
+            if (_user.HideAmountsEnabled)
+            {
+                lblWalletAmount.Text = "••••••";
+                lblSafeAmount.Text = "••••••";
+            }
+            else
+            {
+                lblWalletAmount.Text = wallet.ToString("#,##0", tr) + " ₺";
+                lblSafeAmount.Text = safe.ToString("#,##0", tr) + " ₺";
+            }
         }
 
         private void BtnTransfer_Click(object? sender, EventArgs e)

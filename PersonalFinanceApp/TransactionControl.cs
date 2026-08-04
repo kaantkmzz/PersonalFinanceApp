@@ -3,7 +3,7 @@ using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class TransactionControl : UserControl
+    public partial class TransactionControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly TransactionService _transactionService = new TransactionService();
@@ -30,19 +30,25 @@ namespace PersonalFinanceApp
         private Button btnDelete = new Button();
         private Button btnExport = new Button();
         private Button btnRecurring = new Button();
-        private CheckBox chkHideAmounts = new CheckBox();
         private Label lblStatus = new Label();
         private Label lblWalletBalance = new Label();
 
         private DataGridView dgvTransactions = new DataGridView();
         private List<Transaction> _cachedTransactions = new List<Transaction>();
-        private bool _amountsHidden = false;
+        
 
         public TransactionControl(User user)
         {
             _user = user;
             InitializeComponent();
             SetupUI();
+            LoadCategorySuggestions();
+            LoadTransactions();
+            RefreshWalletBalance();
+        }
+
+        public void RefreshData()
+        {
             LoadCategorySuggestions();
             LoadTransactions();
             RefreshWalletBalance();
@@ -226,19 +232,9 @@ namespace PersonalFinanceApp
                 }
             };
 
-            chkHideAmounts.Text = "Tutarları Gizle";
-            chkHideAmounts.Left = 200;
-            chkHideAmounts.Top = 20;
-            chkHideAmounts.AutoSize = true;
-            chkHideAmounts.ForeColor = TextMuted;
-            chkHideAmounts.CheckedChanged += (s, e) =>
-            {
-                _amountsHidden = chkHideAmounts.Checked;
-                RefreshGrid();
-            };
+            
 
             pnlBottom.Controls.Add(btnDelete);
-            pnlBottom.Controls.Add(chkHideAmounts);
             pnlBottom.Controls.Add(btnExport);
             pnlBottom.Controls.Add(btnRecurring);
 
@@ -291,7 +287,9 @@ namespace PersonalFinanceApp
                 ID = t.Id,
                 Tip = t.Type == "income" ? "Gelir" : "Gider",
                 Kategori = t.CategoryName,
-                Tutar = _amountsHidden ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺",
+                Tutar = _user.HideAmountsEnabled
+                    ? "••••••"
+                    : t.Amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR")) + " ₺",
                 Açıklama = t.Description
             }).ToList();
 

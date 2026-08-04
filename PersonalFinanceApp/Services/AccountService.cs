@@ -86,5 +86,10 @@ namespace PersonalFinanceApp.Services
         {
             _repository.AdjustSafeBalance(userId, delta);
         }
+
+        public void SetHideAmounts(int userId, bool hideAmounts)
+        {
+            _repository.SetHideAmounts(userId, hideAmounts);
+        }
     }
 }

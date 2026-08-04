@@ -3,7 +3,7 @@ using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class SavingsGoalControl : UserControl
+    public partial class SavingsGoalControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly SavingsGoalService _goalService = new SavingsGoalService();
@@ -33,6 +33,11 @@ namespace PersonalFinanceApp
             public string Hedef { get; set; } = string.Empty;
             public string HedefTutar { get; set; } = string.Empty;
             public bool MevcutDurum { get; set; }
+        }
+
+        public void RefreshData()
+        {
+            LoadGoals();
         }
 
         public SavingsGoalControl(User user)
@@ -183,7 +188,7 @@ namespace PersonalFinanceApp
             {
                 ID = g.Id,
                 Hedef = g.GoalName,
-                HedefTutar = g.TargetAmount.ToString("#,##0", tr) + " ₺",
+                HedefTutar = _user.HideAmountsEnabled ? "••••••" : g.TargetAmount.ToString("#,##0", tr) + " ₺",
                 MevcutDurum = g.IsAchieved
             }).ToList();
 

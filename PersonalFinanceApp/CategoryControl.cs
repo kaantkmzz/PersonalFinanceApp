@@ -3,7 +3,7 @@ using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class CategoryControl : UserControl
+    public partial class CategoryControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly CategoryService _categoryService = new CategoryService();
@@ -37,6 +37,11 @@ namespace PersonalFinanceApp
             _user = user;
             InitializeComponent();
             SetupUI();
+            LoadCategories();
+        }
+
+        public void RefreshData()
+        {
             LoadCategories();
         }
 
@@ -216,8 +221,9 @@ namespace PersonalFinanceApp
                 ID = c.Id,
                 Ad = c.Name,
                 Tip = c.Type == "income" ? "Gelir" : "Gider",
-                ToplamTutar = (totals.TryGetValue(c.Id, out decimal total) ? total : 0)
-                    .ToString("#,##0", tr) + " ₺"
+                ToplamTutar = _user.HideAmountsEnabled
+                    ? "••••••"
+                    : (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
             }).ToList();
 
             dgvCategories.DataSource = displayList;

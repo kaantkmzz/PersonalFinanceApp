@@ -4,7 +4,7 @@ using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class ReportControl : UserControl
+    public partial class ReportControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly ReportService _reportService = new ReportService();
@@ -45,6 +45,10 @@ namespace PersonalFinanceApp
             LoadReport();
         }
 
+        public void RefreshData()
+        {
+            LoadReport();
+        }
         private void SetupUI()
         {
             this.AutoScaleMode = AutoScaleMode.None;
@@ -193,13 +197,24 @@ namespace PersonalFinanceApp
             _currentReport = current;
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            lblIncome.Text = current.TotalIncome.ToString("#,##0", tr) + " ₺";
-            lblExpense.Text = current.TotalExpense.ToString("#,##0", tr) + " ₺";
-            lblNet.Text = current.NetBalance.ToString("#,##0", tr) + " ₺";
-
             var (wallet, safe) = _accountService.GetBalances(_user.Id);
-            lblWalletBalance.Text = wallet.ToString("#,##0", tr) + " ₺";
-            lblSafeBalance.Text = safe.ToString("#,##0", tr) + " ₺";
+
+            if (_user.HideAmountsEnabled)
+            {
+                lblIncome.Text = "••••••";
+                lblExpense.Text = "••••••";
+                lblNet.Text = "••••••";
+                lblWalletBalance.Text = "••••••";
+                lblSafeBalance.Text = "••••••";
+            }
+            else
+            {
+                lblIncome.Text = current.TotalIncome.ToString("#,##0", tr) + " ₺";
+                lblExpense.Text = current.TotalExpense.ToString("#,##0", tr) + " ₺";
+                lblNet.Text = current.NetBalance.ToString("#,##0", tr) + " ₺";
+                lblWalletBalance.Text = wallet.ToString("#,##0", tr) + " ₺";
+                lblSafeBalance.Text = safe.ToString("#,##0", tr) + " ₺";
+            }
 
             _hoveredPointIndex = -1;
             chart.Series.Clear();
@@ -291,9 +306,8 @@ namespace PersonalFinanceApp
                 double value = point.YValues[0];
                 var tr = new System.Globalization.CultureInfo("tr-TR");
 
-                MessageBox.Show(
-                    $"{point.AxisLabel}\nTutar: {value.ToString("#,##0", tr)} ₺",
-                    "Kategori Bilgisi");
+                string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
+                MessageBox.Show($"{point.AxisLabel}\nTutar: {amountText}", "Kategori Bilgisi");
             }
         }
 
