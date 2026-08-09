@@ -198,12 +198,12 @@ namespace PersonalFinanceApp
             if (decimal.TryParse(value, out decimal amount)) { txtTargetAmount.TextChanged -= TxtTargetAmount_TextChanged; txtTargetAmount.Text = amount.ToString("#,##0"); txtTargetAmount.SelectionStart = txtTargetAmount.Text.Length; txtTargetAmount.TextChanged += TxtTargetAmount_TextChanged; }
         }
 
-        private void DgvGoals_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DgvGoals_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvGoals.ColumnCount)
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
                 e.Handled = true;
             }
         }
@@ -258,23 +258,23 @@ namespace PersonalFinanceApp
 
             if (dgvGoals.Columns["ID"] != null)
             {
-                dgvGoals.Columns["ID"].Visible = false;
-                dgvGoals.Columns["Hedef"].FillWeight = 110;
+                dgvGoals.Columns["ID"]!.Visible = false;
+                dgvGoals.Columns["Hedef"]!.FillWeight = 110;
 
-                dgvGoals.Columns["Biriken"].FillWeight = 60;
-                dgvGoals.Columns["Biriken"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                dgvGoals.Columns["Biriken"]!.FillWeight = 60;
+                dgvGoals.Columns["Biriken"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
-                dgvGoals.Columns["HedefTutar"].HeaderText = "Hedef Tutar";
-                dgvGoals.Columns["HedefTutar"].FillWeight = 60;
-                dgvGoals.Columns["HedefTutar"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                dgvGoals.Columns["HedefTutar"]!.HeaderText = "Hedef Tutar";
+                dgvGoals.Columns["HedefTutar"]!.FillWeight = 60;
+                dgvGoals.Columns["HedefTutar"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
-                dgvGoals.Columns["Ilerleme"].HeaderText = "İlerleme";
-                dgvGoals.Columns["Ilerleme"].FillWeight = 40;
-                dgvGoals.Columns["Ilerleme"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvGoals.Columns["Ilerleme"]!.HeaderText = "İlerleme";
+                dgvGoals.Columns["Ilerleme"]!.FillWeight = 40;
+                dgvGoals.Columns["Ilerleme"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-                dgvGoals.Columns["Tamamlandı"].FillWeight = 40;
-                dgvGoals.Columns["Tamamlandı"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dgvGoals.Columns["Tamamlandı"].ReadOnly = true;
+                dgvGoals.Columns["Tamamlandı"]!.FillWeight = 40;
+                dgvGoals.Columns["Tamamlandı"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvGoals.Columns["Tamamlandı"]!.ReadOnly = true;
             }
 
             if (_user.HideAmountsEnabled)
@@ -344,7 +344,7 @@ namespace PersonalFinanceApp
             }
         }
 
-        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
 
         // Görünürlüğü artırılmış kapsül tasarımı (Daha tok zemin, net çizgiler)
         private void SetupTranslucentCapsule(Panel pnl, Color fillColor, Color borderColor)
@@ -353,7 +353,7 @@ namespace PersonalFinanceApp
             pnl.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.Parent.BackColor);
+                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
 
                 var rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
 
@@ -371,7 +371,7 @@ namespace PersonalFinanceApp
             pnl.SizeChanged += (s, e) => pnl.Invalidate();
         }
 
-        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius) { var path = new System.Drawing.Drawing2D.GraphicsPath(); int d = Math.Max(radius * 2, 1); path.AddArc(rect.X, rect.Y, d, d, 180, 90); path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90); path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90); path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90); path.CloseFigure(); return path; }
     }
 }

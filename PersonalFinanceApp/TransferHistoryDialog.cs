@@ -85,9 +85,9 @@ namespace PersonalFinanceApp
 
             if (dgvHistory.Columns["Tarih"] != null)
             {
-                dgvHistory.Columns["Tarih"].FillWeight = 45;
-                dgvHistory.Columns["Yön"].FillWeight = 35;
-                dgvHistory.Columns["Tutar"].FillWeight = 20;
+                dgvHistory.Columns["Tarih"]!.FillWeight = 45;
+                dgvHistory.Columns["Yön"]!.FillWeight = 35;
+                dgvHistory.Columns["Tutar"]!.FillWeight = 20;
             }
         }
     }

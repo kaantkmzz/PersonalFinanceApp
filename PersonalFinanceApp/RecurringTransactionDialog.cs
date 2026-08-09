@@ -187,10 +187,10 @@ namespace PersonalFinanceApp
 
             if (dgvRecurring.Columns["ID"] != null)
             {
-                dgvRecurring.Columns["ID"].Visible = false;
-                dgvRecurring.Columns["Tip"].ReadOnly = true;
-                dgvRecurring.Columns["Kategori"].ReadOnly = true;
-                dgvRecurring.Columns["Tutar"].ReadOnly = true;
+                dgvRecurring.Columns["ID"]!.Visible = false;
+                dgvRecurring.Columns["Tip"]!.ReadOnly = true;
+                dgvRecurring.Columns["Kategori"]!.ReadOnly = true;
+                dgvRecurring.Columns["Tutar"]!.ReadOnly = true;
             }
 
             _isUpdatingProgrammatically = false;
@@ -203,7 +203,7 @@ namespace PersonalFinanceApp
 
             var row = dgvRecurring.Rows[e.RowIndex];
             int recurringId = Convert.ToInt32(row.Cells["ID"].Value);
-            bool newValue = (bool)row.Cells["Aktif"].Value;
+            bool newValue = (bool)row.Cells["Aktif"].Value!;
 
             _recurringService.SetActive(recurringId, _user.Id, newValue);
         }
