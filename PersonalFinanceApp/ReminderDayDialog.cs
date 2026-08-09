@@ -206,7 +206,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnDelete);
         }
 
-        private void DgvReminders_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DgvReminders_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex >= 0 && e.ColumnIndex > 0)
             {
@@ -217,7 +217,7 @@ namespace PersonalFinanceApp
 
                 using (Pen p = new Pen(lineColor, 1))
                 {
-                    e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 6, e.CellBounds.Left, e.CellBounds.Bottom - 6);
+                    e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 6, e.CellBounds.Left, e.CellBounds.Bottom - 6);
                 }
 
                 e.Handled = true;
@@ -243,19 +243,19 @@ namespace PersonalFinanceApp
 
             if (dgvReminders.Columns["ID"] != null)
             {
-                dgvReminders.Columns["ID"].Visible = false;
+                dgvReminders.Columns["ID"]!.Visible = false;
 
                 // Sadece Saat ve Başlık kilitli kalacak, Tamamlandı kilitsiz!
-                dgvReminders.Columns["Saat"].ReadOnly = true;
-                dgvReminders.Columns["Başlık"].ReadOnly = true;
-                dgvReminders.Columns["Tamamlandı"].ReadOnly = false;
+                dgvReminders.Columns["Saat"]!.ReadOnly = true;
+                dgvReminders.Columns["Başlık"]!.ReadOnly = true;
+                dgvReminders.Columns["Tamamlandı"]!.ReadOnly = false;
 
-                dgvReminders.Columns["Saat"].FillWeight = 50;
-                dgvReminders.Columns["Başlık"].FillWeight = 160;
-                dgvReminders.Columns["Tamamlandı"].FillWeight = 70;
+                dgvReminders.Columns["Saat"]!.FillWeight = 50;
+                dgvReminders.Columns["Başlık"]!.FillWeight = 160;
+                dgvReminders.Columns["Tamamlandı"]!.FillWeight = 70;
 
-                dgvReminders.Columns["Saat"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dgvReminders.Columns["Tamamlandı"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvReminders.Columns["Saat"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvReminders.Columns["Tamamlandı"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
 
             foreach (DataGridViewRow row in dgvReminders.Rows)
@@ -384,7 +384,7 @@ namespace PersonalFinanceApp
             btn.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(btn.Parent.BackColor);
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
 
                 Rectangle rect = new Rectangle(0, 0, btn.Width - 1, btn.Height - 1);
                 using (var path = GetRoundedRectPath(rect, 8))
