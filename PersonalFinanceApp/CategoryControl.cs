@@ -162,17 +162,17 @@ namespace PersonalFinanceApp
             this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
         }
 
-        private void DgvCategories_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DgvCategories_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvCategories.ColumnCount)
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
                 e.Handled = true;
             }
         }
 
-        private void DgvCategories_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        private void DgvCategories_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0)
             {
@@ -181,7 +181,7 @@ namespace PersonalFinanceApp
 
                 if (idCell?.Value != null && adCell?.Value != null && int.TryParse(idCell.Value.ToString(), out int categoryId))
                 {
-                    string categoryName = adCell.Value.ToString();
+                    string categoryName = adCell.Value.ToString() ?? string.Empty;
 
                     // Yeni oluşturduğumuz pencereyi açıyoruz
                     using (var dialog = new CategoryDetailsDialog(_user, categoryId, categoryName))
@@ -214,9 +214,9 @@ namespace PersonalFinanceApp
 
             if (dgvCategories.Columns["ID"] != null)
             {
-                dgvCategories.Columns["ID"].FillWeight = 30; dgvCategories.Columns["Ad"].FillWeight = 90;
-                dgvCategories.Columns["Tip"].FillWeight = 60; dgvCategories.Columns["ToplamTutar"].FillWeight = 90;
-                dgvCategories.Columns["ToplamTutar"].HeaderText = "Toplam Tutar";
+                dgvCategories.Columns["ID"]!.FillWeight = 30; dgvCategories.Columns["Ad"]!.FillWeight = 90;
+                dgvCategories.Columns["Tip"]!.FillWeight = 60; dgvCategories.Columns["ToplamTutar"]!.FillWeight = 90;
+                dgvCategories.Columns["ToplamTutar"]!.HeaderText = "Toplam Tutar";
             }
         }
 
@@ -245,7 +245,7 @@ namespace PersonalFinanceApp
             pnl.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.Parent.BackColor);
+                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
                 var rect = new Rectangle(1, 1, pnl.Width - 3, pnl.Height - 3);
                 using (var path = GetRoundedRectPath(rect, pnl.Height / 2))
                 {
@@ -290,7 +290,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? Color.FromArgb(60, 65, 85) : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index].ToString(), cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             };
 
             // 2. BEYAZ ÇERÇEVE ÇÖZÜMÜ: Sadece dıştaki 1 piksellik beyaz çizgiyi tıraşlıyoruz
@@ -324,8 +324,8 @@ namespace PersonalFinanceApp
             pnlArrow.BringToFront();
         }
 
-        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
-        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius) { var path = new System.Drawing.Drawing2D.GraphicsPath(); int d = Math.Max(radius * 2, 1); path.AddArc(rect.X, rect.Y, d, d, 180, 90); path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90); path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90); path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90); path.CloseFigure(); return path; }
     }
 }

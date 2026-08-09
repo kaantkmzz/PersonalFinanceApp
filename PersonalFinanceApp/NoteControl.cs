@@ -249,7 +249,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(pnlLeft);
         }
 
-        private void DgvNotes_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DgvNotes_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && dgvNotes.Columns[e.ColumnIndex].Name == "Tarih")
             {
@@ -260,7 +260,7 @@ namespace PersonalFinanceApp
 
                 using (Pen p = new Pen(lineColor, 1))
                 {
-                    e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 8, e.CellBounds.Left, e.CellBounds.Bottom - 8);
+                    e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 8, e.CellBounds.Left, e.CellBounds.Bottom - 8);
                 }
 
                 e.Handled = true;
@@ -281,16 +281,16 @@ namespace PersonalFinanceApp
             dgvNotes.DataSource = displayList;
 
             if (dgvNotes.Columns["ID"] != null)
-                dgvNotes.Columns["ID"].Visible = false;
+                dgvNotes.Columns["ID"]!.Visible = false;
 
             if (dgvNotes.Columns["Başlık"] != null && dgvNotes.Columns["Tarih"] != null)
             {
-                dgvNotes.Columns["Başlık"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                dgvNotes.Columns["Başlık"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
-                dgvNotes.Columns["Tarih"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-                dgvNotes.Columns["Tarih"].Width = 110;
-                dgvNotes.Columns["Tarih"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dgvNotes.Columns["Tarih"].DefaultCellStyle.Padding = new Padding(0, 0, 10, 0);
+                dgvNotes.Columns["Tarih"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                dgvNotes.Columns["Tarih"]!.Width = 110;
+                dgvNotes.Columns["Tarih"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                dgvNotes.Columns["Tarih"]!.DefaultCellStyle.Padding = new Padding(0, 0, 10, 0);
             }
         }
 
@@ -411,7 +411,7 @@ namespace PersonalFinanceApp
             btn.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(btn.Parent.BackColor);
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
 
                 Rectangle rect = new Rectangle(0, 0, btn.Width - 1, btn.Height - 1);
                 using (var path = GetRoundedRectPath(rect, 8))
