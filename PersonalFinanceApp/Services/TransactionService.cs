@@ -128,6 +128,26 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
+            if (type != "income" && type != "expense")
+            {
+                errorMessage = "Geçersiz işlem tipi.";
+                return false;
+            }
+
+            // Eski işlemin cüzdana etkisini geri al, yeni değerlerin etkisini uygula
+            decimal reverseOldDelta = existing.Type == "income" ? -existing.Amount : existing.Amount;
+            decimal applyNewDelta = type == "income" ? amount : -amount;
+
+            if (type == "expense")
+            {
+                var (wallet, _) = _accountService.GetBalances(userId);
+                if (amount > wallet + reverseOldDelta)
+                {
+                    errorMessage = "Cüzdanınızda yeterli bakiye yok.";
+                    return false;
+                }
+            }
+
             existing.CategoryId = categoryId;
             existing.Amount = amount;
             existing.Type = type;
@@ -135,6 +155,8 @@ namespace PersonalFinanceApp.Services
             existing.TransactionDate = transactionDate;
 
             _repository.Update(existing);
+            _accountService.AdjustWalletBalance(userId, reverseOldDelta + applyNewDelta);
+
             return true;
         }
     }

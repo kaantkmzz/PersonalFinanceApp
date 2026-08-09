@@ -35,6 +35,7 @@ namespace PersonalFinanceApp
         private TextBox txtDescription = new TextBox();
 
         private Button btnAdd = new Button();
+        private Button btnEdit = new Button();
         private Button btnDelete = new Button();
         private Button btnExport = new Button();
         private Button btnRecurring = new Button();
@@ -183,22 +184,27 @@ namespace PersonalFinanceApp
             pnlBottom.Padding = new Padding(20, 15, 40, 15);
             pnlBottom.BackColor = AppBackColor;
 
+            btnEdit.Text = "✏️ Seçili İşlemi Düzenle";
+            btnEdit.Left = 20; btnEdit.Top = 20; btnEdit.Width = 190; btnEdit.Height = 38; btnEdit.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnEdit, Color.FromArgb(80, 85, 105), Color.White, false);
+            btnEdit.Click += BtnEdit_Click;
+
             btnDelete.Text = "🗑️ Seçili İşlemi Sil";
-            btnDelete.Left = 20; btnDelete.Top = 20; btnDelete.Width = 160; btnDelete.Height = 38; btnDelete.Cursor = Cursors.Hand;
+            btnDelete.Left = 220; btnDelete.Top = 20; btnDelete.Width = 160; btnDelete.Height = 38; btnDelete.Cursor = Cursors.Hand;
             SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
             btnDelete.Click += BtnDelete_Click;
 
             btnExport.Text = "📄 CSV'ye Aktar";
-            btnExport.Left = 200; btnExport.Top = 20; btnExport.Width = 160; btnExport.Height = 38; btnExport.Cursor = Cursors.Hand;
+            btnExport.Left = 400; btnExport.Top = 20; btnExport.Width = 160; btnExport.Height = 38; btnExport.Cursor = Cursors.Hand;
             SetupRoundedButton(btnExport, Color.FromArgb(80, 85, 105), Color.White, false);
             btnExport.Click += BtnExport_Click;
 
             btnRecurring.Text = "🔄 Tekrarlanan İşlemler";
-            btnRecurring.Left = 380; btnRecurring.Top = 20; btnRecurring.Width = 210; btnRecurring.Height = 38; btnRecurring.Cursor = Cursors.Hand;
+            btnRecurring.Left = 580; btnRecurring.Top = 20; btnRecurring.Width = 210; btnRecurring.Height = 38; btnRecurring.Cursor = Cursors.Hand;
             SetupRoundedButton(btnRecurring, Color.FromArgb(80, 85, 105), Color.White, false);
             btnRecurring.Click += (s, e) => { using (var dialog = new RecurringTransactionDialog(_user)) { dialog.ShowDialog(); } };
 
-            pnlBottom.Controls.Add(btnDelete); pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
+            pnlBottom.Controls.Add(btnEdit); pnlBottom.Controls.Add(btnDelete); pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
 
             this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
         }
@@ -289,6 +295,26 @@ namespace PersonalFinanceApp
                 txtAmount.Clear(); txtDescription.Clear(); LoadCategorySuggestions(); LoadTransactions(); RefreshWalletBalance();
             }
             else { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = errorMessage; }
+        }
+
+        private void BtnEdit_Click(object? sender, EventArgs e)
+        {
+            if (dgvTransactions.CurrentRow == null) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Lütfen düzenlemek için bir işlem seçin."; return; }
+            var idCell = dgvTransactions.CurrentRow.Cells["ID"];
+            if (idCell?.Value == null || !int.TryParse(idCell.Value.ToString(), out int transactionId)) return;
+
+            var transaction = _cachedTransactions.FirstOrDefault(t => t.Id == transactionId);
+            if (transaction == null) return;
+
+            using (var dialog = new TransactionEditDialog(_user, transaction))
+            {
+                dialog.ShowDialog();
+                if (dialog.WasUpdated)
+                {
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "İşlem güncellendi.";
+                    LoadTransactions(); RefreshWalletBalance();
+                }
+            }
         }
 
         private void BtnDelete_Click(object? sender, EventArgs e)

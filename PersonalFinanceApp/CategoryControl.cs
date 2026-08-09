@@ -35,10 +35,6 @@ namespace PersonalFinanceApp
         private Button btnAdd = new Button();
         private Label lblStatus = new Label();
 
-        private TextBox txtRename = new TextBox();
-        private Button btnRename = new Button();
-        private Button btnDelete = new Button();
-
         private DataGridView dgvCategories = new DataGridView();
         private List<Category> _cachedCategories = new List<Category>();
 
