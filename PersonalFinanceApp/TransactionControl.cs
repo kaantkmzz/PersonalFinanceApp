@@ -246,26 +246,28 @@ namespace PersonalFinanceApp
         private void RefreshGrid()
         {
             var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            // Tarih sütununu Açıklama'nın hemen önüne aldık
             var displayList = _cachedTransactions.Select(t => new
             {
                 ID = t.Id,
-                Tarih = t.TransactionDate.ToString("dd.MM.yyyy HH:mm"), // YENİ SÜTUN: Tarih ve Saat
                 Tip = t.Type == "income" ? "Gelir" : "Gider",
                 Kategori = t.CategoryName,
                 Tutar = _user.HideAmountsEnabled ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺",
+                Tarih = t.TransactionDate.ToString("dd.MM.yyyy HH:mm"),
                 Açıklama = t.Description
             }).ToList();
 
             dgvTransactions.DataSource = displayList;
             if (dgvTransactions.Columns["ID"] != null) dgvTransactions.Columns["ID"].Visible = false;
 
-            // Sütun genişliklerini manuel ayarlıyoruz
             if (dgvTransactions.Columns["Tip"] != null)
             {
-                dgvTransactions.Columns["Tarih"].FillWeight = 65;
-                dgvTransactions.Columns["Tip"].FillWeight = 25; // İyice daraltıldı
+                // Genişlikleri daha estetik olacak şekilde dağıttık
+                dgvTransactions.Columns["Tip"].FillWeight = 30; // Yamuk durmaması için biraz açtık
                 dgvTransactions.Columns["Kategori"].FillWeight = 70;
                 dgvTransactions.Columns["Tutar"].FillWeight = 45;
+                dgvTransactions.Columns["Tarih"].FillWeight = 60;
                 dgvTransactions.Columns["Açıklama"].FillWeight = 95;
             }
         }
