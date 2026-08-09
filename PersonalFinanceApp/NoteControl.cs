@@ -1,5 +1,11 @@
-﻿using PersonalFinanceApp.Models;
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Linq;
+using System.Collections.Generic;
+using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
+using PersonalFinanceApp.Helpers;
 
 namespace PersonalFinanceApp
 {
@@ -20,12 +26,22 @@ namespace PersonalFinanceApp
         private int? _selectedNoteId = null;
 
         private TextBox txtTitle = new TextBox();
-        private TextBox txtContent = new TextBox();
+        private NotebookTextBox txtContent = new NotebookTextBox();
         private Button btnNew = new Button();
         private Button btnSave = new Button();
         private Button btnDelete = new Button();
         private Label lblStatus = new Label();
         private Label lblEditingTitle = new Label();
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000;
+                return cp;
+            }
+        }
 
         public NoteControl(User user)
         {
@@ -66,11 +82,8 @@ namespace PersonalFinanceApp
             btnNew.Top = 65;
             btnNew.Width = 420;
             btnNew.Height = 34;
-            btnNew.FlatStyle = FlatStyle.Flat;
-            btnNew.FlatAppearance.BorderSize = 0;
-            btnNew.BackColor = AccentColor;
-            btnNew.ForeColor = Color.White;
             btnNew.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnNew, AccentColor, Color.White, false);
             btnNew.Click += BtnNew_Click;
 
             Panel pnlGridWrapper = new Panel
@@ -79,8 +92,9 @@ namespace PersonalFinanceApp
                 Top = 115,
                 Width = 420,
                 Height = 600,
-                BackColor = AppBackColor
+                Padding = new Padding(2, 6, 2, 6)
             };
+            SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
 
             dgvNotes.Dock = DockStyle.Fill;
             dgvNotes.ReadOnly = true;
@@ -90,17 +104,24 @@ namespace PersonalFinanceApp
             dgvNotes.AllowUserToResizeRows = false;
             dgvNotes.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvNotes.MultiSelect = false;
-            dgvNotes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvNotes.ColumnHeadersVisible = false;
-            dgvNotes.BackgroundColor = Color.White;
-            dgvNotes.BorderStyle = BorderStyle.None;
             dgvNotes.RowHeadersVisible = false;
             dgvNotes.Font = new Font("Segoe UI", 9.5F);
             dgvNotes.RowTemplate.Height = 46;
-            dgvNotes.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
-            dgvNotes.DefaultCellStyle.SelectionBackColor = Color.FromArgb(238, 239, 246);
-            dgvNotes.DefaultCellStyle.SelectionForeColor = Color.FromArgb(40, 40, 40);
             dgvNotes.SelectionChanged += (s, e) => LoadSelectedNote();
+
+            dgvNotes.BorderStyle = BorderStyle.None;
+            dgvNotes.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvNotes.GridColor = Color.FromArgb(60, 65, 85);
+
+            dgvNotes.BackgroundColor = CardBackColor;
+            dgvNotes.DefaultCellStyle.BackColor = CardBackColor;
+            dgvNotes.DefaultCellStyle.ForeColor = TextLight;
+            dgvNotes.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
+            dgvNotes.DefaultCellStyle.SelectionBackColor = Color.FromArgb(60, 64, 90);
+            dgvNotes.DefaultCellStyle.SelectionForeColor = TextLight;
+
+            dgvNotes.CellPainting += DgvNotes_CellPainting;
 
             pnlGridWrapper.Controls.Add(dgvNotes);
 
@@ -112,84 +133,138 @@ namespace PersonalFinanceApp
             Panel pnlRight = new Panel
             {
                 Dock = DockStyle.Fill,
+                BackColor = AppBackColor
+            };
+
+            Panel pnlRightTop = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 155,
                 BackColor = AppBackColor,
-                Padding = new Padding(20)
+                Padding = new Padding(20, 20, 20, 0)
             };
 
             lblEditingTitle.Text = "Bir not seçin ya da yeni bir not oluşturun";
             lblEditingTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             lblEditingTitle.ForeColor = TextLight;
-            lblEditingTitle.Left = 20;
-            lblEditingTitle.Top = 20;
+            lblEditingTitle.Left = 0;
+            lblEditingTitle.Top = 0;
             lblEditingTitle.AutoSize = true;
 
-            Label lblTitleField = new Label { Text = "Başlık:", Left = 20, Top = 55, ForeColor = TextMuted, AutoSize = true };
-            txtTitle.Left = 20;
-            txtTitle.Top = 80;
-            txtTitle.Width = 700;
-            txtTitle.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            txtTitle.Font = new Font("Segoe UI", 10.5F);
+            Label lblTitleField = new Label { Text = "Başlık:", Left = 0, Top = 45, ForeColor = TextMuted, AutoSize = true };
 
-            Label lblContentField = new Label { Text = "İçerik:", Left = 20, Top = 120, ForeColor = TextMuted, AutoSize = true };
-
-            Panel pnlContentWrapper = new Panel
+            Panel pnlTitleWrapper = new Panel
             {
-                Left = 20,
-                Top = 145,
+                Left = 0,
+                Top = 75,
                 Width = 700,
-                Height = 380,
+                Height = 42
+            };
+            SetupSmoothContainer(pnlTitleWrapper, 8, CardBackColor);
+
+            txtTitle.BorderStyle = BorderStyle.None;
+            txtTitle.Font = new Font("Segoe UI", 11F);
+            txtTitle.BackColor = CardBackColor;
+            txtTitle.ForeColor = TextLight;
+            txtTitle.Width = 680;
+            txtTitle.Location = new Point(10, 8);
+
+            pnlTitleWrapper.Controls.Add(txtTitle);
+
+            // Görsel denge için Top değeri 120'den 135'e indirilip not alanına yaklaştırıldı
+            Label lblContentField = new Label { Text = "İçerik:", Left = 0, Top = 135, ForeColor = TextMuted, AutoSize = true };
+
+            pnlRightTop.Controls.Add(lblEditingTitle);
+            pnlRightTop.Controls.Add(lblTitleField);
+            pnlRightTop.Controls.Add(pnlTitleWrapper);
+            pnlRightTop.Controls.Add(lblContentField);
+
+            Panel pnlRightBottom = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 90,
                 BackColor = AppBackColor,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Padding = new Padding(20, 10, 20, 20)
             };
 
-            txtContent.Dock = DockStyle.Fill;
-            txtContent.Multiline = true;
-            txtContent.ScrollBars = ScrollBars.Vertical;
-            txtContent.Font = new Font("Segoe UI", 10.5F);
-            pnlContentWrapper.Controls.Add(txtContent);
-
             btnSave.Text = "Kaydet";
-            btnSave.Left = 20;
-            btnSave.Top = 540;
+            btnSave.Left = 0;
+            btnSave.Top = 0;
             btnSave.Width = 140;
             btnSave.Height = 36;
-            btnSave.FlatStyle = FlatStyle.Flat;
-            btnSave.FlatAppearance.BorderSize = 0;
-            btnSave.BackColor = AccentColor;
-            btnSave.ForeColor = Color.White;
             btnSave.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSave, AccentColor, Color.White, false);
             btnSave.Click += BtnSave_Click;
 
             btnDelete.Text = "Notu Sil";
-            btnDelete.Left = 170;
-            btnDelete.Top = 540;
+            btnDelete.Left = 150;
+            btnDelete.Top = 0;
             btnDelete.Width = 140;
             btnDelete.Height = 36;
-            btnDelete.FlatStyle = FlatStyle.Flat;
-            btnDelete.FlatAppearance.BorderSize = 1;
-            btnDelete.FlatAppearance.BorderColor = DangerColor;
-            btnDelete.BackColor = AppBackColor;
-            btnDelete.ForeColor = DangerColor;
             btnDelete.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
             btnDelete.Click += BtnDelete_Click;
 
-            lblStatus.Left = 20;
-            lblStatus.Top = 585;
+            lblStatus.Left = 0;
+            lblStatus.Top = 45;
             lblStatus.Width = 500;
             lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
 
-            pnlRight.Controls.Add(lblEditingTitle);
-            pnlRight.Controls.Add(lblTitleField);
-            pnlRight.Controls.Add(txtTitle);
-            pnlRight.Controls.Add(lblContentField);
-            pnlRight.Controls.Add(pnlContentWrapper);
-            pnlRight.Controls.Add(btnSave);
-            pnlRight.Controls.Add(btnDelete);
-            pnlRight.Controls.Add(lblStatus);
+            pnlRightBottom.Controls.Add(btnSave);
+            pnlRightBottom.Controls.Add(btnDelete);
+            pnlRightBottom.Controls.Add(lblStatus);
+
+            txtContent.Dock = DockStyle.Fill;
+            txtContent.BorderStyle = BorderStyle.None;
+            txtContent.Multiline = true;
+            txtContent.ScrollBars = ScrollBars.None;
+            txtContent.WordWrap = true;
+            txtContent.Font = new Font("Segoe UI", 11F);
+            txtContent.BackColor = CardBackColor;
+            txtContent.ForeColor = TextLight;
+
+            Panel pnlContentOuter = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 8, 40, 20),
+                BackColor = AppBackColor
+            };
+
+            Panel pnlContentWrapper = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(6, 12, 6, 12)
+            };
+            SetupSmoothContainer(pnlContentWrapper, 12, CardBackColor);
+
+            pnlContentWrapper.Controls.Add(txtContent);
+            pnlContentOuter.Controls.Add(pnlContentWrapper);
+
+            pnlRight.Controls.Add(pnlContentOuter);
+            pnlRight.Controls.Add(pnlRightBottom);
+            pnlRight.Controls.Add(pnlRightTop);
 
             this.Controls.Add(pnlRight);
             this.Controls.Add(pnlLeft);
+        }
+
+        private void DgvNotes_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && dgvNotes.Columns[e.ColumnIndex].Name == "Tarih")
+            {
+                e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+
+                bool isSelected = (e.State & DataGridViewElementStates.Selected) == DataGridViewElementStates.Selected;
+                Color lineColor = isSelected ? Color.FromArgb(110, 115, 140) : Color.FromArgb(60, 65, 85);
+
+                using (Pen p = new Pen(lineColor, 1))
+                {
+                    e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 8, e.CellBounds.Left, e.CellBounds.Bottom - 8);
+                }
+
+                e.Handled = true;
+            }
         }
 
         private void LoadNotes()
@@ -200,14 +275,22 @@ namespace PersonalFinanceApp
             {
                 ID = n.Id,
                 Başlık = string.IsNullOrWhiteSpace(n.Title) ? "(Başlıksız)" : n.Title,
-                Tarih = n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                Tarih = n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")
             }).ToList();
 
             dgvNotes.DataSource = displayList;
 
             if (dgvNotes.Columns["ID"] != null)
-            {
                 dgvNotes.Columns["ID"].Visible = false;
+
+            if (dgvNotes.Columns["Başlık"] != null && dgvNotes.Columns["Tarih"] != null)
+            {
+                dgvNotes.Columns["Başlık"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+
+                dgvNotes.Columns["Tarih"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                dgvNotes.Columns["Tarih"].Width = 110;
+                dgvNotes.Columns["Tarih"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                dgvNotes.Columns["Tarih"].DefaultCellStyle.Padding = new Padding(0, 0, 10, 0);
             }
         }
 
@@ -229,12 +312,12 @@ namespace PersonalFinanceApp
         private void BtnNew_Click(object? sender, EventArgs e)
         {
             dgvNotes.ClearSelection();
-            dgvNotes.CurrentCell = null; // "aktif satır" bilgisini de gerçekten sıfırlıyoruz
+            dgvNotes.CurrentCell = null;
             lblEditingTitle.Text = "Yeni Not";
             txtTitle.Clear();
             txtContent.Clear();
             lblStatus.Text = string.Empty;
-            _selectedNoteId = null; // en sona aldık — SelectionChanged tetiklense bile artık üzerine yazamaz
+            _selectedNoteId = null;
             txtTitle.Focus();
         }
 
@@ -287,6 +370,128 @@ namespace PersonalFinanceApp
                 lblStatus.Text = "Not silindi.";
                 BtnNew_Click(null, EventArgs.Empty);
                 LoadNotes();
+            }
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius))
+                {
+                    using (var brush = new SolidBrush(bgColor))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+                    using (var pen = new Pen(bgColor, 1))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            btn.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btn.BackColor = Color.Transparent;
+
+            bool isHovered = false;
+            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
+            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
+
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent.BackColor);
+
+                Rectangle rect = new Rectangle(0, 0, btn.Width - 1, btn.Height - 1);
+                using (var path = GetRoundedRectPath(rect, 8))
+                {
+                    if (isOutlined)
+                    {
+                        using (var pen = new Pen(isHovered ? ControlPaint.Light(textColor) : textColor, 1.5f))
+                        {
+                            e.Graphics.DrawPath(pen, path);
+                        }
+                    }
+                    else
+                    {
+                        using (var brush = new SolidBrush(isHovered ? ControlPaint.Light(bgColor) : bgColor))
+                        {
+                            e.Graphics.FillPath(brush, path);
+                        }
+                    }
+                }
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, rect, textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int diameter = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
+            path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    public class NotebookTextBox : TextBox
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wp, IntPtr lp);
+        private const int EM_SETMARGINS = 0xd3;
+        private const int EC_LEFTMARGIN = 0x1;
+
+        private const int WM_PAINT = 0x000F;
+        private const int WM_VSCROLL = 0x0115;
+        private const int WM_MOUSEWHEEL = 0x020A;
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            SendMessage(this.Handle, EM_SETMARGINS, (IntPtr)EC_LEFTMARGIN, (IntPtr)40);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+
+            if (m.Msg == WM_PAINT)
+            {
+                using (Graphics g = Graphics.FromHwnd(this.Handle))
+                {
+                    int lineHeight = this.Font.Height;
+
+                    using (Pen p = new Pen(Color.FromArgb(60, 65, 85), 1))
+                    {
+                        for (int y = lineHeight; y < this.Height; y += lineHeight)
+                        {
+                            g.DrawLine(p, 0, y + 2, this.Width, y + 2);
+                        }
+                    }
+
+                    using (Pen pMargin = new Pen(Color.FromArgb(50, 55, 75), 1))
+                    {
+                        g.DrawLine(pMargin, 32, 0, 32, this.Height);
+                    }
+                }
+            }
+            else if (m.Msg == WM_VSCROLL || m.Msg == WM_MOUSEWHEEL)
+            {
+                this.Invalidate();
             }
         }
     }

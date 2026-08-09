@@ -1,36 +1,55 @@
-﻿using PersonalFinanceApp.Models;
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Linq;
+using System.Collections.Generic;
+using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
-    public partial class ReminderControl : UserControl
+    public partial class ReminderControl : UserControl, IRefreshable
     {
         private readonly User _user;
         private readonly ReminderService _reminderService = new ReminderService();
 
         private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
         private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
+        private static readonly Color MonthCardColor = Color.FromArgb(45, 50, 68);
+        private static readonly Color CardBorderColor = Color.FromArgb(60, 65, 85);
         private static readonly Color TodayColor = Color.FromArgb(60, 64, 90);
         private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color MarkerColor = Color.FromArgb(230, 100, 100);
+
+        // Aktif hatırlatıcılar için kapsül rengi (Hafif saydam kırmızı)
+        private static readonly Color ActiveReminderColor = Color.FromArgb(160, 220, 90, 90);
+        // Normal kapsül rengi (Daha şeffaf)
+        private static readonly Color DefaultCapsuleColor = Color.FromArgb(18, 255, 255, 255);
 
         private Panel pnlTop = new Panel();
         private Panel pnlCalendar = new Panel();
-        private TableLayoutPanel tblCalendar = new TableLayoutPanel();
-        private Label lblMonthYear = new Label();
+        private TableLayoutPanel tblMonths = new TableLayoutPanel();
+        private Label lblYear = new Label();
 
         private int _currentYear;
-        private int _currentMonth;
         private List<Reminder> _cachedReminders = new List<Reminder>();
+
+        private static readonly string[] MonthNames =
+        {
+            "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+            "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+        };
 
         public ReminderControl(User user)
         {
             _user = user;
             _currentYear = DateTime.Today.Year;
-            _currentMonth = DateTime.Today.Month;
             InitializeComponent();
             SetupUI();
+            LoadRemindersAndBuildCalendar();
+        }
+
+        public void RefreshData()
+        {
             LoadRemindersAndBuildCalendar();
         }
 
@@ -41,8 +60,10 @@ namespace PersonalFinanceApp
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
+            EnableDoubleBuffering(this);
+
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 100;
+            pnlTop.Height = 110;
             pnlTop.BackColor = AppBackColor;
 
             Label lblTitle = new Label
@@ -55,79 +76,104 @@ namespace PersonalFinanceApp
                 AutoSize = true
             };
 
+            Panel pnlYearCapsule = new Panel
+            {
+                Left = 20,
+                Top = 65,
+                Width = 150,
+                Height = 34,
+                BackColor = AppBackColor
+            };
+
+            pnlYearCapsule.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+
+                int radius = pnlYearCapsule.Height / 2;
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnlYearCapsule.Width - 1, pnlYearCapsule.Height - 1), radius))
+                {
+                    using (var brush = new SolidBrush(CardBackColor))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+                    using (var pen = new Pen(CardBorderColor, 1))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+            pnlYearCapsule.SizeChanged += (s, e) => pnlYearCapsule.Invalidate();
+
             Button btnPrev = new Button
             {
                 Text = "◀",
-                Left = 20,
-                Top = 62,
-                Width = 40,
+                Left = 2,
+                Top = 2,
+                Width = 30,
                 Height = 30,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = CardBackColor,
+                BackColor = Color.Transparent,
                 ForeColor = TextLight,
                 Cursor = Cursors.Hand
             };
             btnPrev.FlatAppearance.BorderSize = 0;
-            btnPrev.Click += (s, e) => ChangeMonth(-1);
+            btnPrev.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btnPrev.FlatAppearance.MouseOverBackColor = Color.FromArgb(30, 255, 255, 255);
+            btnPrev.Click += (s, e) => ChangeYear(-1);
 
-            lblMonthYear.Left = 70;
-            lblMonthYear.Top = 67;
-            lblMonthYear.AutoSize = true;
-            lblMonthYear.ForeColor = TextLight;
-            lblMonthYear.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblYear.Left = 32;
+            lblYear.Top = 0;
+            lblYear.Width = 86;
+            lblYear.Height = 34;
+            lblYear.AutoSize = false;
+            lblYear.ForeColor = TextLight;
+            lblYear.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblYear.TextAlign = ContentAlignment.MiddleCenter;
+            lblYear.BackColor = Color.Transparent;
 
             Button btnNext = new Button
             {
                 Text = "▶",
-                Left = 230,
-                Top = 62,
-                Width = 40,
+                Left = 118,
+                Top = 2,
+                Width = 30,
                 Height = 30,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = CardBackColor,
+                BackColor = Color.Transparent,
                 ForeColor = TextLight,
                 Cursor = Cursors.Hand
             };
             btnNext.FlatAppearance.BorderSize = 0;
-            btnNext.Click += (s, e) => ChangeMonth(1);
+            btnNext.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btnNext.FlatAppearance.MouseOverBackColor = Color.FromArgb(30, 255, 255, 255);
+            btnNext.Click += (s, e) => ChangeYear(1);
+
+            pnlYearCapsule.Controls.Add(btnPrev);
+            pnlYearCapsule.Controls.Add(lblYear);
+            pnlYearCapsule.Controls.Add(btnNext);
 
             pnlTop.Controls.Add(lblTitle);
-            pnlTop.Controls.Add(btnPrev);
-            pnlTop.Controls.Add(lblMonthYear);
-            pnlTop.Controls.Add(btnNext);
+            pnlTop.Controls.Add(pnlYearCapsule);
 
             pnlCalendar.Dock = DockStyle.Fill;
-            pnlCalendar.Padding = new Padding(20);
+            pnlCalendar.Padding = new Padding(16);
             pnlCalendar.BackColor = AppBackColor;
 
-            tblCalendar.Dock = DockStyle.Fill;
-            tblCalendar.ColumnCount = 7;
-            tblCalendar.BackColor = AppBackColor;
-            tblCalendar.CellBorderStyle = TableLayoutPanelCellBorderStyle.Single;
-            for (int i = 0; i < 7; i++)
-            {
-                tblCalendar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 7f));
-            }
-            
-            EnableDoubleBuffering(tblCalendar);
-            EnableDoubleBuffering(pnlCalendar);
+            tblMonths.Dock = DockStyle.Fill;
+            tblMonths.ColumnCount = 4;
+            tblMonths.RowCount = 3;
+            tblMonths.BackColor = AppBackColor;
+            for (int i = 0; i < 4; i++) tblMonths.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+            for (int i = 0; i < 3; i++) tblMonths.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / 3f));
+            EnableDoubleBuffering(tblMonths);
 
-            pnlCalendar.Controls.Add(tblCalendar);
+            pnlCalendar.Controls.Add(tblMonths);
 
             this.Controls.Add(pnlCalendar);
             this.Controls.Add(pnlTop);
         }
 
-        private void ChangeMonth(int delta)
-        {
-            _currentMonth += delta;
-            if (_currentMonth < 1) { _currentMonth = 12; _currentYear--; }
-            if (_currentMonth > 12) { _currentMonth = 1; _currentYear++; }
-
-            LoadRemindersAndBuildCalendar();
-        }
-
-        // Yansıma (reflection) kullanarak, normalde gizli olan çift tamponlama özelliğini açıyoruz
         private void EnableDoubleBuffering(Control control)
         {
             typeof(Control).InvokeMember(
@@ -138,114 +184,242 @@ namespace PersonalFinanceApp
                 new object[] { true });
         }
 
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius))
+                {
+                    using (var brush = new SolidBrush(bgColor))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+                    using (var pen = new Pen(CardBorderColor, 1))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void ChangeYear(int delta)
+        {
+            _currentYear += delta;
+            LoadRemindersAndBuildCalendar();
+        }
+
         private void LoadRemindersAndBuildCalendar()
         {
             _cachedReminders = _reminderService.GetUserReminders(_user.Id);
-            BuildCalendar();
+            BuildAllMonths();
         }
 
-        private void BuildCalendar()
+        private void BuildAllMonths()
         {
-            tblCalendar.SuspendLayout();
+            lblYear.Text = _currentYear.ToString();
+
+            tblMonths.SuspendLayout();
             this.SuspendLayout();
-            string[] monthNames = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
-            lblMonthYear.Text = $"{monthNames[_currentMonth - 1]} {_currentYear}";
 
-            tblCalendar.Controls.Clear();
-            tblCalendar.RowStyles.Clear();
-            tblCalendar.RowCount = 1;
-            tblCalendar.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+            tblMonths.Controls.Clear();
 
-            string[] dayNames = { "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz" };
-            for (int i = 0; i < 7; i++)
+            for (int month = 1; month <= 12; month++)
             {
-                Label lblDayName = new Label
-                {
-                    Text = dayNames[i],
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    ForeColor = TextMuted,
-                    Font = new Font("Segoe UI", 9F, FontStyle.Bold)
-                };
-                tblCalendar.Controls.Add(lblDayName, i, 0);
+                var card = BuildMiniMonthCard(_currentYear, month);
+                int col = (month - 1) % 4;
+                int row = (month - 1) / 4;
+                tblMonths.Controls.Add(card, col, row);
             }
 
-            DateTime firstOfMonth = new DateTime(_currentYear, _currentMonth, 1);
-            int daysInMonth = DateTime.DaysInMonth(_currentYear, _currentMonth);
-            int startOffset = ((int)firstOfMonth.DayOfWeek + 6) % 7; // Pazartesi = 0 olacak şekilde hizalıyoruz
+            this.ResumeLayout(true);
+            tblMonths.ResumeLayout(true);
+        }
+
+        private Panel BuildMiniMonthCard(int year, int month)
+        {
+            Panel card = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(6)
+            };
+
+            SetupSmoothContainer(card, 12, MonthCardColor);
+            EnableDoubleBuffering(card);
+
+            var dayGrid = BuildDayGrid(year, month);
+
+            Panel pnlMonthTitle = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                BackColor = Color.Transparent
+            };
+
+            string monthText = MonthNames[month - 1];
+            pnlMonthTitle.Paint += (s, e) =>
+            {
+                DrawSoftChip(e.Graphics, pnlMonthTitle.Width, pnlMonthTitle.Height - 4, monthText,
+                    new Font("Segoe UI", 9.5F, FontStyle.Bold), 0, 24, true, DefaultCapsuleColor, 85, 12);
+
+                using (var pen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
+                {
+                    e.Graphics.DrawLine(pen, 15, pnlMonthTitle.Height - 1, pnlMonthTitle.Width - 15, pnlMonthTitle.Height - 1);
+                }
+            };
+
+            card.Controls.Add(dayGrid);
+            card.Controls.Add(pnlMonthTitle);
+
+            return card;
+        }
+
+        private TableLayoutPanel BuildDayGrid(int year, int month)
+        {
+            var grid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 7,
+                BackColor = Color.Transparent,
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+            };
+
+            for (int i = 0; i < 7; i++)
+            {
+                grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 7f));
+            }
+
+            DateTime firstOfMonth = new DateTime(year, month, 1);
+            int daysInMonth = DateTime.DaysInMonth(year, month);
+            int startOffset = ((int)firstOfMonth.DayOfWeek + 6) % 7;
 
             int totalCells = startOffset + daysInMonth;
             int rowCount = (int)Math.Ceiling(totalCells / 7.0);
 
-            for (int r = 0; r < rowCount; r++)
+            grid.RowCount = rowCount;
+            for (int i = 0; i < rowCount; i++)
             {
-                tblCalendar.RowCount++;
-                tblCalendar.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rowCount));
+                grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rowCount));
             }
 
             int dayCounter = 1;
             for (int cell = 0; cell < rowCount * 7; cell++)
             {
-                int row = cell / 7 + 1;
+                int row = cell / 7;
                 int col = cell % 7;
 
                 if (cell < startOffset || dayCounter > daysInMonth)
                 {
-                    Panel emptyCell = new Panel { Dock = DockStyle.Fill, BackColor = AppBackColor };
-                    tblCalendar.Controls.Add(emptyCell, col, row);
+                    Panel empty = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+                    grid.Controls.Add(empty, col, row);
                     continue;
                 }
 
                 int thisDay = dayCounter;
-                DateTime cellDate = new DateTime(_currentYear, _currentMonth, thisDay);
+                DateTime cellDate = new DateTime(year, month, thisDay);
                 bool isToday = cellDate.Date == DateTime.Today;
-                bool hasReminders = _cachedReminders.Any(r => r.ReminderDate.Date == cellDate.Date);
 
-                Panel dayPanel = new Panel
+                // Tamamlanmamış aktif hatırlatıcı var mı kontrolü
+                bool hasActiveReminders = _cachedReminders.Any(r => r.ReminderDate.Date == cellDate.Date && !r.IsCompleted);
+
+                Panel dayCell = new Panel
                 {
                     Dock = DockStyle.Fill,
-                    BackColor = isToday ? TodayColor : CardBackColor,
-                    Cursor = Cursors.Hand,
-                    Margin = new Padding(2)
-                };
-
-                Label lblDayNumber = new Label
-                {
-                    Text = thisDay.ToString(),
-                    Left = 8,
-                    Top = 6,
-                    AutoSize = true,
-                    ForeColor = TextLight,
-                    Font = new Font("Segoe UI", 10F, isToday ? FontStyle.Bold : FontStyle.Regular),
+                    BackColor = isToday ? TodayColor : Color.Transparent,
                     Cursor = Cursors.Hand
                 };
-                dayPanel.Controls.Add(lblDayNumber);
 
-                if (hasReminders)
+                string dayText = thisDay.ToString();
+                dayCell.Paint += (s, e) =>
                 {
-                    Label lblMarker = new Label
-                    {
-                        Text = "●",
-                        Left = lblDayNumber.Right + 4,
-                        Top = 4,
-                        AutoSize = true,
-                        ForeColor = MarkerColor,
-                        Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                        Cursor = Cursors.Hand
-                    };
-                    dayPanel.Controls.Add(lblMarker);
-                    lblMarker.Click += (s, e) => OpenDayDialog(cellDate);
-                }
+                    int chipWidth = 28;
+                    int chipHeight = 26;
+                    int cornerRadius = 6;
 
-                EventHandler openDialog = (s, e) => OpenDayDialog(cellDate);
-                dayPanel.Click += openDialog;
-                lblDayNumber.Click += openDialog;
+                    Font dayFont = new Font("Segoe UI Semibold", 8.5F, isToday ? FontStyle.Bold : FontStyle.Regular);
 
-                tblCalendar.Controls.Add(dayPanel, col, row);
+                    // Eğer aktif hatırlatıcı varsa arka planı kırmızı kapsül yap, yoksa normal şeffaf rengini ver
+                    Color capsuleColor = hasActiveReminders ? ActiveReminderColor : DefaultCapsuleColor;
+
+                    DrawSoftChip(e.Graphics, dayCell.Width, dayCell.Height, dayText,
+                        dayFont, 0, chipHeight, true, capsuleColor, chipWidth, cornerRadius);
+                };
+
+                dayCell.Click += (s, e) => OpenDayDialog(cellDate);
+
+                grid.Controls.Add(dayCell, col, row);
                 dayCounter++;
             }
-            this.ResumeLayout(true);
-            tblCalendar.ResumeLayout(true);
+
+            return grid;
+        }
+
+        private void DrawSoftChip(Graphics g, int areaWidth, int areaHeight, string text, Font font,
+            int horizontalPadding, int chipHeight, bool centered, Color bgColor, int fixedWidth = 0, int cornerRadius = -1)
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            int chipWidth;
+            if (fixedWidth > 0)
+            {
+                chipWidth = fixedWidth;
+            }
+            else
+            {
+                SizeF textSize = g.MeasureString(text, font);
+                chipWidth = (int)textSize.Width + horizontalPadding;
+            }
+
+            int chipX, chipY;
+            if (centered)
+            {
+                chipX = (areaWidth - chipWidth) / 2;
+                chipY = (areaHeight - chipHeight) / 2;
+            }
+            else
+            {
+                chipX = 2;
+                chipY = 1;
+            }
+
+            Rectangle chipRect = new Rectangle(chipX, chipY, chipWidth, chipHeight);
+
+            int radius = cornerRadius >= 0 ? cornerRadius : chipHeight / 2;
+
+            using (var path = GetRoundedRectPath(chipRect, radius))
+            using (var brush = new SolidBrush(bgColor)) // Arka plan rengini dinamik olarak alıyoruz
+            {
+                g.FillPath(brush, path);
+            }
+
+            using (var textBrush = new SolidBrush(TextLight))
+            {
+                var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(text, font, textBrush, chipRect, format);
+            }
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+
+            if (radius <= 0)
+            {
+                path.AddRectangle(rect);
+                return path;
+            }
+
+            int diameter = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
+            path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         private void OpenDayDialog(DateTime date)

@@ -1,4 +1,7 @@
-﻿using PersonalFinanceApp.Data;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using PersonalFinanceApp.Data;
 using PersonalFinanceApp.Models;
 
 namespace PersonalFinanceApp.Services
@@ -39,34 +42,51 @@ namespace PersonalFinanceApp.Services
             return true;
         }
 
-        // Hedef "gerçekleşti" olarak işaretlenince, tutarı kasadan düşer
-        public bool MarkAchieved(int goalId, int userId, out string errorMessage)
+        public bool UpdateGoal(int goalId, int userId, string goalName, decimal targetAmount, out string errorMessage)
         {
             errorMessage = string.Empty;
 
-            var goal = _repository.GetByUserId(userId).FirstOrDefault(g => g.Id == goalId);
-            if (goal == null)
+            if (string.IsNullOrWhiteSpace(goalName)) return false;
+            if (targetAmount <= 0) return false;
+
+            try
             {
-                errorMessage = "Hedef bulunamadı.";
+                var goal = _repository.GetByUserId(userId).FirstOrDefault(g => g.Id == goalId);
+                if (goal == null)
+                {
+                    errorMessage = "Hedef bulunamadı.";
+                    return false;
+                }
+
+                goal.GoalName = goalName;
+                goal.TargetAmount = targetAmount;
+
+                // Hedef güncellendiğinde eğer mevcut tutar hedefi aşıyorsa/eşitse tamamlansın
+                if (goal.CurrentAmount >= goal.TargetAmount)
+                    goal.IsAchieved = true;
+                else
+                    goal.IsAchieved = false;
+
+                _repository.Update(goal);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "Hata oluştu: " + ex.Message;
                 return false;
             }
-
-            var (_, safe) = _accountService.GetBalances(userId);
-            if (goal.TargetAmount > safe)
-            {
-                errorMessage = "Kasanızda yeterli bakiye yok.";
-                return false;
-            }
-
-            _accountService.AdjustSafeBalance(userId, -goal.TargetAmount);
-            _repository.UpdateAchievedStatus(goalId, userId, true);
-            return true;
         }
 
-        // İşaret kaldırılırsa, tutar kasaya geri eklenir
-        public bool UnmarkAchieved(int goalId, int userId, out string errorMessage)
+        // YENİ: HEDEFE YATIRIM YAPMA MANTIĞI
+        public bool InvestInGoal(int goalId, int userId, decimal amount, out string errorMessage)
         {
             errorMessage = string.Empty;
+
+            if (amount <= 0)
+            {
+                errorMessage = "Yatırım tutarı 0'dan büyük olmalıdır.";
+                return false;
+            }
 
             var goal = _repository.GetByUserId(userId).FirstOrDefault(g => g.Id == goalId);
             if (goal == null)
@@ -75,8 +95,42 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            _accountService.AdjustSafeBalance(userId, goal.TargetAmount);
-            _repository.UpdateAchievedStatus(goalId, userId, false);
+            if (goal.IsAchieved)
+            {
+                errorMessage = "Bu hedef zaten tamamlanmış!";
+                return false;
+            }
+
+            // Kasa (Safe) bakiye kontrolü
+            var (_, safe) = _accountService.GetBalances(userId);
+            if (amount > safe)
+            {
+                errorMessage = $"Kasanızda yeterli bakiye yok. Mevcut Kasa: {safe:N2} ₺";
+                return false;
+            }
+
+            // 1. Parayı kasadan düş
+            _accountService.AdjustSafeBalance(userId, -amount);
+
+            // 2. Hedefe parayı ekle
+            goal.CurrentAmount += amount;
+
+            // 3. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
+            if (goal.CurrentAmount >= goal.TargetAmount)
+            {
+                goal.IsAchieved = true;
+
+                // Eğer hedefi aşan bir ödeme yapıldıysa, fazlalığı kasaya iade et
+                decimal overpaid = goal.CurrentAmount - goal.TargetAmount;
+                if (overpaid > 0)
+                {
+                    goal.CurrentAmount = goal.TargetAmount;
+                    _accountService.AdjustSafeBalance(userId, overpaid);
+                }
+            }
+
+            // 4. Veritabanını güncelle
+            _repository.Update(goal);
             return true;
         }
 

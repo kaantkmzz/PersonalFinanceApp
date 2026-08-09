@@ -34,6 +34,16 @@ namespace PersonalFinanceApp
             SetupUI();
         }
 
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED: Bütün formu arka planda hazırlayıp tek seferde çizer.
+                return cp;
+            }
+        }
+
         private void SetupUI()
         {
             this.Text = "Kişisel Finans Takip Sistemi";
@@ -218,7 +228,13 @@ namespace PersonalFinanceApp
 
             foreach (var reminder in dueReminders)
             {
-                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                if (reminder.IsCompleted)
+                {
+                    continue;
+                }
+
+                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK);
                 reminderService.MarkAsNotified(reminder.Id, _user.Id);
             }
         }
@@ -261,6 +277,11 @@ namespace PersonalFinanceApp
                 EnableDoubleBuffering(control);
                 _screenCache[key] = control;
                 pnlContent.Controls.Add(control);
+            }
+            else if (control is IRefreshable refreshable)
+            {
+                // Önbellekten geliyorsa (yani sayfa daha önce açılmışsa), göstermeden önce verisini tazeliyoruz
+                refreshable.RefreshData();
             }
 
             foreach (Control c in pnlContent.Controls)
