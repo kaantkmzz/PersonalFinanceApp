@@ -1,6 +1,11 @@
-﻿using PersonalFinanceApp.Helpers;
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Linq;
+using System.Collections.Generic;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
+using PersonalFinanceApp.Helpers;
 
 namespace PersonalFinanceApp
 {
@@ -10,7 +15,9 @@ namespace PersonalFinanceApp
         private readonly DateTime _date;
         private readonly ReminderService _reminderService = new ReminderService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(37, 41, 59);
+        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
+        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
+        private static readonly Color TextLight = Color.White;
         private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
         private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
         private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
@@ -20,7 +27,7 @@ namespace PersonalFinanceApp
         private bool _isUpdatingProgrammatically = false;
 
         private TextBox txtTitle = new TextBox();
-        private DateTimePicker dtpTime = new DateTimePicker();
+        private MaskedTextBox mskTime = new MaskedTextBox();
         private Button btnAdd = new Button();
         private Button btnDelete = new Button();
         private Label lblStatus = new Label();
@@ -43,13 +50,15 @@ namespace PersonalFinanceApp
             this.Load += (s, e) => DarkTitleBarHelper.EnableDarkTitleBar(this);
         }
 
+        // Yavaş açılma sorununu çözmek için CreateParams bloğu tamamen kaldırıldı!
+
         private void SetupUI()
         {
             this.AutoScaleMode = AutoScaleMode.None;
             string[] monthNames = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
             this.Text = $"{_date.Day} {monthNames[_date.Month - 1]} {_date.Year}";
             this.Width = 560;
-            this.Height = 620;
+            this.Height = 615;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -57,55 +66,107 @@ namespace PersonalFinanceApp
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9.5F);
 
-            Label lblTitleField = new Label { Text = "Başlık:", Left = 20, Top = 20, ForeColor = TextMuted, AutoSize = true };
-            txtTitle.Left = 20;
-            txtTitle.Top = 48;
-            txtTitle.Width = 340;
+            // Başlık Alanı
+            Label lblTitleField = new Label { Text = "Başlık:", Left = 20, Top = 18, ForeColor = TextMuted, AutoSize = true };
 
-            Label lblTimeField = new Label { Text = "Saat:", Left = 380, Top = 20, ForeColor = TextMuted, AutoSize = true };
-            dtpTime.Left = 380;
-            dtpTime.Top = 48;
-            dtpTime.Width = 100;
-            dtpTime.Format = DateTimePickerFormat.Time;
-            dtpTime.ShowUpDown = true;
+            Panel pnlTitleWrapper = new Panel
+            {
+                Left = 20,
+                Top = 42,
+                Width = 320,
+                Height = 38
+            };
+            SetupSmoothContainer(pnlTitleWrapper, 8, CardBackColor);
 
+            txtTitle.BorderStyle = BorderStyle.None;
+            txtTitle.Font = new Font("Segoe UI", 11F);
+            txtTitle.BackColor = CardBackColor;
+            txtTitle.ForeColor = TextLight;
+            txtTitle.Width = 300;
+            txtTitle.Location = new Point(10, 8);
+            pnlTitleWrapper.Controls.Add(txtTitle);
+
+            // Saat Alanı
+            Label lblTimeField = new Label { Text = "Saat:", Left = 360, Top = 18, ForeColor = TextMuted, AutoSize = true };
+
+            Panel pnlTimeWrapper = new Panel
+            {
+                Left = 360,
+                Top = 42,
+                Width = 160,
+                Height = 38
+            };
+            SetupSmoothContainer(pnlTimeWrapper, 8, CardBackColor);
+
+            mskTime.Mask = "00:00";
+            mskTime.ValidatingType = typeof(DateTime);
+            mskTime.Text = DateTime.Now.ToString("HH:mm");
+            mskTime.BorderStyle = BorderStyle.None;
+            mskTime.Font = new Font("Segoe UI", 11F);
+            mskTime.BackColor = CardBackColor;
+            mskTime.ForeColor = TextLight;
+            mskTime.Width = 140;
+            // DİKKAT: Metni tam ortalamak için Y koordinatı 8'den 6'ya çekildi.
+            mskTime.Location = new Point(10, 6);
+            mskTime.TextAlign = HorizontalAlignment.Center;
+            pnlTimeWrapper.Controls.Add(mskTime);
+
+            // Ekle Butonu
             btnAdd.Text = "Ekle";
             btnAdd.Left = 20;
-            btnAdd.Top = 85;
+            btnAdd.Top = 90;
             btnAdd.Width = 500;
-            btnAdd.Height = 32;
-            btnAdd.FlatStyle = FlatStyle.Flat;
-            btnAdd.FlatAppearance.BorderSize = 0;
-            btnAdd.BackColor = AccentColor;
-            btnAdd.ForeColor = Color.White;
+            btnAdd.Height = 36;
             btnAdd.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnAdd, AccentColor, Color.White, false);
             btnAdd.Click += BtnAdd_Click;
 
-            lblStatus.Left = 20;
-            lblStatus.Top = 125;
-            lblStatus.Width = 500;
-            lblStatus.Height = 25;
-            lblStatus.Font = new Font("Segoe UI", 9F);
+            // Tabloyu saran panel
+            Panel pnlGridWrapper = new Panel
+            {
+                Left = 20,
+                Top = 140,
+                Width = 500,
+                Height = 340,
+                Padding = new Padding(2, 6, 2, 6)
+            };
+            SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
 
-            dgvReminders.Left = 20;
-            dgvReminders.Top = 160;
-            dgvReminders.Width = 500;
-            dgvReminders.Height = 340;
+            dgvReminders.Dock = DockStyle.Fill;
+            // DİKKAT: Checkbox'ın tıklanabilmesi için tablonun genel ReadOnly özelliği false yapıldı!
+            dgvReminders.ReadOnly = false;
             dgvReminders.AllowUserToAddRows = false;
             dgvReminders.AllowUserToDeleteRows = false;
             dgvReminders.AllowUserToResizeColumns = false;
             dgvReminders.AllowUserToResizeRows = false;
             dgvReminders.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvReminders.MultiSelect = false;
-            dgvReminders.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvReminders.BackgroundColor = Color.White;
-            dgvReminders.BorderStyle = BorderStyle.None;
+            dgvReminders.ColumnHeadersVisible = true;
             dgvReminders.RowHeadersVisible = false;
             dgvReminders.Font = new Font("Segoe UI", 9.5F);
-            dgvReminders.RowTemplate.Height = 30;
-            dgvReminders.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
-            dgvReminders.DefaultCellStyle.SelectionBackColor = Color.FromArgb(238, 239, 246);
-            dgvReminders.DefaultCellStyle.SelectionForeColor = Color.FromArgb(40, 40, 40);
+            dgvReminders.RowTemplate.Height = 40;
+
+            dgvReminders.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvReminders.BorderStyle = BorderStyle.None;
+            dgvReminders.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvReminders.GridColor = Color.FromArgb(60, 65, 85);
+            dgvReminders.BackgroundColor = CardBackColor;
+
+            dgvReminders.DefaultCellStyle.BackColor = CardBackColor;
+            dgvReminders.DefaultCellStyle.ForeColor = TextLight;
+            dgvReminders.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
+            dgvReminders.DefaultCellStyle.SelectionBackColor = Color.FromArgb(60, 64, 90);
+            dgvReminders.DefaultCellStyle.SelectionForeColor = TextLight;
+
+            dgvReminders.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(35, 39, 54);
+            dgvReminders.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
+            dgvReminders.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(35, 39, 54);
+            dgvReminders.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
+            dgvReminders.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            dgvReminders.EnableHeadersVisualStyles = false;
+            dgvReminders.ColumnHeadersHeight = 38;
+
+            dgvReminders.CellPainting += DgvReminders_CellPainting;
 
             dgvReminders.CurrentCellDirtyStateChanged += (s, e) =>
             {
@@ -116,27 +177,51 @@ namespace PersonalFinanceApp
             };
             dgvReminders.CellValueChanged += DgvReminders_CellValueChanged;
 
+            pnlGridWrapper.Controls.Add(dgvReminders);
+
+            lblStatus.Left = 20;
+            lblStatus.Top = 485;
+            lblStatus.Width = 500;
+            lblStatus.Height = 22;
+            lblStatus.Font = new Font("Segoe UI", 9F);
+            lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+
+            // Sil Butonu
             btnDelete.Text = "Seçili Hatırlatıcıyı Sil";
             btnDelete.Left = 20;
-            btnDelete.Top = 520;
+            btnDelete.Top = 515;
             btnDelete.Width = 500;
-            btnDelete.Height = 34;
-            btnDelete.FlatStyle = FlatStyle.Flat;
-            btnDelete.FlatAppearance.BorderSize = 1;
-            btnDelete.FlatAppearance.BorderColor = DangerColor;
-            btnDelete.BackColor = AppBackColor;
-            btnDelete.ForeColor = DangerColor;
+            btnDelete.Height = 38;
             btnDelete.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
             btnDelete.Click += BtnDelete_Click;
 
             this.Controls.Add(lblTitleField);
-            this.Controls.Add(txtTitle);
+            this.Controls.Add(pnlTitleWrapper);
             this.Controls.Add(lblTimeField);
-            this.Controls.Add(dtpTime);
+            this.Controls.Add(pnlTimeWrapper);
             this.Controls.Add(btnAdd);
+            this.Controls.Add(pnlGridWrapper);
             this.Controls.Add(lblStatus);
-            this.Controls.Add(dgvReminders);
             this.Controls.Add(btnDelete);
+        }
+
+        private void DgvReminders_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex > 0)
+            {
+                e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+
+                bool isSelected = (e.State & DataGridViewElementStates.Selected) == DataGridViewElementStates.Selected;
+                Color lineColor = isSelected ? Color.FromArgb(110, 115, 140) : Color.FromArgb(60, 65, 85);
+
+                using (Pen p = new Pen(lineColor, 1))
+                {
+                    e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 6, e.CellBounds.Left, e.CellBounds.Bottom - 6);
+                }
+
+                e.Handled = true;
+            }
         }
 
         private void LoadReminders()
@@ -159,11 +244,18 @@ namespace PersonalFinanceApp
             if (dgvReminders.Columns["ID"] != null)
             {
                 dgvReminders.Columns["ID"].Visible = false;
+
+                // Sadece Saat ve Başlık kilitli kalacak, Tamamlandı kilitsiz!
                 dgvReminders.Columns["Saat"].ReadOnly = true;
                 dgvReminders.Columns["Başlık"].ReadOnly = true;
-                dgvReminders.Columns["Saat"].FillWeight = 30;
-                dgvReminders.Columns["Başlık"].FillWeight = 100;
-                dgvReminders.Columns["Tamamlandı"].FillWeight = 40;
+                dgvReminders.Columns["Tamamlandı"].ReadOnly = false;
+
+                dgvReminders.Columns["Saat"].FillWeight = 50;
+                dgvReminders.Columns["Başlık"].FillWeight = 160;
+                dgvReminders.Columns["Tamamlandı"].FillWeight = 70;
+
+                dgvReminders.Columns["Saat"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                dgvReminders.Columns["Tamamlandı"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
 
             foreach (DataGridViewRow row in dgvReminders.Rows)
@@ -203,7 +295,15 @@ namespace PersonalFinanceApp
         private void BtnAdd_Click(object? sender, EventArgs e)
         {
             string title = txtTitle.Text.Trim();
-            DateTime reminderDateTime = _date.Date + dtpTime.Value.TimeOfDay;
+
+            if (!TimeSpan.TryParse(mskTime.Text, out TimeSpan timeOfDay))
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Geçersiz saat formatı. Lütfen kontrol edin.";
+                return;
+            }
+
+            DateTime reminderDateTime = _date.Date + timeOfDay;
 
             bool success = _reminderService.AddReminder(_user.Id, title, reminderDateTime, out string errorMessage);
 
@@ -236,23 +336,88 @@ namespace PersonalFinanceApp
             if (confirm == DialogResult.Yes)
             {
                 var idCellDel = dgvReminders.CurrentRow.Cells["ID"];
-                if (idCellDel?.Value == null)
-                {
-                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
-                    lblStatus.Text = "Geçersiz hatırlatıcı seçimi.";
-                    return;
-                }
-                if (!int.TryParse(idCellDel.Value.ToString(), out int reminderId))
-                {
-                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
-                    lblStatus.Text = "Geçersiz hatırlatıcı ID.";
-                    return;
-                }
+                if (idCellDel?.Value == null) return;
+                if (!int.TryParse(idCellDel.Value.ToString(), out int reminderId)) return;
+
                 _reminderService.DeleteReminder(reminderId, _user.Id);
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                 lblStatus.Text = "Hatırlatıcı silindi.";
                 LoadReminders();
             }
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius))
+                {
+                    using (var brush = new SolidBrush(bgColor))
+                    {
+                        e.Graphics.FillPath(brush, path);
+                    }
+                    using (var pen = new Pen(bgColor, 1))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = Color.Transparent;
+            btn.FlatAppearance.MouseDownBackColor = Color.Transparent;
+            btn.BackColor = Color.Transparent;
+
+            bool isHovered = false;
+            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
+            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
+
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent.BackColor);
+
+                Rectangle rect = new Rectangle(0, 0, btn.Width - 1, btn.Height - 1);
+                using (var path = GetRoundedRectPath(rect, 8))
+                {
+                    if (isOutlined)
+                    {
+                        using (var pen = new Pen(isHovered ? ControlPaint.Light(textColor) : textColor, 1.5f))
+                        {
+                            e.Graphics.DrawPath(pen, path);
+                        }
+                    }
+                    else
+                    {
+                        using (var brush = new SolidBrush(isHovered ? ControlPaint.Light(bgColor) : bgColor))
+                        {
+                            e.Graphics.FillPath(brush, path);
+                        }
+                    }
+                }
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, rect, textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int diameter = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
+            path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }
