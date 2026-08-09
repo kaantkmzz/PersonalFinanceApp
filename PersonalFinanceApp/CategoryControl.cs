@@ -159,12 +159,9 @@ namespace PersonalFinanceApp
             dgvCategories.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvCategories.EnableHeadersVisualStyles = false; dgvCategories.ColumnHeadersHeight = 40;
 
             dgvCategories.CellPainting += DgvCategories_CellPainting;
-        }
 
             pnlGridWrapper.Controls.Add(dgvCategories);
             pnlGrid.Controls.Add(pnlGridWrapper);
-
-           
 
             this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
         }
