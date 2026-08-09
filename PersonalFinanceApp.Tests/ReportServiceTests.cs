@@ -27,14 +27,14 @@ namespace PersonalFinanceApp.Tests
         public void GenerateBar_YuzYuzdedeBosKarakterOlmamaliMi()
         {
             string bar = _reportService.GenerateBar(100);
-            Assert.IsFalse(bar.Contains('░'));
+            Assert.DoesNotContain('░', bar);
         }
 
         [TestMethod]
         public void GenerateBar_SifirYuzdedeDoluKarakterOlmamaliMi()
         {
             string bar = _reportService.GenerateBar(0);
-            Assert.IsFalse(bar.Contains('█'));
+            Assert.DoesNotContain('█', bar);
         }
 
         [TestMethod]

@@ -219,12 +219,12 @@ namespace PersonalFinanceApp
             pnlWalletCapsule.Left = pnlTop.Width - pnlWalletCapsule.Width - 40;
         }
 
-        private void DgvTransactions_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void DgvTransactions_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvTransactions.ColumnCount)
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
                 e.Handled = true;
             }
         }
@@ -265,16 +265,16 @@ namespace PersonalFinanceApp
             }).ToList();
 
             dgvTransactions.DataSource = displayList;
-            if (dgvTransactions.Columns["ID"] != null) dgvTransactions.Columns["ID"].Visible = false;
+            if (dgvTransactions.Columns["ID"] != null) dgvTransactions.Columns["ID"]!.Visible = false;
 
             if (dgvTransactions.Columns["Tip"] != null)
             {
                 // Genişlikleri daha estetik olacak şekilde dağıttık
-                dgvTransactions.Columns["Tip"].FillWeight = 30; // Yamuk durmaması için biraz açtık
-                dgvTransactions.Columns["Kategori"].FillWeight = 70;
-                dgvTransactions.Columns["Tutar"].FillWeight = 45;
-                dgvTransactions.Columns["Tarih"].FillWeight = 60;
-                dgvTransactions.Columns["Açıklama"].FillWeight = 95;
+                dgvTransactions.Columns["Tip"]!.FillWeight = 30; // Yamuk durmaması için biraz açtık
+                dgvTransactions.Columns["Kategori"]!.FillWeight = 70;
+                dgvTransactions.Columns["Tutar"]!.FillWeight = 45;
+                dgvTransactions.Columns["Tarih"]!.FillWeight = 60;
+                dgvTransactions.Columns["Açıklama"]!.FillWeight = 95;
             }
         }
 
@@ -382,7 +382,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? Color.FromArgb(60, 65, 85) : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index].ToString(), cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             };
 
             // 2. Sadece dıştaki ince beyaz çerçeveyi tıraşlıyoruz
@@ -415,9 +415,9 @@ namespace PersonalFinanceApp
             pnlArrow.BringToFront();
         }
 
-        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
-        private void SetupTranslucentCapsule(Panel pnl, Color fillColor, Color borderColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent.BackColor); var rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1); using (var path = GetRoundedRectPath(rect, pnl.Height / 2)) { using (var brush = new SolidBrush(fillColor)) e.Graphics.FillPath(brush, path); using (var pen = new Pen(borderColor, 2f)) e.Graphics.DrawPath(pen, path); } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
-        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent.BackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
+        private void SetupTranslucentCapsule(Panel pnl, Color fillColor, Color borderColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); var rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1); using (var path = GetRoundedRectPath(rect, pnl.Height / 2)) { using (var brush = new SolidBrush(fillColor)) e.Graphics.FillPath(brush, path); using (var pen = new Pen(borderColor, 2f)) e.Graphics.DrawPath(pen, path); } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius) { var path = new System.Drawing.Drawing2D.GraphicsPath(); int d = Math.Max(radius * 2, 1); path.AddArc(rect.X, rect.Y, d, d, 180, 90); path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90); path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90); path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90); path.CloseFigure(); return path; }
     }
 }
