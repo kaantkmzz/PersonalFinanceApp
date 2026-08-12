@@ -10,6 +10,8 @@ namespace PersonalFinanceApp.Services
     {
         private readonly SavingsGoalRepository _repository = new SavingsGoalRepository();
         private readonly AccountService _accountService = new AccountService();
+        private readonly CategoryService _categoryService = new CategoryService();
+        private readonly TransactionService _transactionService = new TransactionService();
 
         public List<SavingsGoal> GetUserGoals(int userId)
         {
@@ -117,6 +119,7 @@ namespace PersonalFinanceApp.Services
 
             // 3. Hedefe parayı ekle
             goal.CurrentAmount += amount;
+            decimal actualInvested = amount;
 
             // 4. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
             if (goal.CurrentAmount >= goal.TargetAmount)
@@ -129,11 +132,22 @@ namespace PersonalFinanceApp.Services
                 {
                     goal.CurrentAmount = goal.TargetAmount;
                     _accountService.AdjustSafeBalance(userId, overpaid);
+                    actualInvested -= overpaid;
                 }
             }
 
             // 5. Veritabanını güncelle
             _repository.Update(goal);
+
+            // 6. İşlemler ve Kategoriler ekranlarında da görünsün diye, hedefin adını kategori
+            // olarak kullanan "goal" tipinde bir işlem kaydı düş (cüzdanı etkilemez, sadece log).
+            if (actualInvested > 0)
+            {
+                var category = _categoryService.GetOrCreateCategory(userId, goal.GoalName, "goal");
+                _transactionService.AddTransaction(userId, category.Id, actualInvested, "goal",
+                    $"'{goal.GoalName}' hedefine yatırım", out _);
+            }
+
             return true;
         }
 
