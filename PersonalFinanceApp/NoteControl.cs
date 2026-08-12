@@ -14,12 +14,12 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly NoteService _noteService = new NoteService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private DataGridView dgvNotes = new DataGridView();
         private List<Note> _cachedNotes = new List<Note>();
@@ -31,7 +31,6 @@ namespace PersonalFinanceApp
         private Button btnSave = new Button();
         private Button btnDelete = new Button();
         private Label lblStatus = new Label();
-        private Label lblEditingTitle = new Label();
 
         protected override CreateParams CreateParams
         {
@@ -49,6 +48,20 @@ namespace PersonalFinanceApp
             InitializeComponent();
             SetupUI();
             LoadNotes();
+
+            // DataGridView, ilk oluşturulup ekrana yerleştirildiğinde ilk satırı kendi içinde
+            // otomatik seçiyor ama bu "otomatik" seçimde ilk hücre hiç CellPainting almıyor
+            // (WinForms'a özgü bir tuhaflık), bu yüzden yuvarlak köşeli seçim kutusu o hücrede
+            // hiç çizilmiyor. Bu otomatik seçim, üst formun BringToFront/layout işlemleri
+            // TAMAMEN bittikten sonra oluştuğu için BeginInvoke bile yetersiz kalıyor; bu yüzden
+            // temizlemeyi mesaj kuyruğu tamamen boşalana (Application.Idle) kadar erteliyoruz.
+            EventHandler? idleHandler = null;
+            idleHandler = (s, e) =>
+            {
+                Application.Idle -= idleHandler;
+                ClearNoteSelection();
+            };
+            Application.Idle += idleHandler;
         }
 
         private void SetupUI()
@@ -108,20 +121,24 @@ namespace PersonalFinanceApp
             dgvNotes.RowHeadersVisible = false;
             dgvNotes.Font = new Font("Segoe UI", 9.5F);
             dgvNotes.RowTemplate.Height = 46;
-            dgvNotes.SelectionChanged += (s, e) => LoadSelectedNote();
+            // DataGridView, veri bağlandığında ilk satırı otomatik seçiyor ama o ilk seçili çizim bazen
+            // özel (yuvarlak köşeli) boyamamızdan önce oluşup boş kalabiliyor; seçim değiştikçe (ilk otomatik
+            // seçim dahil) tazeleyerek bunu önlüyoruz.
+            dgvNotes.SelectionChanged += (s, e) => { LoadSelectedNote(); dgvNotes.Invalidate(); };
 
             dgvNotes.BorderStyle = BorderStyle.None;
             dgvNotes.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            dgvNotes.GridColor = Color.FromArgb(60, 65, 85);
+            dgvNotes.GridColor = AppTheme.HoverBackColor;
 
             dgvNotes.BackgroundColor = CardBackColor;
             dgvNotes.DefaultCellStyle.BackColor = CardBackColor;
             dgvNotes.DefaultCellStyle.ForeColor = TextLight;
             dgvNotes.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
-            dgvNotes.DefaultCellStyle.SelectionBackColor = Color.FromArgb(60, 64, 90);
-            dgvNotes.DefaultCellStyle.SelectionForeColor = TextLight;
+            dgvNotes.DefaultCellStyle.SelectionBackColor = AccentColor;
+            dgvNotes.DefaultCellStyle.SelectionForeColor = Color.White;
 
             dgvNotes.CellPainting += DgvNotes_CellPainting;
+            dgvNotes.RowPrePaint += DgvNotes_RowPrePaint;
 
             pnlGridWrapper.Controls.Add(dgvNotes);
 
@@ -139,24 +156,17 @@ namespace PersonalFinanceApp
             Panel pnlRightTop = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 155,
+                Height = 110,
                 BackColor = AppBackColor,
                 Padding = new Padding(20, 20, 20, 0)
             };
 
-            lblEditingTitle.Text = "Bir not seçin ya da yeni bir not oluşturun";
-            lblEditingTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            lblEditingTitle.ForeColor = TextLight;
-            lblEditingTitle.Left = 0;
-            lblEditingTitle.Top = 0;
-            lblEditingTitle.AutoSize = true;
-
-            Label lblTitleField = new Label { Text = "Başlık:", Left = 0, Top = 45, ForeColor = TextMuted, AutoSize = true };
+            Label lblTitleField = new Label { Text = "Başlık:", Left = 0, Top = 0, ForeColor = TextMuted, AutoSize = true };
 
             Panel pnlTitleWrapper = new Panel
             {
                 Left = 0,
-                Top = 75,
+                Top = 30,
                 Width = 700,
                 Height = 42
             };
@@ -171,10 +181,8 @@ namespace PersonalFinanceApp
 
             pnlTitleWrapper.Controls.Add(txtTitle);
 
-            // Görsel denge için Top değeri 120'den 135'e indirilip not alanına yaklaştırıldı
-            Label lblContentField = new Label { Text = "İçerik:", Left = 0, Top = 135, ForeColor = TextMuted, AutoSize = true };
+            Label lblContentField = new Label { Text = "İçerik:", Left = 0, Top = 90, ForeColor = TextMuted, AutoSize = true };
 
-            pnlRightTop.Controls.Add(lblEditingTitle);
             pnlRightTop.Controls.Add(lblTitleField);
             pnlRightTop.Controls.Add(pnlTitleWrapper);
             pnlRightTop.Controls.Add(lblContentField);
@@ -249,22 +257,86 @@ namespace PersonalFinanceApp
             this.Controls.Add(pnlLeft);
         }
 
+        // Seçili satırda Başlık ve Tarih hücrelerini ayrı ayrı değil, tek bir yuvarlak köşeli
+        // kutu olarak (satırın tamamını kaplayacak şekilde) boyar; hücre bazlı boyama burada
+        // ikiye bölünmüş görünüme yol açıyordu.
+        private void DgvNotes_RowPrePaint(object? sender, DataGridViewRowPrePaintEventArgs e)
+        {
+            if (!dgvNotes.Rows[e.RowIndex].Selected) return;
+            if (dgvNotes.Columns["Başlık"] == null || dgvNotes.Columns["Tarih"] == null) return;
+
+            var g = e.Graphics!;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            int colBaslik = dgvNotes.Columns["Başlık"]!.Index;
+            int colTarih = dgvNotes.Columns["Tarih"]!.Index;
+            var titleCellRect = dgvNotes.GetCellDisplayRectangle(colBaslik, e.RowIndex, false);
+            var dateCellRect = dgvNotes.GetCellDisplayRectangle(colTarih, e.RowIndex, false);
+            var rowRect = Rectangle.Union(titleCellRect, dateCellRect);
+
+            using (var bgBrush = new SolidBrush(CardBackColor))
+                g.FillRectangle(bgBrush, rowRect);
+
+            var pillRect = new Rectangle(rowRect.Left + 1, rowRect.Top + 2, Math.Max(1, rowRect.Width - 2), Math.Max(1, rowRect.Height - 4));
+            using (var path = GetRoundedRectPath(pillRect, 8))
+            using (var brush = new SolidBrush(AccentColor))
+                g.FillPath(brush, path);
+
+            string titleText = dgvNotes.Rows[e.RowIndex].Cells[colBaslik].Value?.ToString() ?? string.Empty;
+            var titleTextRect = Rectangle.Inflate(titleCellRect, -8, 0);
+            TextRenderer.DrawText(g, titleText, dgvNotes.Font, titleTextRect, Color.White,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.Left);
+
+            string dateText = dgvNotes.Rows[e.RowIndex].Cells[colTarih].Value?.ToString() ?? string.Empty;
+            var dateTextRect = Rectangle.Inflate(dateCellRect, -8, 0);
+            TextRenderer.DrawText(g, dateText, dgvNotes.Font, dateTextRect, Color.White,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.Right);
+
+            e.Handled = true;
+        }
+
         private void DgvNotes_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && dgvNotes.Columns[e.ColumnIndex].Name == "Tarih")
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+
+            bool isSelected = (e.State & DataGridViewElementStates.Selected) == DataGridViewElementStates.Selected;
+            var g = e.Graphics!;
+
+            if (isSelected)
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(CardBackColor);
+
+                var rect = new Rectangle(e.CellBounds.Left + 1, e.CellBounds.Top + 2, Math.Max(1, e.CellBounds.Width - 2), Math.Max(1, e.CellBounds.Height - 4));
+                using (var path = GetRoundedRectPath(rect, 8))
+                using (var brush = new SolidBrush(AccentColor))
+                    g.FillPath(brush, path);
+
+                // Metni kendimiz çiziyoruz: e.Paint'i sadece ContentForeground ile çağırmak DataGridView'da
+                // güvenilir şekilde metni çizmeyebiliyor.
+                string text = e.FormattedValue?.ToString() ?? e.Value?.ToString() ?? string.Empty;
+                var cellStyle = dgvNotes.Columns[e.ColumnIndex].DefaultCellStyle;
+                var textRect = Rectangle.Inflate(e.CellBounds, -8, 0);
+                TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
+                flags |= cellStyle.Alignment == DataGridViewContentAlignment.MiddleRight ? TextFormatFlags.Right : TextFormatFlags.Left;
+                TextRenderer.DrawText(g, text, dgvNotes.Font, textRect, Color.White, flags);
+            }
+            else
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+            }
 
-                bool isSelected = (e.State & DataGridViewElementStates.Selected) == DataGridViewElementStates.Selected;
-                Color lineColor = isSelected ? Color.FromArgb(110, 115, 140) : Color.FromArgb(60, 65, 85);
-
+            if (dgvNotes.Columns[e.ColumnIndex].Name == "Tarih")
+            {
+                Color lineColor = isSelected ? AppTheme.SelectedRowLineColor : AppTheme.HoverBackColor;
                 using (Pen p = new Pen(lineColor, 1))
                 {
-                    e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 8, e.CellBounds.Left, e.CellBounds.Bottom - 8);
+                    g.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 8, e.CellBounds.Left, e.CellBounds.Bottom - 8);
                 }
-
-                e.Handled = true;
             }
+
+            e.Handled = true;
         }
 
         private void LoadNotes()
@@ -292,6 +364,16 @@ namespace PersonalFinanceApp
                 dgvNotes.Columns["Tarih"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
                 dgvNotes.Columns["Tarih"]!.DefaultCellStyle.Padding = new Padding(0, 0, 10, 0);
             }
+
+        }
+
+        private void ClearNoteSelection()
+        {
+            dgvNotes.ClearSelection();
+            dgvNotes.CurrentCell = null;
+            txtTitle.Clear();
+            txtContent.Clear();
+            _selectedNoteId = null;
         }
 
         private void LoadSelectedNote()
@@ -303,7 +385,6 @@ namespace PersonalFinanceApp
             if (note == null) return;
 
             _selectedNoteId = note.Id;
-            lblEditingTitle.Text = "Not Düzenle";
             txtTitle.Text = note.Title;
             txtContent.Text = note.Content;
             lblStatus.Text = string.Empty;
@@ -313,7 +394,6 @@ namespace PersonalFinanceApp
         {
             dgvNotes.ClearSelection();
             dgvNotes.CurrentCell = null;
-            lblEditingTitle.Text = "Yeni Not";
             txtTitle.Clear();
             txtContent.Clear();
             lblStatus.Text = string.Empty;
@@ -475,7 +555,7 @@ namespace PersonalFinanceApp
                 {
                     int lineHeight = this.Font.Height;
 
-                    using (Pen p = new Pen(Color.FromArgb(60, 65, 85), 1))
+                    using (Pen p = new Pen(AppTheme.HoverBackColor, 1))
                     {
                         for (int y = lineHeight; y < this.Height; y += lineHeight)
                         {
@@ -483,7 +563,7 @@ namespace PersonalFinanceApp
                         }
                     }
 
-                    using (Pen pMargin = new Pen(Color.FromArgb(50, 55, 75), 1))
+                    using (Pen pMargin = new Pen(AppTheme.RowSeparatorColor, 1))
                     {
                         g.DrawLine(pMargin, 32, 0, 32, this.Height);
                     }

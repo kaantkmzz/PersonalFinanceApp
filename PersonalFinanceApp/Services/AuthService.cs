@@ -145,10 +145,6 @@ namespace PersonalFinanceApp.Services
                     }
                 }
 
-                // Kullanıcı başarıyla oluşturuldu, şimdi varsayılan kategorilerini ekleyelim
-                var categoryService = new CategoryService();
-                categoryService.CreateDefaultCategories(newUserId);
-
                 return true;
             }
             catch (Exception ex)

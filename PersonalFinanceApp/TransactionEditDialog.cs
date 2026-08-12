@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Linq;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -14,11 +15,11 @@ namespace PersonalFinanceApp
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly CategoryService _categoryService = new CategoryService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
 
         private ComboBox cmbType = new ComboBox();
         private ComboBox cmbCategory = new ComboBox();
@@ -36,11 +37,13 @@ namespace PersonalFinanceApp
 
             SetupDialog();
             LoadCategories();
+            this.Load += (s, e) => DarkTitleBarHelper.EnableDarkTitleBar(this);
         }
 
         private void SetupDialog()
         {
-            this.Size = new Size(420, 420);
+            this.AutoScaleMode = AutoScaleMode.None;
+            this.ClientSize = new Size(400, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -52,47 +55,85 @@ namespace PersonalFinanceApp
             Label lblTitle = new Label { Text = "İşlemi Düzenle", Font = new Font("Segoe UI", 14F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
             this.Controls.Add(lblTitle);
 
-            Label lblType = new Label { Text = "Tip:", Left = 20, Top = 60, ForeColor = TextMuted, AutoSize = true };
-            cmbType.Left = 20; cmbType.Top = 82; cmbType.Width = 360;
-            cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
+            // --- Tip ---
+            Label lblType = new Label { Text = "Tip:", Left = 20, Top = 68, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlType = new Panel { Left = 20, Top = 90, Width = 360, Height = 38 };
+            cmbType.Left = 5; cmbType.Top = 8; cmbType.Width = 350;
+            cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider");
             cmbType.SelectedIndex = _transaction.Type == "income" ? 0 : 1;
             cmbType.SelectedIndexChanged += (s, e) => LoadCategories();
-            this.Controls.Add(lblType); this.Controls.Add(cmbType);
+            pnlType.Controls.Add(cmbType);
+            SetupCustomComboBox(pnlType, cmbType);
+            this.Controls.Add(lblType); this.Controls.Add(pnlType);
 
-            Label lblCategory = new Label { Text = "Kategori:", Left = 20, Top = 115, ForeColor = TextMuted, AutoSize = true };
-            cmbCategory.Left = 20; cmbCategory.Top = 137; cmbCategory.Width = 360;
-            cmbCategory.DropDownStyle = ComboBoxStyle.DropDownList;
-            this.Controls.Add(lblCategory); this.Controls.Add(cmbCategory);
+            // --- Kategori ---
+            Label lblCategory = new Label { Text = "Kategori:", Left = 20, Top = 138, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlCategory = new Panel { Left = 20, Top = 160, Width = 360, Height = 38 };
+            cmbCategory.Left = 5; cmbCategory.Top = 8; cmbCategory.Width = 350;
+            cmbCategory.Font = new Font("Segoe UI", 9.5F); cmbCategory.DropDownStyle = ComboBoxStyle.DropDownList;
+            pnlCategory.Controls.Add(cmbCategory);
+            SetupCustomComboBox(pnlCategory, cmbCategory);
+            this.Controls.Add(lblCategory); this.Controls.Add(pnlCategory);
 
-            Label lblAmount = new Label { Text = "Tutar:", Left = 20, Top = 170, ForeColor = TextMuted, AutoSize = true };
-            txtAmount.Left = 20; txtAmount.Top = 192; txtAmount.Width = 360;
+            // --- Tutar ---
+            Label lblAmount = new Label { Text = "Tutar:", Left = 20, Top = 208, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlAmount = new Panel { Left = 20, Top = 230, Width = 360, Height = 38 };
+            SetupSmoothContainer(pnlAmount, 8, CardBackColor);
+            txtAmount.Left = 12; txtAmount.Top = 9; txtAmount.Width = 336;
+            txtAmount.Font = new Font("Segoe UI", 10.5F); txtAmount.BorderStyle = BorderStyle.None;
+            txtAmount.BackColor = CardBackColor; txtAmount.ForeColor = TextLight;
             txtAmount.Text = _transaction.Amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-            this.Controls.Add(lblAmount); this.Controls.Add(txtAmount);
+            pnlAmount.Controls.Add(txtAmount);
+            this.Controls.Add(lblAmount); this.Controls.Add(pnlAmount);
 
-            Label lblDate = new Label { Text = "Tarih:", Left = 20, Top = 225, ForeColor = TextMuted, AutoSize = true };
-            dtpDate.Left = 20; dtpDate.Top = 247; dtpDate.Width = 360;
+            // --- Tarih ---
+            Label lblDate = new Label { Text = "Tarih:", Left = 20, Top = 278, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlDate = new Panel { Left = 20, Top = 300, Width = 360, Height = 38 };
+            SetupSmoothContainer(pnlDate, 8, CardBackColor);
+            dtpDate.Left = 8; dtpDate.Top = 6; dtpDate.Width = 344;
+            dtpDate.Font = new Font("Segoe UI", 10F);
             dtpDate.Format = DateTimePickerFormat.Custom;
             dtpDate.CustomFormat = "dd.MM.yyyy HH:mm";
             dtpDate.Value = _transaction.TransactionDate;
-            this.Controls.Add(lblDate); this.Controls.Add(dtpDate);
+            dtpDate.CalendarForeColor = TextLight;
+            dtpDate.CalendarMonthBackground = CardBackColor;
+            dtpDate.CalendarTitleBackColor = AppTheme.HeaderBackColor;
+            dtpDate.CalendarTitleForeColor = TextLight;
+            dtpDate.CalendarTrailingForeColor = TextMuted;
+            dtpDate.HandleCreated += (s, e) =>
+            {
+                DarkTitleBarHelper.DisableVisualStyle(dtpDate);
+                dtpDate.BackColor = CardBackColor;
+                dtpDate.ForeColor = TextLight;
+            };
+            DarkTitleBarHelper.EnableDarkCalendarPopup(dtpDate);
+            pnlDate.Controls.Add(dtpDate);
+            this.Controls.Add(lblDate); this.Controls.Add(pnlDate);
 
-            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 280, ForeColor = TextMuted, AutoSize = true };
-            txtDescription.Left = 20; txtDescription.Top = 302; txtDescription.Width = 360;
+            // --- Açıklama ---
+            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 348, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlDesc = new Panel { Left = 20, Top = 370, Width = 360, Height = 38 };
+            SetupSmoothContainer(pnlDesc, 8, CardBackColor);
+            txtDescription.Left = 12; txtDescription.Top = 9; txtDescription.Width = 336;
+            txtDescription.Font = new Font("Segoe UI", 10.5F); txtDescription.BorderStyle = BorderStyle.None;
+            txtDescription.BackColor = CardBackColor; txtDescription.ForeColor = TextLight;
             txtDescription.Text = _transaction.Description ?? string.Empty;
-            this.Controls.Add(lblDescription); this.Controls.Add(txtDescription);
+            pnlDesc.Controls.Add(txtDescription);
+            this.Controls.Add(lblDescription); this.Controls.Add(pnlDesc);
 
-            Button btnSave = new Button { Text = "Kaydet", Left = 20, Top = 340, Width = 170, Height = 36, Cursor = Cursors.Hand, BackColor = AccentColor, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnSave.FlatAppearance.BorderSize = 0;
+            // --- Butonlar ---
+            Button btnSave = new Button { Text = "Kaydet", Left = 20, Top = 432, Width = 172, Height = 40, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnSave, AccentColor, Color.White);
             btnSave.Click += BtnSave_Click;
             this.Controls.Add(btnSave);
 
-            Button btnCancel = new Button { Text = "İptal", Left = 210, Top = 340, Width = 170, Height = 36, Cursor = Cursors.Hand, BackColor = Color.FromArgb(80, 85, 105), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            btnCancel.FlatAppearance.BorderSize = 0;
+            Button btnCancel = new Button { Text = "İptal", Left = 208, Top = 432, Width = 172, Height = 40, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnCancel, Color.FromArgb(80, 85, 105), Color.White);
             btnCancel.Click += (s, e) => this.Close();
             this.Controls.Add(btnCancel);
 
-            lblStatus.Left = 20; lblStatus.Top = 385; lblStatus.AutoSize = true;
+            lblStatus.Left = 20; lblStatus.Top = 484; lblStatus.Width = 360; lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             this.Controls.Add(lblStatus);
@@ -142,6 +183,94 @@ namespace PersonalFinanceApp
             {
                 lblStatus.Text = errorMessage;
             }
+        }
+
+        // --- GÖRSEL YARDIMCI METOTLAR ---
+        private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
+        {
+            SetupSmoothContainer(pnl, 8, CardBackColor);
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
+
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 22;
+            cmb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            };
+
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+
+            Panel pnlArrow = new Panel();
+            pnlArrow.Width = 28;
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width - 1;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.BackColor = CardBackColor;
+            pnlArrow.Cursor = Cursors.Hand;
+
+            pnlArrow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 5;
+                int ay = pnlArrow.Height / 2 - 2;
+                using (var brush = new SolidBrush(TextMuted))
+                    e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 10, ay), new Point(ax + 5, ay + 6) });
+            };
+
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius))
+                using (var brush = new SolidBrush(bgColor))
+                    e.Graphics.FillPath(brush, path);
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Font = new Font("Segoe UI", 10F);
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8))
+                using (var brush = new SolidBrush(bgColor))
+                    e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }
