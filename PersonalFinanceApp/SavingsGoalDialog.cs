@@ -18,12 +18,14 @@ namespace PersonalFinanceApp
         private TextBox txtInvestAmount = new TextBox();
         private Label lblStatus = new Label();
         private Label lblProgress = new Label();
+        private DataGridView dgvHistory = new DataGridView();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color SuccessColor = Color.FromArgb(70, 180, 120);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color SuccessColor => AppTheme.SuccessColor;
 
         public SavingsGoalDialog(User user, int goalId)
         {
@@ -38,8 +40,9 @@ namespace PersonalFinanceApp
 
         private void SetupUI()
         {
+            this.AutoScaleMode = AutoScaleMode.None;
             this.Text = "Hedef Detayı ve Yatırım";
-            this.Size = new Size(420, 500);
+            this.Size = new Size(420, 660);
             this.BackColor = AppBackColor;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -49,13 +52,13 @@ namespace PersonalFinanceApp
             // --- HEDEF BİLGİLERİ ---
             Label lblTitle = new Label { Text = "Hedef Bilgileri", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 20, AutoSize = true };
 
-            Label lblName = new Label { Text = "Hedef Adı:", ForeColor = Color.LightGray, Left = 20, Top = 60, AutoSize = true };
+            Label lblName = new Label { Text = "Hedef Adı:", ForeColor = TextMuted, Left = 20, Top = 52, AutoSize = true };
             Panel pnlName = new Panel { Left = 20, Top = 80, Width = 360, Height = 36 };
             SetupSmoothContainer(pnlName, 8, CardBackColor);
             txtGoalName.BorderStyle = BorderStyle.None; txtGoalName.BackColor = CardBackColor; txtGoalName.ForeColor = TextLight; txtGoalName.Font = new Font("Segoe UI", 10F); txtGoalName.Location = new Point(10, 8); txtGoalName.Width = 340;
             pnlName.Controls.Add(txtGoalName);
 
-            Label lblTarget = new Label { Text = "Hedef Tutar:", ForeColor = Color.LightGray, Left = 20, Top = 130, AutoSize = true };
+            Label lblTarget = new Label { Text = "Hedef Tutar:", ForeColor = TextMuted, Left = 20, Top = 122, AutoSize = true };
             Panel pnlTarget = new Panel { Left = 20, Top = 150, Width = 170, Height = 36 };
             SetupSmoothContainer(pnlTarget, 8, CardBackColor);
             txtTargetAmount.BorderStyle = BorderStyle.None; txtTargetAmount.BackColor = CardBackColor; txtTargetAmount.ForeColor = TextLight; txtTargetAmount.Font = new Font("Segoe UI", 10F); txtTargetAmount.Location = new Point(10, 8); txtTargetAmount.Width = 150;
@@ -67,7 +70,7 @@ namespace PersonalFinanceApp
             btnUpdate.Click += BtnUpdate_Click;
 
             // --- YATIRIM (ÖDEME) ALANI ---
-            Panel divider = new Panel { Left = 20, Top = 210, Width = 360, Height = 1, BackColor = Color.FromArgb(60, 65, 85) };
+            Panel divider = new Panel { Left = 20, Top = 210, Width = 360, Height = 1, BackColor = AppTheme.HoverBackColor };
 
             Label lblInvestTitle = new Label { Text = "Yatırım Yap (Kasadan Düşer)", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 230, AutoSize = true };
 
@@ -83,10 +86,42 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnInvest, SuccessColor, Color.White);
             btnInvest.Click += BtnInvest_Click;
 
-            lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Left = 20; lblStatus.Top = 350; lblStatus.Width = 360; lblStatus.Height = 40; lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+            lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Left = 20; lblStatus.Top = 350; lblStatus.Width = 360; lblStatus.Height = 30; lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+
+            // --- YATIRIM GEÇMİŞİ ---
+            Panel divider2 = new Panel { Left = 20, Top = 390, Width = 360, Height = 1, BackColor = AppTheme.HoverBackColor };
+            Label lblHistoryTitle = new Label { Text = "Yatırım Geçmişi", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 405, AutoSize = true };
+
+            Panel pnlHistoryWrapper = new Panel { Left = 20, Top = 440, Width = 360, Height = 180, Padding = new Padding(2, 4, 2, 4) };
+            SetupSmoothContainer(pnlHistoryWrapper, 10, CardBackColor);
+
+            dgvHistory.Dock = DockStyle.Fill;
+            dgvHistory.ReadOnly = true;
+            dgvHistory.AllowUserToAddRows = false;
+            dgvHistory.AllowUserToDeleteRows = false;
+            dgvHistory.AllowUserToResizeColumns = false;
+            dgvHistory.AllowUserToResizeRows = false;
+            dgvHistory.ColumnHeadersVisible = false;
+            dgvHistory.RowHeadersVisible = false;
+            dgvHistory.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvHistory.MultiSelect = false;
+            dgvHistory.Font = new Font("Segoe UI", 9.5F);
+            dgvHistory.RowTemplate.Height = 32;
+            dgvHistory.BorderStyle = BorderStyle.None;
+            dgvHistory.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvHistory.GridColor = AppTheme.HoverBackColor;
+            dgvHistory.BackgroundColor = CardBackColor;
+            dgvHistory.DefaultCellStyle.BackColor = CardBackColor;
+            dgvHistory.DefaultCellStyle.ForeColor = TextLight;
+            dgvHistory.DefaultCellStyle.SelectionBackColor = CardBackColor;
+            dgvHistory.DefaultCellStyle.SelectionForeColor = TextLight;
+            dgvHistory.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            pnlHistoryWrapper.Controls.Add(dgvHistory);
 
             this.Controls.Add(lblTitle); this.Controls.Add(lblName); this.Controls.Add(pnlName); this.Controls.Add(lblTarget); this.Controls.Add(pnlTarget); this.Controls.Add(btnUpdate);
             this.Controls.Add(divider); this.Controls.Add(lblInvestTitle); this.Controls.Add(lblProgress); this.Controls.Add(pnlInvest); this.Controls.Add(btnInvest); this.Controls.Add(lblStatus);
+            this.Controls.Add(divider2); this.Controls.Add(lblHistoryTitle); this.Controls.Add(pnlHistoryWrapper);
         }
 
         private void LoadGoalData()
@@ -101,7 +136,36 @@ namespace PersonalFinanceApp
                 
                 decimal progressPercent = goal.TargetAmount > 0 ? (goal.CurrentAmount / goal.TargetAmount) * 100 : 0;
                 lblProgress.Text = $"Biriken: {goal.CurrentAmount:N0} ₺   /   Kalan: {Math.Max(0, goal.TargetAmount - goal.CurrentAmount):N0} ₺  (%{progressPercent:N1})";
-            
+
+            }
+
+            LoadInvestmentHistory();
+        }
+
+        private void LoadInvestmentHistory()
+        {
+            var history = _goalService.GetInvestmentHistory(_goalId, _user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            var displayList = history.Select(h => new
+            {
+                Tarih = h.InvestedAt.ToString("dd.MM.yyyy HH:mm"),
+                Tutar = h.Amount.ToString("#,##0", tr) + " ₺"
+            }).ToList();
+
+            dgvHistory.DataSource = displayList;
+
+            if (dgvHistory.Columns["Tutar"] != null)
+            {
+                dgvHistory.Columns["Tarih"]!.FillWeight = 60;
+                dgvHistory.Columns["Tutar"]!.FillWeight = 40;
+                dgvHistory.Columns["Tutar"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                dgvHistory.Columns["Tutar"]!.DefaultCellStyle.ForeColor = SuccessColor;
+            }
+
+            if (history.Count == 0)
+            {
+                dgvHistory.DataSource = null;
             }
         }
 
@@ -150,6 +214,6 @@ namespace PersonalFinanceApp
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; }
-        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent.BackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
     }
 }

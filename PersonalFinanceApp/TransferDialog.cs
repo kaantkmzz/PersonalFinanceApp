@@ -9,9 +9,9 @@ namespace PersonalFinanceApp
         public decimal Amount { get; private set; }
         public TransferDirection Direction { get; private set; }
 
-        private static readonly Color AppBackColor = Color.FromArgb(37, 41, 59);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color AccentColor => AppTheme.AccentColor;
 
         private RadioButton rbToSafe = new RadioButton();
         private RadioButton rbToWallet = new RadioButton();

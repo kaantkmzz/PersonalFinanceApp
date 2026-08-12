@@ -112,10 +112,13 @@ namespace PersonalFinanceApp.Services
             // 1. Parayı kasadan düş
             _accountService.AdjustSafeBalance(userId, -amount);
 
-            // 2. Hedefe parayı ekle
+            // 2. Yatırım geçmişine kaydet
+            _repository.AddInvestment(goalId, userId, amount);
+
+            // 3. Hedefe parayı ekle
             goal.CurrentAmount += amount;
 
-            // 3. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
+            // 4. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
             if (goal.CurrentAmount >= goal.TargetAmount)
             {
                 goal.IsAchieved = true;
@@ -129,7 +132,7 @@ namespace PersonalFinanceApp.Services
                 }
             }
 
-            // 4. Veritabanını güncelle
+            // 5. Veritabanını güncelle
             _repository.Update(goal);
             return true;
         }
@@ -137,6 +140,11 @@ namespace PersonalFinanceApp.Services
         public void DeleteGoal(int goalId, int userId)
         {
             _repository.Delete(goalId, userId);
+        }
+
+        public List<Models.SavingsGoalInvestment> GetInvestmentHistory(int goalId, int userId)
+        {
+            return _repository.GetInvestmentHistory(goalId, userId);
         }
     }
 }

@@ -7,25 +7,6 @@ namespace PersonalFinanceApp.Services
     {
         private readonly CategoryRepository _repository = new CategoryRepository();
 
-        // Yeni kullanıcı kayıt olduğunda çağrılacak — birkaç temel kategori otomatik oluşturur
-        public void CreateDefaultCategories(int userId)
-        {
-            var defaults = new List<Category>
-            {
-                new Category { UserId = userId, Name = "Maaş", Type = "income" },
-                new Category { UserId = userId, Name = "Ek Gelir", Type = "income" },
-                new Category { UserId = userId, Name = "Market", Type = "expense" },
-                new Category { UserId = userId, Name = "Fatura", Type = "expense" },
-                new Category { UserId = userId, Name = "Ulaşım", Type = "expense" },
-                new Category { UserId = userId, Name = "Eğlence", Type = "expense" }
-            };
-
-            foreach (var category in defaults)
-            {
-                _repository.Add(category);
-            }
-        }
-
         public List<Category> GetUserCategories(int userId)
         {
             return _repository.GetByUserId(userId);
@@ -46,7 +27,7 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense")
+            if (type != "income" && type != "expense" && type != "goal")
             {
                 errorMessage = "Geçersiz kategori tipi.";
                 return false;

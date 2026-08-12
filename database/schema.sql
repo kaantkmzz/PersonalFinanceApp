@@ -23,7 +23,7 @@ CREATE TABLE categories (
     category_id  SERIAL PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
-    type         TEXT NOT NULL CHECK (type IN ('income', 'expense'))
+    type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal'))
 );
 
 CREATE TABLE transactions (
@@ -31,7 +31,7 @@ CREATE TABLE transactions (
     user_id           INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     category_id       INTEGER NOT NULL REFERENCES categories(category_id),
     amount            NUMERIC(14,2) NOT NULL,
-    type              TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+    type              TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal')),
     description       TEXT,
     transaction_date  TIMESTAMP NOT NULL,
     created_at        TIMESTAMP NOT NULL DEFAULT NOW()
@@ -45,8 +45,10 @@ CREATE TABLE recurring_transactions (
     type                   TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     description            TEXT,
     is_active              BOOLEAN NOT NULL DEFAULT TRUE,
+    frequency              VARCHAR(10) NOT NULL DEFAULT 'monthly' CHECK (frequency IN ('daily', 'weekly', 'monthly')),
     last_processed_month   INTEGER,
     last_processed_year    INTEGER,
+    last_processed_date    DATE,
     created_at             TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -58,6 +60,14 @@ CREATE TABLE savings_goals (
     current_amount  NUMERIC(14,2) NOT NULL DEFAULT 0,
     is_achieved     BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE savings_goal_investments (
+    investment_id  SERIAL PRIMARY KEY,
+    goal_id        INTEGER NOT NULL REFERENCES savings_goals(goal_id) ON DELETE CASCADE,
+    user_id        INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    amount         NUMERIC(14,2) NOT NULL,
+    invested_at    TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE notes (

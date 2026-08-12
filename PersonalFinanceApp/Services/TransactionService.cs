@@ -66,7 +66,7 @@ namespace PersonalFinanceApp.Services
                 Amount = amount,
                 Type = type,
                 Description = description,
-                TransactionDate = DateTime.Today
+                TransactionDate = DateTime.Now
             };
 
             _repository.Add(transaction);
