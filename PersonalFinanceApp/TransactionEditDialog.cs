@@ -60,8 +60,8 @@ namespace PersonalFinanceApp
             Panel pnlType = new Panel { Left = 20, Top = 90, Width = 360, Height = 38 };
             cmbType.Left = 5; cmbType.Top = 8; cmbType.Width = 350;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider");
-            cmbType.SelectedIndex = _transaction.Type == "income" ? 0 : 1;
+            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.Items.Add("Hedef");
+            cmbType.SelectedIndex = _transaction.Type switch { "income" => 0, "goal" => 2, _ => 1 };
             cmbType.SelectedIndexChanged += (s, e) => LoadCategories();
             pnlType.Controls.Add(cmbType);
             SetupCustomComboBox(pnlType, cmbType);
@@ -139,7 +139,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblStatus);
         }
 
-        private string GetSelectedType() => cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
+        private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
 
         private void LoadCategories()
         {

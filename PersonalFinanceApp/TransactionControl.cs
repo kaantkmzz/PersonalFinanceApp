@@ -73,7 +73,7 @@ namespace PersonalFinanceApp
             Panel pnlType = new Panel { Left = 20, Top = 100, Width = 140, Height = 36 };
             cmbType.Left = 5; cmbType.Top = 7; cmbType.Width = 135;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.SelectedIndex = 1;
+            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.Items.Add("Hedef"); cmbType.SelectedIndex = 1;
             cmbType.SelectedIndexChanged += (s, e) => LoadCategorySuggestions();
             pnlType.Controls.Add(cmbType);
             SetupCustomComboBox(pnlType, cmbType); // Beyazlık ve Mavi renk düzeltildi
@@ -206,7 +206,8 @@ namespace PersonalFinanceApp
             }
         }
 
-        private string GetSelectedType() { return cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense"; }
+        private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
+        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
 
         private void LoadCategorySuggestions()
         {
@@ -234,7 +235,7 @@ namespace PersonalFinanceApp
             var displayList = _cachedTransactions.Select(t => new
             {
                 ID = t.Id,
-                Tip = t.Type == "income" ? "Gelir" : "Gider",
+                Tip = TypeToTr(t.Type),
                 Kategori = t.CategoryName,
                 Tutar = _user.HideAmountsEnabled ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺",
                 Tarih = t.TransactionDate.ToString("dd.MM.yyyy HH:mm"),
@@ -326,7 +327,7 @@ namespace PersonalFinanceApp
                             writer.WriteLine("Tarih;Tip;Kategori;Tutar;Açıklama");
                             foreach (var t in _cachedTransactions)
                             {
-                                string tip = t.Type == "income" ? "Gelir" : "Gider";
+                                string tip = TypeToTr(t.Type);
                                 string tarih = t.TransactionDate.ToString("dd.MM.yyyy");
                                 string tutar = t.Amount.ToString("0.00", tr);
                                 string aciklama = (t.Description ?? "").Replace(";", ",");
