@@ -15,12 +15,12 @@ namespace PersonalFinanceApp
         private readonly DateTime _date;
         private readonly ReminderService _reminderService = new ReminderService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private DataGridView dgvReminders = new DataGridView();
         private List<Reminder> _cachedReminders = new List<Reminder>();
@@ -149,7 +149,7 @@ namespace PersonalFinanceApp
             dgvReminders.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvReminders.BorderStyle = BorderStyle.None;
             dgvReminders.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            dgvReminders.GridColor = Color.FromArgb(60, 65, 85);
+            dgvReminders.GridColor = AppTheme.HoverBackColor;
             dgvReminders.BackgroundColor = CardBackColor;
 
             dgvReminders.DefaultCellStyle.BackColor = CardBackColor;
@@ -158,9 +158,9 @@ namespace PersonalFinanceApp
             dgvReminders.DefaultCellStyle.SelectionBackColor = Color.FromArgb(60, 64, 90);
             dgvReminders.DefaultCellStyle.SelectionForeColor = TextLight;
 
-            dgvReminders.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(35, 39, 54);
+            dgvReminders.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor;
             dgvReminders.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
-            dgvReminders.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(35, 39, 54);
+            dgvReminders.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvReminders.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvReminders.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             dgvReminders.EnableHeadersVisualStyles = false;
@@ -213,7 +213,7 @@ namespace PersonalFinanceApp
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
 
                 bool isSelected = (e.State & DataGridViewElementStates.Selected) == DataGridViewElementStates.Selected;
-                Color lineColor = isSelected ? Color.FromArgb(110, 115, 140) : Color.FromArgb(60, 65, 85);
+                Color lineColor = isSelected ? AppTheme.SelectedRowLineColor : AppTheme.HoverBackColor;
 
                 using (Pen p = new Pen(lineColor, 1))
                 {

@@ -17,11 +17,11 @@ namespace PersonalFinanceApp
         private readonly CategoryService _categoryService = new CategoryService();
         private readonly TransactionService _transactionService = new TransactionService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private Label lblTitle = new Label();
         private DataGridView dgvTransactions = new DataGridView();
@@ -73,9 +73,12 @@ namespace PersonalFinanceApp
             dgvTransactions.BackgroundColor = CardBackColor;
             dgvTransactions.DefaultCellStyle.BackColor = CardBackColor;
             dgvTransactions.DefaultCellStyle.ForeColor = TextLight;
-            dgvTransactions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(60, 65, 85);
-            dgvTransactions.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(35, 39, 54);
+            dgvTransactions.DefaultCellStyle.SelectionBackColor = AppTheme.HoverBackColor;
+            dgvTransactions.DefaultCellStyle.SelectionForeColor = TextLight;
+            dgvTransactions.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor;
             dgvTransactions.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
+            dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
+            dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvTransactions.EnableHeadersVisualStyles = false;
 
             pnlGridWrapper.Controls.Add(dgvTransactions);
@@ -91,12 +94,16 @@ namespace PersonalFinanceApp
             pnlRename.Controls.Add(txtRename);
             this.Controls.Add(pnlRename);
 
-            Button btnRename = new Button { Text = "✏️ Yeniden Adlandır", Left = 230, Top = 370, Width = 160, Height = 36, Cursor = Cursors.Hand };
+            Button btnRename = new Button { Text = "✏️ Yeniden Adlandır", Top = 370, Height = 36, Cursor = Cursors.Hand };
+            btnRename.Width = TextRenderer.MeasureText(btnRename.Text, btnRename.Font).Width + 44;
+            btnRename.Left = 230;
             SetupRoundedButton(btnRename, Color.FromArgb(80, 85, 105), Color.White);
             btnRename.Click += BtnRename_Click;
             this.Controls.Add(btnRename);
 
-            Button btnDelete = new Button { Text = "🗑️ Kategoriyi Sil", Left = 505, Top = 370, Width = 160, Height = 36, Cursor = Cursors.Hand };
+            Button btnDelete = new Button { Text = "🗑️ Kategoriyi Sil", Top = 370, Height = 36, Cursor = Cursors.Hand };
+            btnDelete.Width = TextRenderer.MeasureText(btnDelete.Text, btnDelete.Font).Width + 44;
+            btnDelete.Left = 665 - btnDelete.Width;
             SetupRoundedButton(btnDelete, DangerColor, Color.White);
             btnDelete.Click += BtnDelete_Click;
             this.Controls.Add(btnDelete);
