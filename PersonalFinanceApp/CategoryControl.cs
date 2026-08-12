@@ -65,7 +65,7 @@ namespace PersonalFinanceApp
             Panel pnlFilter = new Panel { Left = 20, Top = 95, Width = 140, Height = 36 };
             cmbFilterType.Left = 5; cmbFilterType.Top = 7; cmbFilterType.Width = 135;
             cmbFilterType.Font = new Font("Segoe UI", 9.5F); cmbFilterType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.SelectedIndex = 0;
+            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.Items.Add("Hedef"); cmbFilterType.SelectedIndex = 0;
             cmbFilterType.SelectedIndexChanged += (s, e) => LoadCategories();
             pnlFilter.Controls.Add(cmbFilterType);
             SetupCustomComboBox(pnlFilter, cmbFilterType); // Beyazlık ve mavi renk düzeltildi
@@ -82,7 +82,7 @@ namespace PersonalFinanceApp
             Panel pnlNewType = new Panel { Left = 420, Top = 95, Width = 120, Height = 36 };
             cmbNewCategoryType.Left = 5; cmbNewCategoryType.Top = 7; cmbNewCategoryType.Width = 115;
             cmbNewCategoryType.Font = new Font("Segoe UI", 9.5F); cmbNewCategoryType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbNewCategoryType.Items.Add("Gelir"); cmbNewCategoryType.Items.Add("Gider"); cmbNewCategoryType.SelectedIndex = 1;
+            cmbNewCategoryType.Items.Add("Gelir"); cmbNewCategoryType.Items.Add("Gider"); cmbNewCategoryType.Items.Add("Hedef"); cmbNewCategoryType.SelectedIndex = 1;
             pnlNewType.Controls.Add(cmbNewCategoryType);
             SetupCustomComboBox(pnlNewType, cmbNewCategoryType); // Beyazlık ve mavi renk düzeltildi
 
@@ -174,7 +174,7 @@ namespace PersonalFinanceApp
         {
             string filter = cmbFilterType.SelectedItem?.ToString() ?? "Tümü";
             if (filter == "Tümü") _cachedCategories = _categoryService.GetUserCategories(_user.Id);
-            else _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, filter == "Gelir" ? "income" : "expense");
+            else _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, TrToType(filter));
 
             var totals = _transactionService.GetCategoryTotals(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
@@ -183,7 +183,7 @@ namespace PersonalFinanceApp
             {
                 ID = c.Id,
                 Ad = c.Name,
-                Tip = c.Type == "income" ? "Gelir" : "Gider",
+                Tip = TypeToTr(c.Type),
                 ToplamTutar = (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
             }).ToList();
 
@@ -198,10 +198,13 @@ namespace PersonalFinanceApp
         }
 
         // Şeffaf kapsül çizimini yapan yardımcı metot (Bu sınıfta olmadığı için eklememiz gerekiyor)
+        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
+        private static string TrToType(string tr) => tr switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
+
         private void BtnAdd_Click(object? sender, EventArgs e)
         {
             string name = txtNewCategory.Text.Trim();
-            string type = cmbNewCategoryType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
+            string type = TrToType(cmbNewCategoryType.SelectedItem?.ToString() ?? "Gider");
             if (_categoryService.AddCategory(_user.Id, name, type, out string errorMessage))
             {
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "Kategori eklendi."; txtNewCategory.Clear(); LoadCategories();
