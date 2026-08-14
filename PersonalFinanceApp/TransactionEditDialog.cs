@@ -20,6 +20,7 @@ namespace PersonalFinanceApp
         private static Color TextLight => AppTheme.TextLight;
         private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private ComboBox cmbType = new ComboBox();
         private ComboBox cmbCategory = new ComboBox();
@@ -29,6 +30,7 @@ namespace PersonalFinanceApp
         private Label lblStatus = new Label();
 
         public bool WasUpdated { get; private set; }
+        public bool WasDeleted { get; private set; }
 
         public TransactionEditDialog(User user, Transaction transaction)
         {
@@ -43,7 +45,7 @@ namespace PersonalFinanceApp
         private void SetupDialog()
         {
             this.AutoScaleMode = AutoScaleMode.None;
-            this.ClientSize = new Size(400, 560);
+            this.ClientSize = new Size(400, 600);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -134,7 +136,12 @@ namespace PersonalFinanceApp
             btnCancel.Click += (s, e) => this.Close();
             this.Controls.Add(btnCancel);
 
-            lblStatus.Left = 20; lblStatus.Top = 484; lblStatus.Width = 360; lblStatus.Height = 25;
+            Button btnDelete = new Button { Text = "🗑️ İşlemi Sil", Left = 20, Top = 480, Width = 360, Height = 40, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnDelete, DangerColor, Color.White);
+            btnDelete.Click += BtnDelete_Click;
+            this.Controls.Add(btnDelete);
+
+            lblStatus.Left = 20; lblStatus.Top = 528; lblStatus.Width = 360; lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             this.Controls.Add(lblStatus);
@@ -198,6 +205,22 @@ namespace PersonalFinanceApp
             if (success)
             {
                 WasUpdated = true;
+                this.Close();
+            }
+            else
+            {
+                lblStatus.Text = errorMessage;
+            }
+        }
+
+        private void BtnDelete_Click(object? sender, EventArgs e)
+        {
+            if (MessageBox.Show("Bu işlemi silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            if (_transactionService.DeleteTransaction(_transaction.Id, _user.Id, out string errorMessage))
+            {
+                WasDeleted = true;
                 this.Close();
             }
             else
