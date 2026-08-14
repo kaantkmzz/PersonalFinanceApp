@@ -46,6 +46,12 @@ namespace PersonalFinanceApp
         private Panel pnlLegendWrapper = new Panel();
         private FlowLayoutPanel pnlLegendFlow = new FlowLayoutPanel();
 
+        // Lejant öğesinin (Gelir/Gider/Hedef/Boşta ya da kırılımdaki tek bir kategori) üzerine gelindiğinde
+        // grafikte hangi dilim(ler)in beyaz çizgiyle vurgulanacağını tutar (bkz. BuildChart, AddLegendEntry).
+        private readonly Dictionary<string, List<int>> _typeToPointIndices = new Dictionary<string, List<int>>();
+        private int _idlePointIndex = -1;
+        private readonly HashSet<int> _legendHoverIndices = new HashSet<int>();
+
         // Grafik açılış (saat 12'den başlayıp bir tur dönerek beliren) animasyonu
         private Panel pnlChartReveal = new Panel();
         private System.Windows.Forms.Timer _revealTimer = new System.Windows.Forms.Timer();
@@ -417,6 +423,8 @@ namespace PersonalFinanceApp
         {
             chart.Series.Clear();
             chart.Annotations.Clear();
+            _typeToPointIndices.Clear();
+            _idlePointIndex = -1;
 
             Series series = new Series("İşlemler") { ChartType = SeriesChartType.Doughnut };
             series["PieLabelStyle"] = "Outside";
@@ -444,26 +452,32 @@ namespace PersonalFinanceApp
                 // aynı renkteki (gelir/gider/hedef) küçük kategoriler "Diğer" adıyla tek dilimde birleştirilir.
                 decimal smallSliceThreshold = pieTotal * 0.04m;
 
-                void AddGroupedPoints(IEnumerable<(string Name, decimal Amount)> items, Color color)
+                void AddGroupedPoints(IEnumerable<(string Name, decimal Amount)> items, Color color, string type)
                 {
                     var large = items.Where(i => i.Amount >= smallSliceThreshold).ToList();
                     var small = items.Where(i => i.Amount < smallSliceThreshold).ToList();
 
+                    if (!_typeToPointIndices.TryGetValue(type, out var indices))
+                    {
+                        indices = new List<int>();
+                        _typeToPointIndices[type] = indices;
+                    }
+
                     foreach (var item in large)
-                        AddPoint(item.Name, item.Amount, color);
+                        indices.Add(AddPoint(item.Name, item.Amount, color));
 
                     if (small.Count == 1)
-                        AddPoint(small[0].Name, small[0].Amount, color);
+                        indices.Add(AddPoint(small[0].Name, small[0].Amount, color));
                     else if (small.Count > 1)
-                        AddPoint("Diğer", small.Sum(i => i.Amount), color, small);
+                        indices.Add(AddPoint("Diğer", small.Sum(i => i.Amount), color, small));
                 }
 
-                AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor);
-                AddGroupedPoints(current.ExpenseBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), ExpenseColor);
-                AddGroupedPoints(current.GoalBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), GoalColor);
+                AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor, "income");
+                AddGroupedPoints(current.ExpenseBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), ExpenseColor, "expense");
+                AddGroupedPoints(current.GoalBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), GoalColor, "goal");
 
                 if (idle > 0 || series.Points.Count == 0)
-                    AddPoint("Boşta", idle, IdleColor);
+                    _idlePointIndex = AddPoint("Boşta", idle, IdleColor);
             }
             else
             {
@@ -581,10 +595,10 @@ namespace PersonalFinanceApp
                 decimal incomeTotal = current.IncomeBreakdown.Sum(x => x.TotalAmount);
                 decimal expenseTotal = current.ExpenseBreakdown.Sum(x => x.TotalAmount);
 
-                if (incomeTotal > 0) AddLegendEntry(IncomeColor, "Gelir", incomeTotal, pieTotal, () => DrillInto("income"));
-                if (expenseTotal > 0) AddLegendEntry(ExpenseColor, "Gider", expenseTotal, pieTotal, () => DrillInto("expense"));
-                if (goalTotal > 0) AddLegendEntry(GoalColor, "Hedef", goalTotal, pieTotal, () => DrillInto("goal"));
-                if (idle > 0) AddLegendEntry(IdleColor, "Boşta", idle, pieTotal, null);
+                if (incomeTotal > 0) AddLegendEntry(IncomeColor, "Gelir", incomeTotal, pieTotal, () => DrillInto("income"), _typeToPointIndices.GetValueOrDefault("income"));
+                if (expenseTotal > 0) AddLegendEntry(ExpenseColor, "Gider", expenseTotal, pieTotal, () => DrillInto("expense"), _typeToPointIndices.GetValueOrDefault("expense"));
+                if (goalTotal > 0) AddLegendEntry(GoalColor, "Hedef", goalTotal, pieTotal, () => DrillInto("goal"), _typeToPointIndices.GetValueOrDefault("goal"));
+                if (idle > 0) AddLegendEntry(IdleColor, "Boşta", idle, pieTotal, null, _idlePointIndex >= 0 ? new List<int> { _idlePointIndex } : null);
             }
 
             CenterLegend();
@@ -612,23 +626,54 @@ namespace PersonalFinanceApp
 
             var ordered = items.OrderByDescending(i => i.TotalAmount).ToList();
             var shades = GenerateShades(baseColor, ordered.Count);
+            // BuildChart de aynı kaynak listeyi aynı şekilde (OrderByDescending) sıralayıp dilimleri
+            // 0'dan başlayarak sırayla eklediği için, buradaki i. öğe doğrudan i. dilime karşılık gelir.
             for (int i = 0; i < ordered.Count; i++)
-                AddLegendEntry(shades[i], ordered[i].CategoryName, ordered[i].TotalAmount, typeTotal, null);
+                AddLegendEntry(shades[i], ordered[i].CategoryName, ordered[i].TotalAmount, typeTotal, null, new List<int> { i });
         }
 
+        // Kırılım görünümünden birleşik görünüme dönüş: sade bir ok butonu (metin yerine daha
+        // belirgin, dolgulu ve tıklanabilir olduğu açıkça belli olan bir görünüm).
         private void AddBackLegendEntry()
         {
-            Label lbl = new Label
+            Panel btnBack = new Panel
             {
-                Text = "← Tüm Kategoriler",
-                AutoSize = true,
-                ForeColor = AccentColor,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Width = 30,
+                Height = 30,
                 Cursor = Cursors.Hand,
-                Margin = new Padding(0, 0, 24, 0)
+                Margin = new Padding(4, 2, 24, 2),
+                BackColor = AppBackColor
             };
-            lbl.Click += (s, e) => { _drillDownType = null; RenderReport(); };
-            pnlLegendFlow.Controls.Add(lbl);
+
+            bool isHovered = false;
+            btnBack.MouseEnter += (s, e) => { isHovered = true; btnBack.Invalidate(); };
+            btnBack.MouseLeave += (s, e) => { isHovered = false; btnBack.Invalidate(); };
+
+            btnBack.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btnBack.Parent?.BackColor ?? AppBackColor);
+
+                using (var brush = new SolidBrush(isHovered ? ControlPaint.Light(AccentColor) : AccentColor))
+                    e.Graphics.FillEllipse(brush, 0, 0, btnBack.Width - 1, btnBack.Height - 1);
+
+                using var pen = new Pen(Color.White, 2.4f)
+                {
+                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                    EndCap = System.Drawing.Drawing2D.LineCap.Round,
+                    LineJoin = System.Drawing.Drawing2D.LineJoin.Round
+                };
+                int cx = btnBack.Width / 2, cy = btnBack.Height / 2;
+                e.Graphics.DrawLines(pen, new PointF[]
+                {
+                    new PointF(cx + 5, cy - 7),
+                    new PointF(cx - 6, cy),
+                    new PointF(cx + 5, cy + 7)
+                });
+            };
+
+            btnBack.Click += (s, e) => { _drillDownType = null; RenderReport(); };
+            pnlLegendFlow.Controls.Add(btnBack);
         }
 
         private void DrillInto(string type)
@@ -637,7 +682,7 @@ namespace PersonalFinanceApp
             RenderReport();
         }
 
-        private void AddLegendEntry(Color color, string label, decimal amount, decimal totalForPercent, Action? onClick)
+        private void AddLegendEntry(Color color, string label, decimal amount, decimal totalForPercent, Action? onClick, List<int>? highlightIndices = null)
         {
             int percent = totalForPercent > 0 ? (int)Math.Round(amount / totalForPercent * 100) : 0;
             Font legendFont = new Font("Segoe UI", 9.5F);
@@ -669,6 +714,17 @@ namespace PersonalFinanceApp
                 lbl.Cursor = Cursors.Hand;
                 dot.Click += (s, e) => onClick();
                 lbl.Click += (s, e) => onClick();
+            }
+
+            // Lejant öğesinin üzerine gelince, grafikte bir dilimin üstüne gelindiğinde olduğu gibi
+            // ilgili dilim(ler)in etrafını beyaz çizgiyle vurguluyoruz (o türe ait tek bir dilim
+            // olabileceği gibi, "Gelir" gibi bir üst kategori için birden fazla dilim de olabilir).
+            if (highlightIndices != null && highlightIndices.Count > 0)
+            {
+                dot.MouseEnter += (s, e) => SetLegendHover(highlightIndices);
+                dot.MouseLeave += (s, e) => ClearLegendHover();
+                lbl.MouseEnter += (s, e) => SetLegendHover(highlightIndices);
+                lbl.MouseLeave += (s, e) => ClearLegendHover();
             }
 
             // Nokta ve etiketini tek bir kapsayıcıya koyup pnlLegendFlow'a TEK parça olarak ekliyoruz;
@@ -809,6 +865,40 @@ namespace PersonalFinanceApp
                 series.Points[_hoveredPointIndex].BorderWidth = 2;
             }
             _hoveredPointIndex = -1;
+        }
+
+        // Lejantta bir öğenin (ör. "Gelir %30" ya da kırılımda tek bir kategori) üzerine gelindiğinde,
+        // grafik üzerinde fareyle bir dilime gelindiğindeki aynı beyaz çerçeve vurgusunu, birden fazla
+        // dilim olsa bile (ör. "Gelir" birkaç kategoriye yayılmışsa) hepsine birden uygular.
+        private void SetLegendHover(List<int> indices)
+        {
+            var series = chart.Series.FirstOrDefault();
+            if (series == null) return;
+
+            ClearLegendHover();
+
+            foreach (var idx in indices)
+            {
+                if (idx < 0 || idx >= series.Points.Count) continue;
+                series.Points[idx].BorderColor = Color.White;
+                series.Points[idx].BorderWidth = 4;
+                _legendHoverIndices.Add(idx);
+            }
+        }
+
+        private void ClearLegendHover()
+        {
+            var series = chart.Series.FirstOrDefault();
+            if (series != null)
+            {
+                foreach (var idx in _legendHoverIndices)
+                {
+                    if (idx < 0 || idx >= series.Points.Count) continue;
+                    series.Points[idx].BorderColor = SliceBorderColor;
+                    series.Points[idx].BorderWidth = 2;
+                }
+            }
+            _legendHoverIndices.Clear();
         }
 
         private void Chart_MouseClick(object? sender, MouseEventArgs e)
