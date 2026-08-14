@@ -168,8 +168,8 @@ namespace PersonalFinanceApp
                 Padding = new Padding(20, 15, 20, 20)
             };
 
-            Label lblMonth = new Label { Text = "Ay:", Left = 0, Top = 0, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlMonth = new Panel { Left = 0, Top = 20, Width = 195, Height = 36 };
+            Label lblMonth = new Label { Text = "Ay:", Left = 0, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlMonth = new Panel { Left = 0, Top = 24, Width = 195, Height = 36 };
             cmbMonth.Left = 5; cmbMonth.Top = 7; cmbMonth.Width = 190;
             cmbMonth.Font = new Font("Segoe UI", 9.5F); cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
             var trMonths = new System.Globalization.CultureInfo("tr-TR");
@@ -178,8 +178,8 @@ namespace PersonalFinanceApp
             pnlMonth.Controls.Add(cmbMonth);
             SetupCustomComboBox(pnlMonth, cmbMonth);
 
-            Label lblYear = new Label { Text = "Yıl:", Left = 210, Top = 0, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlYear = new Panel { Left = 210, Top = 20, Width = 195, Height = 36 };
+            Label lblYear = new Label { Text = "Yıl:", Left = 210, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlYear = new Panel { Left = 210, Top = 24, Width = 195, Height = 36 };
             SetupSmoothContainer(pnlYear, 8, CardBackColor);
             nudYear.Left = 10; nudYear.Top = 6; nudYear.Width = 175;
             nudYear.Font = new Font("Segoe UI", 9.5F); nudYear.BorderStyle = BorderStyle.None;
@@ -487,15 +487,16 @@ namespace PersonalFinanceApp
 
                 // Kırılım görünümünde her kategori kendi dilimi olduğundan, çok sayıda küçük dilim
                 // aynı bölgede toplanıp dış etiketlerin (ve bağlantı çizgilerinin) üst üste binmesine
-                // yol açabiliyordu. Payı %3'ün altında kalan dilimler için etiketi gizliyoruz;
-                // dilim yine grafikte görünür, sadece çakışan metni çizilmiyor.
+                // yol açabiliyordu. Payı %3'ün altında kalan dilimler için etiketi TAMAMEN kapatıyoruz
+                // ("Disabled") — sadece metni değil, işaret eden çizgiyi de kaldırır; dilim yine
+                // grafikte kendi rengiyle görünmeye devam ediyor.
                 decimal typeTotal = ordered.Sum(i => i.TotalAmount);
                 decimal labelThreshold = typeTotal * 0.03m;
                 for (int i = 0; i < ordered.Count; i++)
                 {
                     int idx = AddPoint(ordered[i].CategoryName, ordered[i].TotalAmount, shades[i]);
                     if (ordered[i].TotalAmount < labelThreshold)
-                        series.Points[idx].Label = " ";
+                        series.Points[idx]["PieLabelStyle"] = "Disabled";
                 }
 
                 if (ordered.Count == 0)
@@ -645,7 +646,7 @@ namespace PersonalFinanceApp
             Size textSize = TextRenderer.MeasureText($"{label} %{percent}", legendFont);
             int dotTopMargin = Math.Max(0, (textSize.Height - dotSize) / 2);
 
-            Panel dot = new Panel { Width = dotSize, Height = dotSize, Margin = new Padding(4, dotTopMargin, 4, 0) };
+            Panel dot = new Panel { Width = dotSize, Height = dotSize, Margin = new Padding(0, dotTopMargin, 4, 0) };
             dot.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
@@ -659,7 +660,7 @@ namespace PersonalFinanceApp
                 AutoSize = true,
                 ForeColor = TextLight,
                 Font = legendFont,
-                Margin = new Padding(0, 0, 18, 0)
+                Margin = new Padding(0, 0, 0, 0)
             };
 
             if (onClick != null)
@@ -670,8 +671,22 @@ namespace PersonalFinanceApp
                 lbl.Click += (s, e) => onClick();
             }
 
-            pnlLegendFlow.Controls.Add(dot);
-            pnlLegendFlow.Controls.Add(lbl);
+            // Nokta ve etiketini tek bir kapsayıcıya koyup pnlLegendFlow'a TEK parça olarak ekliyoruz;
+            // aksi halde satır kaydırma (WrapContents) ikisinin arasından bölüp noktayı bir üst satırda,
+            // yazıyı bir alt satırda bırakabiliyordu.
+            FlowLayoutPanel entry = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.LeftToRight,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = false,
+                BackColor = AppBackColor,
+                Margin = new Padding(4, 4, 18, 4)
+            };
+            entry.Controls.Add(dot);
+            entry.Controls.Add(lbl);
+
+            pnlLegendFlow.Controls.Add(entry);
         }
 
         // Tek bir temel rengin (ör. yeşil) N farklı tonunu üretir; kaç kategori olursa olsun
