@@ -19,7 +19,6 @@ namespace PersonalFinanceApp
         private static Color TextLight => AppTheme.TextLight;
         private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
-        private static Color DangerColor => AppTheme.DangerColor;
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
@@ -31,8 +30,6 @@ namespace PersonalFinanceApp
         private TextBox txtDescription = new TextBox();
 
         private Button btnAdd = new Button();
-        private Button btnEdit = new Button();
-        private Button btnDelete = new Button();
         private Button btnExport = new Button();
         private Button btnRecurring = new Button();
         private TextBox txtSearch = new TextBox();
@@ -158,6 +155,7 @@ namespace PersonalFinanceApp
             dgvTransactions.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgvTransactions.MultiSelect = false;
             dgvTransactions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill; dgvTransactions.RowHeadersVisible = false;
             dgvTransactions.Font = new Font("Segoe UI", 9.5F); dgvTransactions.RowTemplate.Height = 44;
+            dgvTransactions.CellDoubleClick += DgvTransactions_CellDoubleClick;
 
             dgvTransactions.BorderStyle = BorderStyle.None; dgvTransactions.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             dgvTransactions.GridColor = AppTheme.GridLineColor; dgvTransactions.BackgroundColor = CardBackColor;
@@ -183,24 +181,10 @@ namespace PersonalFinanceApp
             pnlBottom.Padding = new Padding(20, 15, 40, 15);
             pnlBottom.BackColor = AppBackColor;
 
-            btnEdit.Text = "✏️ Seçili İşlemi Düzenle";
-            btnEdit.Top = 20; btnEdit.Height = 38; btnEdit.Cursor = Cursors.Hand;
-            btnEdit.Width = TextRenderer.MeasureText(btnEdit.Text, btnEdit.Font).Width + 44;
-            btnEdit.Left = 20;
-            SetupRoundedButton(btnEdit, Color.FromArgb(80, 85, 105), Color.White, false);
-            btnEdit.Click += BtnEdit_Click;
-
-            btnDelete.Text = "🗑️ Seçili İşlemi Sil";
-            btnDelete.Top = 20; btnDelete.Height = 38; btnDelete.Cursor = Cursors.Hand;
-            btnDelete.Width = TextRenderer.MeasureText(btnDelete.Text, btnDelete.Font).Width + 44;
-            btnDelete.Left = btnEdit.Left + btnEdit.Width + 20;
-            SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
-            btnDelete.Click += BtnDelete_Click;
-
             btnExport.Text = "📄 CSV'ye Aktar";
             btnExport.Top = 20; btnExport.Height = 38; btnExport.Cursor = Cursors.Hand;
             btnExport.Width = TextRenderer.MeasureText(btnExport.Text, btnExport.Font).Width + 44;
-            btnExport.Left = btnDelete.Left + btnDelete.Width + 20;
+            btnExport.Left = 20;
             SetupRoundedButton(btnExport, Color.FromArgb(80, 85, 105), Color.White, false);
             btnExport.Click += BtnExport_Click;
 
@@ -211,7 +195,7 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnRecurring, Color.FromArgb(80, 85, 105), Color.White, false);
             btnRecurring.Click += (s, e) => { using (var dialog = new RecurringTransactionDialog(_user)) { dialog.ShowDialog(); } };
 
-            pnlBottom.Controls.Add(btnEdit); pnlBottom.Controls.Add(btnDelete); pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
+            pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
 
             this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
         }
@@ -323,10 +307,10 @@ namespace PersonalFinanceApp
             else { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = errorMessage; }
         }
 
-        private void BtnEdit_Click(object? sender, EventArgs e)
+        private void DgvTransactions_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
-            if (dgvTransactions.CurrentRow == null) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Lütfen düzenlemek için bir işlem seçin."; return; }
-            var idCell = dgvTransactions.CurrentRow.Cells["ID"];
+            if (e.RowIndex < 0) return;
+            var idCell = dgvTransactions.Rows[e.RowIndex].Cells["ID"];
             if (idCell?.Value == null || !int.TryParse(idCell.Value.ToString(), out int transactionId)) return;
 
             var transaction = _cachedTransactions.FirstOrDefault(t => t.Id == transactionId);
@@ -340,22 +324,11 @@ namespace PersonalFinanceApp
                     lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "İşlem güncellendi.";
                     LoadTransactions();
                 }
-            }
-        }
-
-        private void BtnDelete_Click(object? sender, EventArgs e)
-        {
-            if (dgvTransactions.CurrentRow == null) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Lütfen silmek için bir işlem seçin."; return; }
-            var idCell = dgvTransactions.CurrentRow.Cells["ID"];
-            if (idCell?.Value == null || !int.TryParse(idCell.Value.ToString(), out int transactionId)) return;
-
-            if (MessageBox.Show("Bu işlemi silmek istediğinize emin misiniz?", "Onay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-            {
-                if (_transactionService.DeleteTransaction(transactionId, _user.Id, out string errorMessage))
+                else if (dialog.WasDeleted)
                 {
-                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "İşlem silindi."; LoadTransactions();
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "İşlem silindi.";
+                    LoadTransactions();
                 }
-                else { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = errorMessage; }
             }
         }
 

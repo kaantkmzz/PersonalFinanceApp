@@ -41,7 +41,7 @@ namespace PersonalFinanceApp
             this.ControlBox = false;
 
             pnlCard.Width = 480;
-            pnlCard.Height = 420;
+            pnlCard.Height = 400;
             pnlCard.BackColor = AppBackColor;
             pnlCard.Paint += (s, e) =>
             {
@@ -58,9 +58,9 @@ namespace PersonalFinanceApp
 
             Panel pnlIconBadge = CreateIconBadge("🏦");
             Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
-            Label lblHint = new Label { Text = "Kasanızda şu an bulunan\ntoplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 42, TextAlign = ContentAlignment.TopLeft };
+            Label lblHint = new Label { Text = "Kasanızda şu an bulunan\ntoplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 50, TextAlign = ContentAlignment.TopLeft };
 
-            Panel pnlField = new Panel { Left = 60, Top = 208, Width = 360, Height = 48 };
+            Panel pnlField = new Panel { Left = 60, Top = 216, Width = 360, Height = 48 };
             SetupSmoothContainer(pnlField, 10, FieldBackColor);
             txtInitialSavings.BorderStyle = BorderStyle.None;
             txtInitialSavings.BackColor = FieldBackColor;
@@ -73,7 +73,7 @@ namespace PersonalFinanceApp
             pnlField.Controls.Add(txtInitialSavings);
 
             lblError.Left = 60;
-            lblError.Top = 263;
+            lblError.Top = 270;
             lblError.Width = 360;
             lblError.Height = 24;
             lblError.ForeColor = DangerColor;
@@ -81,13 +81,13 @@ namespace PersonalFinanceApp
             lblError.Font = new Font("Segoe UI", 9F);
             lblError.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 298, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 306, Width = 360, Height = 46, Cursor = Cursors.Hand };
             SetupRoundedButton(btnFinish, AccentColor, Color.White);
             btnFinish.Click += BtnFinish_Click;
 
-            CenterHorizontally(pnlIconBadge, 0, 40);
+            CenterHorizontally(pnlIconBadge, 0, 36);
             CenterHorizontally(lblPrompt, 0, 118);
-            CenterHorizontally(lblHint, 0, 150);
+            CenterHorizontally(lblHint, 0, 154);
 
             pnlStep.Controls.Add(pnlIconBadge);
             pnlStep.Controls.Add(lblPrompt);
