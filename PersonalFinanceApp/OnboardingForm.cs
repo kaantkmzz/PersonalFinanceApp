@@ -76,10 +76,10 @@ namespace PersonalFinanceApp
             PaintCardShape(pnlStep1);
 
             Panel pnlIconBadge1 = CreateIconBadge("👛");
-            Label lblPrompt1 = new Label { Text = "Aylık toplam gelirinizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true };
-            Label lblHint1 = new Label { Text = "Bu tutar, aylık bütçenizi takip etmemize yardımcı olur", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, AutoSize = true };
+            Label lblPrompt1 = new Label { Text = "Aylık toplam gelirinizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblHint1 = new Label { Text = "Bu tutar, aylık bütçenizi takip\netmemize yardımcı olur", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 42, TextAlign = ContentAlignment.TopLeft };
 
-            Panel pnlField1 = new Panel { Left = 60, Top = 195, Width = 360, Height = 48 };
+            Panel pnlField1 = new Panel { Left = 60, Top = 208, Width = 360, Height = 48 };
             SetupSmoothContainer(pnlField1, 10, FieldBackColor);
             txtMonthlyIncome.BorderStyle = BorderStyle.None;
             txtMonthlyIncome.BackColor = FieldBackColor;
@@ -92,14 +92,15 @@ namespace PersonalFinanceApp
             pnlField1.Controls.Add(txtMonthlyIncome);
 
             lblError1.Left = 60;
-            lblError1.Top = 250;
+            lblError1.Top = 263;
             lblError1.Width = 360;
             lblError1.Height = 24;
             lblError1.ForeColor = DangerColor;
+            lblError1.BackColor = Color.Transparent;
             lblError1.Font = new Font("Segoe UI", 9F);
             lblError1.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnNext = new Button { Text = "Devam Et", Left = 60, Top = 285, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            Button btnNext = new Button { Text = "Devam Et", Left = 60, Top = 298, Width = 360, Height = 46, Cursor = Cursors.Hand };
             SetupRoundedButton(btnNext, AccentColor, Color.White);
             btnNext.Click += BtnNext_Click;
 
@@ -120,10 +121,10 @@ namespace PersonalFinanceApp
             PaintCardShape(pnlStep2);
 
             Panel pnlIconBadge2 = CreateIconBadge("🏦");
-            Label lblPrompt2 = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true };
-            Label lblHint2 = new Label { Text = "Kasanızda şu an bulunan toplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, AutoSize = true };
+            Label lblPrompt2 = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblHint2 = new Label { Text = "Kasanızda şu an bulunan\ntoplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 42, TextAlign = ContentAlignment.TopLeft };
 
-            Panel pnlField2 = new Panel { Left = 60, Top = 195, Width = 360, Height = 48 };
+            Panel pnlField2 = new Panel { Left = 60, Top = 208, Width = 360, Height = 48 };
             SetupSmoothContainer(pnlField2, 10, FieldBackColor);
             txtInitialSavings.BorderStyle = BorderStyle.None;
             txtInitialSavings.BackColor = FieldBackColor;
@@ -136,14 +137,15 @@ namespace PersonalFinanceApp
             pnlField2.Controls.Add(txtInitialSavings);
 
             lblError2.Left = 60;
-            lblError2.Top = 250;
+            lblError2.Top = 263;
             lblError2.Width = 360;
             lblError2.Height = 24;
             lblError2.ForeColor = DangerColor;
+            lblError2.BackColor = Color.Transparent;
             lblError2.Font = new Font("Segoe UI", 9F);
             lblError2.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 285, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 298, Width = 360, Height = 46, Cursor = Cursors.Hand };
             SetupRoundedButton(btnFinish, AccentColor, Color.White);
             btnFinish.Click += BtnFinish_Click;
 

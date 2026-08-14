@@ -35,6 +35,8 @@ namespace PersonalFinanceApp
         private Button btnDelete = new Button();
         private Button btnExport = new Button();
         private Button btnRecurring = new Button();
+        private TextBox txtSearch = new TextBox();
+        private Button btnSearch = new Button();
         private Label lblStatus = new Label();
 
         private DataGridView dgvTransactions = new DataGridView();
@@ -63,10 +65,10 @@ namespace PersonalFinanceApp
 
             // --- ÜST PANEL ---
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 230;
+            pnlTop.Height = 258;
             pnlTop.BackColor = AppBackColor;
 
-            Label lblTitle = new Label { Text = "Gelir / Gider İşlemleri", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
+            Label lblTitle = new Label { Text = "İşlemler", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
 
             // Girdi Alanları
             Label lblType = new Label { Text = "Tip:", Left = 20, Top = 75, ForeColor = TextMuted, AutoSize = true };
@@ -92,6 +94,7 @@ namespace PersonalFinanceApp
             txtAmount.Left = 10; txtAmount.Top = 8; txtAmount.Width = 100;
             txtAmount.Font = new Font("Segoe UI", 10.5F); txtAmount.BorderStyle = BorderStyle.None;
             txtAmount.BackColor = CardBackColor; txtAmount.ForeColor = TextLight;
+            txtAmount.TextChanged += (s, e) => SmartFormatAmount(txtAmount);
             pnlAmount.Controls.Add(txtAmount);
 
             Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 150, ForeColor = TextMuted, AutoSize = true };
@@ -111,8 +114,23 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White, false);
             btnAdd.Click += BtnAdd_Click;
 
-            lblStatus.Left = 695; // 540 (Buton Left) + 140 (Buton Yüksekliği) + 15 boşluk
-            lblStatus.Top = 184;  // Buton ile dikeyde hizalı olması için
+            // Arama kutusu, İşlem Ekle butonunun hemen yanında
+            Label lblSearch = new Label { Text = "Ara:", Left = 695, Top = 150, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 695, Top = 175, Width = 140, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 120;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
+            txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.TextChanged += (s, e) => RefreshGrid();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍";
+            btnSearch.Left = 843; btnSearch.Top = 175; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White, false);
+            btnSearch.Click += (s, e) => RefreshGrid();
+
+            lblStatus.Left = 20;
+            lblStatus.Top = 222;
             lblStatus.AutoSize = true;
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             lblStatus.Font = new Font("Segoe UI", 9F);
@@ -122,7 +140,9 @@ namespace PersonalFinanceApp
             pnlTop.Controls.Add(lblCategory); pnlTop.Controls.Add(pnlCategory);
             pnlTop.Controls.Add(lblAmount); pnlTop.Controls.Add(pnlAmount);
             pnlTop.Controls.Add(lblDescription); pnlTop.Controls.Add(pnlDesc);
-            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblStatus);
+            pnlTop.Controls.Add(btnAdd);
+            pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
+            pnlTop.Controls.Add(lblStatus);
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
@@ -231,8 +251,16 @@ namespace PersonalFinanceApp
         {
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
+            string searchText = txtSearch.Text.Trim();
+            var visibleTransactions = string.IsNullOrEmpty(searchText)
+                ? _cachedTransactions
+                : _cachedTransactions.Where(t =>
+                    tr.CompareInfo.IndexOf(t.CategoryName ?? string.Empty, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0 ||
+                    tr.CompareInfo.IndexOf(t.Description ?? string.Empty, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0
+                  ).ToList();
+
             // Tarih sütununu Açıklama'nın hemen önüne aldık
-            var displayList = _cachedTransactions.Select(t => new
+            var displayList = visibleTransactions.Select(t => new
             {
                 ID = t.Id,
                 Tip = TypeToTr(t.Type),
@@ -256,11 +284,31 @@ namespace PersonalFinanceApp
             }
         }
 
+        private bool _suppressAmountFormatting = false;
+
+        // Tutar kutusuna yazılan rakamları "10.000" gibi binlik ayraçlarla biçimlendirir (Onboarding ekranındakiyle aynı mantık).
+        private void SmartFormatAmount(TextBox txt)
+        {
+            if (_suppressAmountFormatting || string.IsNullOrWhiteSpace(txt.Text)) return;
+            string value = new string(txt.Text.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(value)) return;
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                string formatted = amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+                if (txt.Text == formatted) return;
+                _suppressAmountFormatting = true;
+                txt.Text = formatted;
+                txt.SelectionStart = txt.Text.Length;
+                _suppressAmountFormatting = false;
+            }
+        }
+
         private void BtnAdd_Click(object? sender, EventArgs e)
         {
             string categoryName = cmbCategory.Text.Trim();
             if (string.IsNullOrWhiteSpace(categoryName)) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Lütfen bir kategori adı girin."; return; }
-            if (!decimal.TryParse(txtAmount.Text, out decimal amount)) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Geçersiz tutar."; return; }
+            string rawAmount = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+            if (!decimal.TryParse(rawAmount, out decimal amount)) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Geçersiz tutar."; return; }
 
             string type = GetSelectedType();
             string description = txtDescription.Text;

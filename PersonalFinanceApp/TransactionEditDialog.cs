@@ -83,7 +83,8 @@ namespace PersonalFinanceApp
             txtAmount.Left = 12; txtAmount.Top = 9; txtAmount.Width = 336;
             txtAmount.Font = new Font("Segoe UI", 10.5F); txtAmount.BorderStyle = BorderStyle.None;
             txtAmount.BackColor = CardBackColor; txtAmount.ForeColor = TextLight;
-            txtAmount.Text = _transaction.Amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            txtAmount.Text = _transaction.Amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+            txtAmount.TextChanged += (s, e) => SmartFormatAmount(txtAmount);
             pnlAmount.Controls.Add(txtAmount);
             this.Controls.Add(lblAmount); this.Controls.Add(pnlAmount);
 
@@ -141,6 +142,25 @@ namespace PersonalFinanceApp
 
         private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
 
+        private bool _suppressAmountFormatting = false;
+
+        // Tutar kutusuna yazılan rakamları "10.000" gibi binlik ayraçlarla biçimlendirir.
+        private void SmartFormatAmount(TextBox txt)
+        {
+            if (_suppressAmountFormatting || string.IsNullOrWhiteSpace(txt.Text)) return;
+            string value = new string(txt.Text.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(value)) return;
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                string formatted = amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+                if (txt.Text == formatted) return;
+                _suppressAmountFormatting = true;
+                txt.Text = formatted;
+                txt.SelectionStart = txt.Text.Length;
+                _suppressAmountFormatting = false;
+            }
+        }
+
         private void LoadCategories()
         {
             string type = GetSelectedType();
@@ -160,7 +180,8 @@ namespace PersonalFinanceApp
                 lblStatus.Text = "Lütfen bir kategori seçin.";
                 return;
             }
-            if (!decimal.TryParse(txtAmount.Text, out decimal amount))
+            string rawAmount = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+            if (!decimal.TryParse(rawAmount, out decimal amount))
             {
                 lblStatus.Text = "Geçersiz tutar.";
                 return;
