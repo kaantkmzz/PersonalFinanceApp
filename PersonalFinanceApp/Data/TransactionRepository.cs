@@ -157,7 +157,7 @@ namespace PersonalFinanceApp.Data
             };
         }
 
-        public decimal GetTotalByTypeAndMonth(int userId, string type, int year, int month)
+        public decimal GetTotalByTypeAndDateRange(int userId, string type, DateTime start, DateTime end)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
@@ -167,22 +167,21 @@ namespace PersonalFinanceApp.Data
             SELECT COALESCE(SUM(amount), 0)
             FROM transactions
             WHERE user_id = @userId AND type = @type
-              AND EXTRACT(YEAR FROM transaction_date) = @year
-              AND EXTRACT(MONTH FROM transaction_date) = @month";
+              AND transaction_date >= @start AND transaction_date < @end";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.Parameters.AddWithValue("@type", type);
-                    cmd.Parameters.AddWithValue("@year", year);
-                    cmd.Parameters.AddWithValue("@month", month);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
 
                     return (decimal)(cmd.ExecuteScalar() ?? 0m);
                 }
             }
         }
 
-        public List<CategorySummary> GetCategoryBreakdown(int userId, string type, int year, int month)
+        public List<CategorySummary> GetCategoryBreakdownByDateRange(int userId, string type, DateTime start, DateTime end)
         {
             var results = new List<CategorySummary>();
 
@@ -195,8 +194,7 @@ namespace PersonalFinanceApp.Data
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
             WHERE t.user_id = @userId AND t.type = @type
-              AND EXTRACT(YEAR FROM t.transaction_date) = @year
-              AND EXTRACT(MONTH FROM t.transaction_date) = @month
+              AND t.transaction_date >= @start AND t.transaction_date < @end
             GROUP BY c.name
             ORDER BY total_amount DESC";
 
@@ -204,8 +202,8 @@ namespace PersonalFinanceApp.Data
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.Parameters.AddWithValue("@type", type);
-                    cmd.Parameters.AddWithValue("@year", year);
-                    cmd.Parameters.AddWithValue("@month", month);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
 
                     using (var reader = cmd.ExecuteReader())
                     {

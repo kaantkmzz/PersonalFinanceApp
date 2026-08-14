@@ -213,6 +213,9 @@ namespace PersonalFinanceApp
                 var recurringService = new RecurringTransactionService();
                 var (addedRecurring, failedRecurring) = recurringService.ProcessDueRecurring(user.Id);
 
+                // Seçili rapor periyodu (günlük/haftalık/aylık) tamamlanmışsa geçmişe kaydedip yenisini başlatır.
+                user.ReportPeriodStart = new ReportHistoryService().CheckAndSnapshotCompletedPeriods(user.Id, user.ReportPeriodType, user.ReportPeriodStart);
+
                 var infoMessages = new List<string>();
                 if (addedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklendi:\n- " + string.Join("\n- ", addedRecurring));
                 if (failedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklenemedi:\n- " + string.Join("\n- ", failedRecurring));
