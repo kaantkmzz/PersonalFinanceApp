@@ -72,7 +72,7 @@ namespace PersonalFinanceApp
             Panel pnlType = new Panel { Left = 20, Top = 100, Width = 140, Height = 36 };
             cmbType.Left = 5; cmbType.Top = 7; cmbType.Width = 135;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.Items.Add("Hedef"); cmbType.SelectedIndex = 1;
+            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.SelectedIndex = 1;
             cmbType.SelectedIndexChanged += (s, e) => LoadCategorySuggestions();
             pnlType.Controls.Add(cmbType);
             SetupCustomComboBox(pnlType, cmbType); // Beyazlık ve Mavi renk düzeltildi
@@ -193,7 +193,7 @@ namespace PersonalFinanceApp
             btnRecurring.Width = TextRenderer.MeasureText(btnRecurring.Text, btnRecurring.Font).Width + 44;
             btnRecurring.Left = btnExport.Left + btnExport.Width + 20;
             SetupRoundedButton(btnRecurring, Color.FromArgb(80, 85, 105), Color.White, false);
-            btnRecurring.Click += (s, e) => { using (var dialog = new RecurringTransactionDialog(_user)) { dialog.ShowDialog(); } };
+            btnRecurring.Click += (s, e) => { using (var dialog = new RecurringTransactionDialog(_user)) { dialog.ShowDialog(); } LoadTransactions(); };
 
             pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
 
@@ -210,7 +210,7 @@ namespace PersonalFinanceApp
             }
         }
 
-        private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
+        private string GetSelectedType() => cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
         private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
 
         private void LoadCategorySuggestions()
@@ -385,7 +385,9 @@ namespace PersonalFinanceApp
             };
 
             // 2. Sadece dıştaki ince beyaz çerçeveyi tıraşlıyoruz
-            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+            // Alt kenarı kırpmıyoruz (sadece üst/sol/sağ): kırpma "g, y, ç" gibi alt çıkıntılı (descender)
+            // harflerin editable Kategori kutusunda kesilmesine yol açıyordu.
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 1));
 
             // 3. Oku ve beyaz çizgiyi gizlemek için örtü paneli (Overlay)
             Panel pnlArrow = new Panel();
