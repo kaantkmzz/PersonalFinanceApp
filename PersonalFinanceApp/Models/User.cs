@@ -11,7 +11,9 @@
 
         public bool HideAmountsEnabled { get; set; }
 
-        public string ReportPeriodType { get; set; } = "monthly";
-        public DateTime ReportPeriodStart { get; set; } = DateTime.Now;
+        public string FullName { get; set; } = string.Empty;
+        public string CleanupFrequency { get; set; } = "never";
+        public DateTime CleanupPeriodStart { get; set; } = DateTime.Now;
+        public bool CleanupExportBeforeClear { get; set; }
     }
 }

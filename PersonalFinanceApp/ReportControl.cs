@@ -23,11 +23,10 @@ namespace PersonalFinanceApp
         private static Color GoalColor => AppTheme.GoalColor;
         private static Color SliceBorderColor => AppTheme.SliceBorderColor;
 
-        private Button btnDaily = new Button();
-        private Button btnWeekly = new Button();
-        private Button btnMonthly = new Button();
+        private ComboBox cmbMonth = new ComboBox();
+        private NumericUpDown nudYear = new NumericUpDown();
+        private Button btnView = new Button();
         private Button btnExportReport = new Button();
-        private Button btnHistory = new Button();
         private MonthlyReport? _currentReport;
         private decimal _currentWallet;
         private decimal _currentSafe;
@@ -169,109 +168,104 @@ namespace PersonalFinanceApp
                 Padding = new Padding(20, 15, 20, 20)
             };
 
-            SetupPeriodButton(btnDaily, ReportPeriodHelper.Daily, "Günlük");
-            btnDaily.Left = 0; btnDaily.Top = 0; btnDaily.Width = 128; btnDaily.Height = 32;
+            Label lblMonth = new Label { Text = "Ay:", Left = 0, Top = 0, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlMonth = new Panel { Left = 0, Top = 20, Width = 195, Height = 36 };
+            cmbMonth.Left = 5; cmbMonth.Top = 7; cmbMonth.Width = 190;
+            cmbMonth.Font = new Font("Segoe UI", 9.5F); cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
+            var trMonths = new System.Globalization.CultureInfo("tr-TR");
+            for (int m = 1; m <= 12; m++) cmbMonth.Items.Add(trMonths.DateTimeFormat.GetMonthName(m));
+            cmbMonth.SelectedIndex = DateTime.Today.Month - 1;
+            pnlMonth.Controls.Add(cmbMonth);
+            SetupCustomComboBox(pnlMonth, cmbMonth);
 
-            SetupPeriodButton(btnWeekly, ReportPeriodHelper.Weekly, "Haftalık");
-            btnWeekly.Left = 138; btnWeekly.Top = 0; btnWeekly.Width = 128; btnWeekly.Height = 32;
+            Label lblYear = new Label { Text = "Yıl:", Left = 210, Top = 0, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlYear = new Panel { Left = 210, Top = 20, Width = 195, Height = 36 };
+            SetupSmoothContainer(pnlYear, 8, CardBackColor);
+            nudYear.Left = 10; nudYear.Top = 6; nudYear.Width = 175;
+            nudYear.Font = new Font("Segoe UI", 9.5F); nudYear.BorderStyle = BorderStyle.None;
+            nudYear.BackColor = CardBackColor; nudYear.ForeColor = TextLight;
+            nudYear.Minimum = 2000; nudYear.Maximum = 2100; nudYear.Value = DateTime.Today.Year;
+            nudYear.TextAlign = HorizontalAlignment.Left;
+            pnlYear.Controls.Add(nudYear);
 
-            SetupPeriodButton(btnMonthly, ReportPeriodHelper.Monthly, "Aylık");
-            btnMonthly.Left = 276; btnMonthly.Top = 0; btnMonthly.Width = 129; btnMonthly.Height = 32;
+            btnView.Text = "Görüntüle";
+            btnView.Left = 0; btnView.Top = 64; btnView.Width = 405; btnView.Height = 34;
+            btnView.Cursor = Cursors.Hand;
+            btnView.Click += (s, e) => { _drillDownType = null; LoadReport(); };
+            SetupRoundedButton(btnView, AccentColor, Color.White);
 
-            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 52, IncomeColor, lblIncome);
-            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 52, ExpenseColor, lblExpense);
-            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 157, TextLight, lblNet);
-            Panel cardSafe = CreateSummaryCard("Kasa", 210, 157, SafeColor, lblSafeBalance);
+            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 116, IncomeColor, lblIncome);
+            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 116, ExpenseColor, lblExpense);
+            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 221, TextLight, lblNet);
+            Panel cardSafe = CreateSummaryCard("Kasa", 210, 221, SafeColor, lblSafeBalance);
 
             btnExportReport.Text = "Raporu CSV'ye Aktar";
             btnExportReport.Left = 0;
-            btnExportReport.Top = 267;
+            btnExportReport.Top = 331;
             btnExportReport.Width = 405;
             btnExportReport.Height = 34;
             btnExportReport.Cursor = Cursors.Hand;
             btnExportReport.Click += BtnExportReport_Click;
             SetupOutlinedButton(btnExportReport, TextMuted, TextLight);
 
-            btnHistory.Text = "Geçmiş Raporlar";
-            btnHistory.Left = 0;
-            btnHistory.Top = 311;
-            btnHistory.Width = 405;
-            btnHistory.Height = 34;
-            btnHistory.Cursor = Cursors.Hand;
-            btnHistory.Click += (s, e) => { using var dialog = new ReportHistoryDialog(_user); dialog.ShowDialog(); };
-            SetupOutlinedButton(btnHistory, TextMuted, TextLight);
-
-            pnlRight.Controls.Add(btnDaily);
-            pnlRight.Controls.Add(btnWeekly);
-            pnlRight.Controls.Add(btnMonthly);
+            pnlRight.Controls.Add(lblMonth);
+            pnlRight.Controls.Add(pnlMonth);
+            pnlRight.Controls.Add(lblYear);
+            pnlRight.Controls.Add(pnlYear);
+            pnlRight.Controls.Add(btnView);
             pnlRight.Controls.Add(cardIncome);
             pnlRight.Controls.Add(cardExpense);
             pnlRight.Controls.Add(cardNet);
             pnlRight.Controls.Add(cardSafe);
             pnlRight.Controls.Add(btnExportReport);
-            pnlRight.Controls.Add(btnHistory);
 
             // Sıra önemli: önce Fill (sol), sonra Right (sağ) — böylece sağ blok sabit genişliğini korur, sol kalanı doldurur
             this.Controls.Add(pnlLeft);
             this.Controls.Add(pnlRight);
         }
 
-        private void SetupPeriodButton(Button btn, string periodType, string text)
+        private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
         {
-            btn.Text = text;
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.FlatAppearance.BorderSize = 0;
-            btn.BackColor = Color.Transparent;
-            btn.Cursor = Cursors.Hand;
-            btn.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            SetupSmoothContainer(pnl, 8, CardBackColor);
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
 
-            bool isHovered = false;
-            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
-            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
-
-            btn.Paint += (s, e) =>
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 22;
+            cmb.DrawItem += (s, e) =>
             {
-                bool active = _user.ReportPeriodType == periodType;
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
-
-                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
-                if (active)
-                {
-                    using var brush = new SolidBrush(isHovered ? ControlPaint.Light(AccentColor) : AccentColor);
-                    e.Graphics.FillPath(brush, path);
-                }
-                else
-                {
-                    using var pen = new Pen(isHovered ? TextLight : TextMuted, 1.2f);
-                    e.Graphics.DrawPath(pen, path);
-                }
-
-                Color textColor = active ? Color.White : TextMuted;
-                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             };
 
-            btn.Click += (s, e) => SelectPeriod(periodType);
-        }
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
 
-        // Kullanıcı Günlük/Haftalık/Aylık'tan birine geçince o an açık periyodu bırakıp yeni bir periyot
-        // başlatıyoruz (tamamlanmamış periyotlar geçmişe otomatik kaydedilmez, sadece doğal süresi
-        // dolanlar kaydedilir — bkz. ReportHistoryService). Seçim veritabanına yazılıp kalıcı hâle geliyor.
-        private void SelectPeriod(string periodType)
-        {
-            if (_user.ReportPeriodType != periodType)
+            Panel pnlArrow = new Panel();
+            pnlArrow.Width = 28;
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width - 1;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.BackColor = CardBackColor;
+            pnlArrow.Cursor = Cursors.Hand;
+
+            pnlArrow.Paint += (s, e) =>
             {
-                _user.ReportPeriodType = periodType;
-                _user.ReportPeriodStart = DateTime.Now;
-                _accountService.SetReportPeriod(_user.Id, periodType, _user.ReportPeriodStart);
-            }
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 5;
+                int ay = pnlArrow.Height / 2 - 2;
+                using (var brush = new SolidBrush(TextMuted))
+                    e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 10, ay), new Point(ax + 5, ay + 6) });
+            };
 
-            btnDaily.Invalidate();
-            btnWeekly.Invalidate();
-            btnMonthly.Invalidate();
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
 
-            _drillDownType = null;
-            LoadReport();
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
         }
 
         private Panel CreateSummaryCard(string title, int left, int top, Color valueColor, Label valueLabel)
@@ -366,12 +360,13 @@ namespace PersonalFinanceApp
             timer.Start();
         }
 
-        // Seçili periyodun (henüz tamamlanmamış, o ana kadarki) verisini veritabanından çeker.
+        // Seçili ay/yıla ait veriyi veritabanından çeker.
         private void LoadReport()
         {
-            DateTime start = _user.ReportPeriodStart;
-            DateTime end = DateTime.Now;
-            if (end <= start) end = start.AddMinutes(1);
+            int year = (int)nudYear.Value;
+            int month = cmbMonth.SelectedIndex + 1;
+            DateTime start = new DateTime(year, month, 1);
+            DateTime end = start.AddMonths(1);
 
             _currentReport = _reportService.GenerateReport(_user.Id, start, end);
             var (wallet, safe) = _accountService.GetBalances(_user.Id);
@@ -818,7 +813,7 @@ namespace PersonalFinanceApp
             using (var dialog = new SaveFileDialog())
             {
                 dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
-                dialog.FileName = $"rapor_{_currentReport.PeriodStart:yyyy_MM_dd}.csv";
+                dialog.FileName = $"rapor_{_currentReport.PeriodStart:yyyy_MM}.csv";
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
@@ -857,6 +852,36 @@ namespace PersonalFinanceApp
                     }
                 }
             }
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
         }
 
         private void SetupOutlinedButton(Button btn, Color borderColor, Color textColor)

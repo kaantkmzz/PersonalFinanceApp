@@ -64,6 +64,22 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        // Kullanıcının tüm işlem geçmişini siler (temizleme sıklığı ayarı tarafından kullanılır)
+        public void DeleteAllForUser(int userId)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "DELETE FROM transactions WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         public void Delete(int transactionId, int userId)
         {
             using (var conn = DatabaseHelper.GetConnection())

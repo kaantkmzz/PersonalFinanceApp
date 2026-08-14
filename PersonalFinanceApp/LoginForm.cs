@@ -201,7 +201,8 @@ namespace PersonalFinanceApp
 
                 this.Hide();
 
-                if (!user.OnboardingCompleted)
+                bool justOnboarded = !user.OnboardingCompleted;
+                if (justOnboarded)
                 {
                     using (var onboarding = new OnboardingForm(user.Id))
                     {
@@ -213,19 +214,25 @@ namespace PersonalFinanceApp
                 var recurringService = new RecurringTransactionService();
                 var (addedRecurring, failedRecurring) = recurringService.ProcessDueRecurring(user.Id);
 
-                // Seçili rapor periyodu (günlük/haftalık/aylık) tamamlanmışsa geçmişe kaydedip yenisini başlatır.
-                user.ReportPeriodStart = new ReportHistoryService().CheckAndSnapshotCompletedPeriods(user.Id, user.ReportPeriodType, user.ReportPeriodStart);
+                var cleanupService = new DataCleanupService();
+                var (cleaned, exportedCsvPath) = cleanupService.CheckAndRunCleanup(user);
 
                 var infoMessages = new List<string>();
                 if (addedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklendi:\n- " + string.Join("\n- ", addedRecurring));
                 if (failedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklenemedi:\n- " + string.Join("\n- ", failedRecurring));
+                if (cleaned)
+                {
+                    string cleanupMsg = "Temizleme sıklığı ayarınıza göre işlemleriniz ve kategorileriniz temizlendi.";
+                    if (exportedCsvPath != null) cleanupMsg += $"\nTemizlemeden önce şu dosyaya yedeklendi:\n{exportedCsvPath}";
+                    infoMessages.Add(cleanupMsg);
+                }
 
                 if (infoMessages.Count > 0)
                 {
                     MessageBox.Show(string.Join("\n\n", infoMessages), "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
-                MainForm mainForm = new MainForm(user);
+                MainForm mainForm = new MainForm(user, startOnProfile: justOnboarded);
                 mainForm.ShowDialog();
 
                 if (mainForm.ExitRequested)

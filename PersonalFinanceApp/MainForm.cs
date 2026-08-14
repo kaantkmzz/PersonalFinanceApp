@@ -33,10 +33,21 @@ namespace PersonalFinanceApp
         private Panel pnlSidebar = new Panel();
         private Panel pnlContent = new Panel();
 
-        public MainForm(User user)
+        public MainForm(User user, bool startOnProfile = false)
         {
             _user = user;
-            _activeContentFactory = () => new HomeControl(_user);
+            if (startOnProfile)
+            {
+                _activeContentKey = "profile";
+                _activeContentFactory = () => new ProfileControl(_user);
+                _activeMenuLabel = "Profil";
+            }
+            else
+            {
+                _activeContentKey = "home";
+                _activeContentFactory = () => new HomeControl(_user);
+                _activeMenuLabel = "Ana Sayfa";
+            }
             InitializeComponent();
             SetupUI();
         }
@@ -70,7 +81,7 @@ namespace PersonalFinanceApp
 
             BuildSidebar();
 
-            ShowCachedContent("home", () => new HomeControl(_user));
+            ShowCachedContent(_activeContentKey, _activeContentFactory);
 
             _reminderTimer.Interval = 30000;
             _reminderTimer.Tick += ReminderTimer_Tick;
@@ -103,23 +114,18 @@ namespace PersonalFinanceApp
                 Top = 25,
                 AutoSize = true
             };
-            lblLogo.Cursor = Cursors.Hand;
-            lblLogo.Click += (s, e) =>
-            {
-                ClearActiveButton();
-                _activeMenuLabel = null;
-                ShowCachedContent("home", () => new HomeControl(_user));
-            };
             pnlSidebar.Controls.Add(lblLogo);
 
             string[] menuItems =
             {
+                "Ana Sayfa",
                 "İşlemler",
                 "Kategoriler",
                 "Rapor",
                 "Hedefler",
                 "Notlar",
                 "Hatırlatıcılar",
+                "Profil",
                 "Şifre Değiştir"
             };
 
@@ -544,6 +550,9 @@ namespace PersonalFinanceApp
         {
             switch (menuText)
             {
+                case "Ana Sayfa":
+                    ShowCachedContent("home", () => new HomeControl(_user));
+                    break;
                 case "İşlemler":
                     ShowCachedContent("transactions", () => new TransactionControl(_user));
                     break;
@@ -561,6 +570,9 @@ namespace PersonalFinanceApp
                     break;
                 case "Hatırlatıcılar":
                     ShowCachedContent("reminders", () => new ReminderControl(_user));
+                    break;
+                case "Profil":
+                    ShowCachedContent("profile", () => new ProfileControl(_user));
                     break;
                 case "Şifre Değiştir":
                     ShowCachedContent("password", () => new PasswordChangeControl(_user));

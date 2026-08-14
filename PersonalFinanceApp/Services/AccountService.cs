@@ -92,14 +92,24 @@ namespace PersonalFinanceApp.Services
             _repository.SetHideAmounts(userId, hideAmounts);
         }
 
-        public (string PeriodType, DateTime PeriodStart) GetReportPeriod(int userId)
+        public void SetFullName(int userId, string fullName)
         {
-            return _repository.GetReportPeriod(userId);
+            _repository.SetFullName(userId, fullName);
         }
 
-        public void SetReportPeriod(int userId, string periodType, DateTime periodStart)
+        public void SetCleanupFrequency(int userId, string frequency, DateTime periodStart)
         {
-            _repository.SetReportPeriod(userId, periodType, periodStart);
+            _repository.SetCleanupFrequency(userId, frequency, periodStart);
+        }
+
+        public void SetCleanupPeriodStart(int userId, DateTime periodStart)
+        {
+            _repository.SetCleanupPeriodStart(userId, periodStart);
+        }
+
+        public void SetCleanupExportBeforeClear(int userId, bool exportBeforeClear)
+        {
+            _repository.SetCleanupExportBeforeClear(userId, exportBeforeClear);
         }
     }
 }

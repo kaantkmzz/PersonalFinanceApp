@@ -23,6 +23,8 @@ namespace PersonalFinanceApp
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
+        private Panel pnlBottom = new Panel();
+        private Button btnExport = new Button();
 
         private ComboBox cmbFilterType = new ComboBox();
         private TextBox txtNewCategory = new TextBox();
@@ -154,7 +156,50 @@ namespace PersonalFinanceApp
             pnlGridWrapper.Controls.Add(dgvCategories);
             pnlGrid.Controls.Add(pnlGridWrapper);
 
-            this.Controls.Add(pnlGrid); this.Controls.Add(pnlTop);
+            // --- ALT PANEL ---
+            pnlBottom.Dock = DockStyle.Bottom;
+            pnlBottom.Height = 80;
+            pnlBottom.Padding = new Padding(20, 15, 40, 15);
+            pnlBottom.BackColor = AppBackColor;
+
+            btnExport.Text = "📄 CSV'ye Aktar";
+            btnExport.Top = 20; btnExport.Height = 38; btnExport.Cursor = Cursors.Hand;
+            btnExport.Width = TextRenderer.MeasureText(btnExport.Text, btnExport.Font).Width + 44;
+            btnExport.Left = 20;
+            SetupRoundedButton(btnExport, Color.FromArgb(80, 85, 105), Color.White);
+            btnExport.Click += BtnExport_Click;
+
+            pnlBottom.Controls.Add(btnExport);
+
+            this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
+        }
+
+        private void BtnExport_Click(object? sender, EventArgs e)
+        {
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
+                dialog.FileName = $"kategoriler_{DateTime.Today:yyyy_MM_dd}.csv";
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        var totals = _transactionService.GetCategoryTotals(_user.Id);
+                        var tr = new System.Globalization.CultureInfo("tr-TR");
+                        using (var writer = new System.IO.StreamWriter(dialog.FileName, false, System.Text.Encoding.UTF8))
+                        {
+                            writer.WriteLine("Ad;Tip;Toplam Tutar");
+                            foreach (var c in _cachedCategories)
+                            {
+                                decimal total = totals.TryGetValue(c.Id, out decimal t) ? t : 0;
+                                writer.WriteLine($"{c.Name};{TypeToTr(c.Type)};{total.ToString("0.00", tr)}");
+                            }
+                        }
+                        lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "Kategoriler CSV olarak dışa aktarıldı.";
+                    }
+                    catch (Exception ex) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = $"Dışa aktarma başarısız: {ex.Message}"; }
+                }
+            }
         }
 
         private void DgvCategories_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)

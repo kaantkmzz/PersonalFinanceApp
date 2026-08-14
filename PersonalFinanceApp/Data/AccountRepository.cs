@@ -208,41 +208,65 @@ namespace PersonalFinanceApp.Data
             }
         }
 
-        public (string PeriodType, DateTime PeriodStart) GetReportPeriod(int userId)
+        public void SetFullName(int userId, string fullName)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "SELECT report_period_type, report_period_start FROM users WHERE user_id = @userId";
+                string query = "UPDATE users SET full_name = @fullName WHERE user_id = @userId";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
+                    cmd.Parameters.AddWithValue("@fullName", fullName);
                     cmd.Parameters.AddWithValue("@userId", userId);
-
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return (reader.GetString(0), reader.GetDateTime(1));
-                        }
-                    }
+                    cmd.ExecuteNonQuery();
                 }
             }
-
-            return ("monthly", DateTime.Now);
         }
 
-        public void SetReportPeriod(int userId, string periodType, DateTime periodStart)
+        public void SetCleanupFrequency(int userId, string frequency, DateTime periodStart)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "UPDATE users SET report_period_type = @periodType, report_period_start = @periodStart WHERE user_id = @userId";
+                string query = "UPDATE users SET cleanup_frequency = @frequency, cleanup_period_start = @periodStart WHERE user_id = @userId";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
-                    cmd.Parameters.AddWithValue("@periodType", periodType);
+                    cmd.Parameters.AddWithValue("@frequency", frequency);
                     cmd.Parameters.AddWithValue("@periodStart", periodStart);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void SetCleanupPeriodStart(int userId, DateTime periodStart)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET cleanup_period_start = @periodStart WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@periodStart", periodStart);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void SetCleanupExportBeforeClear(int userId, bool exportBeforeClear)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET cleanup_export_before_clear = @exportBeforeClear WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@exportBeforeClear", exportBeforeClear);
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.ExecuteNonQuery();
                 }
