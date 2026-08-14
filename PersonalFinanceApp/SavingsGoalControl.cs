@@ -14,30 +14,24 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly SavingsGoalService _goalService = new SavingsGoalService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
         private Panel pnlBottom = new Panel();
-
-        // Kasa Kapsülü
-        private Panel pnlSafeBalanceCapsule = new Panel();
-        private Label lblSafeBalance = new Label();
-        private readonly AccountService _accountService = new AccountService();
 
         private TextBox txtGoalName = new TextBox();
         private TextBox txtTargetAmount = new TextBox();
         private Button btnAddGoal = new Button();
         private Label lblStatus = new Label();
 
-        // Özet Kapsülü
-        private Panel pnlSummaryCapsule = new Panel();
-        private Label lblTotalSummary = new Label();
+        // Alt bilgi şeridi: her istatistik kendi yuvarlak köşeli kutucuğunda
+        private FlowLayoutPanel pnlStatsFlow = new FlowLayoutPanel();
 
         private DataGridView dgvGoals = new DataGridView();
         private List<SavingsGoal> _cachedGoals = new List<SavingsGoal>();
@@ -50,15 +44,25 @@ namespace PersonalFinanceApp
             public string Biriken { get; set; } = string.Empty;
             public string HedefTutar { get; set; } = string.Empty;
             public string Ilerleme { get; set; } = string.Empty;
+            public double IlerlemeRaw { get; set; }
             public bool Tamamlandı { get; set; }
         }
+
+        // İlerleme çubuklarının, ekran her açıldığında/yenilendiğinde 0'dan gerçek değerine dolan animasyonu
+        private float _goalsAnimProgress = 1f;
+        private readonly System.Windows.Forms.Timer _goalsAnimTimer = new System.Windows.Forms.Timer { Interval = 16 };
+        private readonly System.Diagnostics.Stopwatch _goalsAnimStopwatch = new System.Diagnostics.Stopwatch();
+        private const int GoalsAnimDurationMs = 650;
+        private static readonly Font ProgressPercentFont = new Font("Segoe UI", 8F);
 
         public SavingsGoalControl(User user)
         {
             _user = user;
             InitializeComponent();
             SetupUI();
+            _goalsAnimTimer.Tick += GoalsAnimTimer_Tick;
             LoadGoals();
+            this.Disposed += (s, e) => _goalsAnimTimer.Dispose();
         }
 
         public void RefreshData()
@@ -108,22 +112,7 @@ namespace PersonalFinanceApp
             lblStatus.Height = 25;
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
 
-            // --- SAĞ ÜST: KASA BAKİYESİ ŞEFFAF KAPSÜLÜ ---
-            pnlSafeBalanceCapsule.Height = 38;
-            pnlSafeBalanceCapsule.Top = 95; // "Hedef Ekle" butonu ile aynı hizaya getirildi
-            // Belirgin kapsül rengi: Hafif yeşilimsi koyu zemin ve canlı yeşil çerçeve
-            SetupTranslucentCapsule(pnlSafeBalanceCapsule, Color.FromArgb(35, 45, 40), Color.FromArgb(46, 204, 113));
-
-            lblSafeBalance.Dock = DockStyle.Fill;
-            lblSafeBalance.TextAlign = ContentAlignment.MiddleCenter;
-            lblSafeBalance.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblSafeBalance.ForeColor = Color.FromArgb(210, 255, 220);
-            pnlSafeBalanceCapsule.Controls.Add(lblSafeBalance);
-
             pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblGoalName); pnlTop.Controls.Add(pnlGoalName); pnlTop.Controls.Add(lblTargetAmount); pnlTop.Controls.Add(pnlTargetAmount); pnlTop.Controls.Add(btnAddGoal); pnlTop.Controls.Add(lblStatus);
-            pnlTop.Controls.Add(pnlSafeBalanceCapsule);
-
-            pnlTop.Resize += (s, e) => { pnlSafeBalanceCapsule.Left = pnlTop.Width - pnlSafeBalanceCapsule.Width - 40; };
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
@@ -136,54 +125,52 @@ namespace PersonalFinanceApp
             dgvGoals.Dock = DockStyle.Fill;
             dgvGoals.AllowUserToAddRows = false; dgvGoals.AllowUserToDeleteRows = false; dgvGoals.AllowUserToResizeColumns = false; dgvGoals.AllowUserToResizeRows = false;
             dgvGoals.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgvGoals.MultiSelect = false; dgvGoals.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvGoals.RowHeadersVisible = false; dgvGoals.Font = new Font("Segoe UI", 9.5F); dgvGoals.RowTemplate.Height = 44;
+            dgvGoals.RowHeadersVisible = false; dgvGoals.Font = new Font("Segoe UI", 9.5F); dgvGoals.RowTemplate.Height = 50;
 
             dgvGoals.BorderStyle = BorderStyle.None; dgvGoals.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            dgvGoals.GridColor = Color.FromArgb(55, 60, 80); dgvGoals.BackgroundColor = CardBackColor;
+            dgvGoals.GridColor = AppTheme.GridLineColor; dgvGoals.BackgroundColor = CardBackColor;
             dgvGoals.DefaultCellStyle.BackColor = CardBackColor; dgvGoals.DefaultCellStyle.ForeColor = TextLight;
             dgvGoals.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
             dgvGoals.DefaultCellStyle.SelectionBackColor = AccentColor; dgvGoals.DefaultCellStyle.SelectionForeColor = Color.White;
 
-            dgvGoals.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(35, 39, 54); dgvGoals.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
-            dgvGoals.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(35, 39, 54); dgvGoals.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
+            dgvGoals.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvGoals.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
+            dgvGoals.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvGoals.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvGoals.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvGoals.EnableHeadersVisualStyles = false; dgvGoals.ColumnHeadersHeight = 40;
 
             dgvGoals.CellPainting += DgvGoals_CellPainting;
             dgvGoals.CellDoubleClick += DgvGoals_CellDoubleClick;
             dgvGoals.DataBindingComplete += (s, e) => ApplyAchievedStyling();
+            EnableDoubleBuffering(dgvGoals);
 
             pnlGridWrapper.Controls.Add(dgvGoals);
             pnlGrid.Controls.Add(pnlGridWrapper);
 
-            // --- ALT PANEL (Özet Kapsülü ve Silme) ---
+            // --- ALT PANEL (İstatistik kutucukları ve Silme) ---
             pnlBottom.Dock = DockStyle.Bottom;
-            pnlBottom.Height = 80;
-            pnlBottom.Padding = new Padding(20, 15, 40, 15);
+            pnlBottom.Height = 96;
+            pnlBottom.Padding = new Padding(20, 15, 30, 15);
             pnlBottom.BackColor = AppBackColor;
 
             btnDelete.Text = "🗑️ Hedefi Sil";
             btnDelete.Left = 20;
-            btnDelete.Top = 20;
+            btnDelete.Top = 29;
             btnDelete.Width = 140;
             btnDelete.Height = 38;
             btnDelete.Cursor = Cursors.Hand;
             SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
             btnDelete.Click += BtnDelete_Click;
 
-            // --- SAĞ ALT: ÖZET ŞEFFAF KAPSÜLÜ ---
-            pnlSummaryCapsule.Dock = DockStyle.Right;
-            // Belirgin kapsül rengi: Hafif morumsu koyu zemin ve parlak mor/mavi çerçeve
-            SetupTranslucentCapsule(pnlSummaryCapsule, Color.FromArgb(40, 38, 55), AccentColor);
-
-            lblTotalSummary.Dock = DockStyle.Fill;
-            lblTotalSummary.TextAlign = ContentAlignment.MiddleCenter;
-            lblTotalSummary.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-            lblTotalSummary.ForeColor = Color.FromArgb(230, 200, 120);
-
-            pnlSummaryCapsule.Controls.Add(lblTotalSummary);
+            // --- SAĞ ALT: İSTATİSTİK KUTUCUKLARI ---
+            pnlStatsFlow.FlowDirection = FlowDirection.LeftToRight;
+            pnlStatsFlow.AutoSize = true;
+            pnlStatsFlow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlStatsFlow.WrapContents = false;
+            pnlStatsFlow.BackColor = AppBackColor;
+            pnlStatsFlow.Margin = new Padding(0);
 
             pnlBottom.Controls.Add(btnDelete);
-            pnlBottom.Controls.Add(pnlSummaryCapsule);
+            pnlBottom.Controls.Add(pnlStatsFlow);
+            pnlBottom.Resize += (s, e) => PositionStatsFlow();
 
             this.Controls.Add(pnlGrid);
             this.Controls.Add(pnlBottom);
@@ -200,12 +187,77 @@ namespace PersonalFinanceApp
 
         private void DgvGoals_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvGoals.ColumnCount)
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.ColumnIndex >= dgvGoals.ColumnCount) return;
+
+            if (dgvGoals.Columns[e.ColumnIndex].Name == "Ilerleme")
+            {
+                PaintProgressCell(e);
+                return;
+            }
+
+            if (e.ColumnIndex > 0)
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+                using (Pen p = new Pen(AppTheme.RowSeparatorColor, 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
                 e.Handled = true;
             }
+        }
+
+        // "İlerleme" hücresini düz yazı yerine dolan bir ilerleme çubuğu olarak çizer.
+        private void PaintProgressCell(DataGridViewCellPaintingEventArgs e)
+        {
+            e.PaintBackground(e.CellBounds, true);
+            var g = e.Graphics!;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            double rawPercent = 0;
+            if (dgvGoals.Rows[e.RowIndex].Cells["IlerlemeRaw"].Value is double d) rawPercent = d;
+            rawPercent = Math.Min(100, Math.Max(0, rawPercent));
+            double animated = rawPercent * _goalsAnimProgress;
+
+            string text = $"% {animated:N1}";
+            var textRect = new Rectangle(e.CellBounds.Left, e.CellBounds.Top + 7, e.CellBounds.Width, 18);
+            TextRenderer.DrawText(g, text, ProgressPercentFont, textRect, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            const int barHeight = 8;
+            const int pad = 14;
+            var barRect = new Rectangle(e.CellBounds.Left + pad, e.CellBounds.Bottom - barHeight - 8, Math.Max(0, e.CellBounds.Width - pad * 2), barHeight);
+
+            using (var trackPath = GetRoundedRectPath(barRect, barHeight / 2))
+            using (var trackBrush = new SolidBrush(AppTheme.GridLineColor))
+                g.FillPath(trackBrush, trackPath);
+
+            int fillWidth = (int)(barRect.Width * (animated / 100.0));
+            if (fillWidth > barHeight)
+            {
+                var fillRect = new Rectangle(barRect.Left, barRect.Top, fillWidth, barRect.Height);
+                Color fillColor = rawPercent >= 99.9 ? AppTheme.SuccessColor : AccentColor;
+                using var fillPath = GetRoundedRectPath(fillRect, barHeight / 2);
+                using var fillBrush = new SolidBrush(fillColor);
+                g.FillPath(fillBrush, fillPath);
+            }
+
+            e.Handled = true;
+        }
+
+        private void StartGoalsProgressAnimation()
+        {
+            _goalsAnimTimer.Stop();
+            _goalsAnimProgress = 0f;
+            _goalsAnimStopwatch.Restart();
+            _goalsAnimTimer.Start();
+        }
+
+        private void GoalsAnimTimer_Tick(object? sender, EventArgs e)
+        {
+            double t = _goalsAnimStopwatch.Elapsed.TotalMilliseconds / GoalsAnimDurationMs;
+            bool finished = t >= 1.0;
+            if (finished) t = 1.0;
+
+            _goalsAnimProgress = (float)(1 - Math.Pow(1 - t, 3));
+            dgvGoals.Invalidate();
+
+            if (finished) _goalsAnimTimer.Stop();
         }
 
         private void DgvGoals_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -225,12 +277,6 @@ namespace PersonalFinanceApp
         {
             _cachedGoals = _goalService.GetUserGoals(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
-            var (_, safeBalance) = _accountService.GetBalances(_user.Id);
-
-            lblSafeBalance.Text = _user.HideAmountsEnabled ? "🏦 Kasa: ••••••" : $"🏦 Kasa: {safeBalance.ToString("#,##0", tr)} ₺";
-            Size safeTextSize = TextRenderer.MeasureText(lblSafeBalance.Text, lblSafeBalance.Font);
-            pnlSafeBalanceCapsule.Width = safeTextSize.Width + 40;
-            pnlSafeBalanceCapsule.Left = pnlTop.Width - pnlSafeBalanceCapsule.Width - 40;
 
             int totalCount = _cachedGoals.Count;
             int achievedCount = _cachedGoals.Count(g => g.IsAchieved);
@@ -250,6 +296,7 @@ namespace PersonalFinanceApp
                     Biriken = _user.HideAmountsEnabled ? "••••••" : g.CurrentAmount.ToString("#,##0", tr) + " ₺",
                     HedefTutar = _user.HideAmountsEnabled ? "••••••" : g.TargetAmount.ToString("#,##0", tr) + " ₺",
                     Ilerleme = $"% {percent:N1}",
+                    IlerlemeRaw = (double)percent,
                     Tamamlandı = g.IsAchieved
                 };
             }).ToList();
@@ -259,6 +306,7 @@ namespace PersonalFinanceApp
             if (dgvGoals.Columns["ID"] != null)
             {
                 dgvGoals.Columns["ID"]!.Visible = false;
+                dgvGoals.Columns["IlerlemeRaw"]!.Visible = false;
                 dgvGoals.Columns["Hedef"]!.FillWeight = 110;
 
                 dgvGoals.Columns["Biriken"]!.FillWeight = 60;
@@ -269,7 +317,7 @@ namespace PersonalFinanceApp
                 dgvGoals.Columns["HedefTutar"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
                 dgvGoals.Columns["Ilerleme"]!.HeaderText = "İlerleme";
-                dgvGoals.Columns["Ilerleme"]!.FillWeight = 40;
+                dgvGoals.Columns["Ilerleme"]!.FillWeight = 55;
                 dgvGoals.Columns["Ilerleme"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
                 dgvGoals.Columns["Tamamlandı"]!.FillWeight = 40;
@@ -277,17 +325,61 @@ namespace PersonalFinanceApp
                 dgvGoals.Columns["Tamamlandı"]!.ReadOnly = true;
             }
 
-            if (_user.HideAmountsEnabled)
-            {
-                lblTotalSummary.Text = $"🎯 Toplam Hedef: {totalCount}   |   ✅ Gerçekleşen: {achievedCount}   |   ⏳ Bekleyen: {pendingCount}   |   💸 Harcanan: ••••••   |   💰 Toplam Tutar: ••••••";
-            }
-            else
-            {
-                lblTotalSummary.Text = $"🎯 Toplam Hedef: {totalCount}   |   ✅ Gerçekleşen: {achievedCount}   |   ⏳ Bekleyen: {pendingCount}   |   💸 Harcanan: {totalInvested.ToString("#,##0", tr)} ₺   |   💰 Toplam Tutar: {totalAmount.ToString("#,##0", tr)} ₺";
-            }
+            string harcananText = _user.HideAmountsEnabled ? "••••••" : totalInvested.ToString("#,##0", tr) + " ₺";
+            string toplamText = _user.HideAmountsEnabled ? "••••••" : totalAmount.ToString("#,##0", tr) + " ₺";
 
-            Size textSize = TextRenderer.MeasureText(lblTotalSummary.Text, lblTotalSummary.Font);
-            pnlSummaryCapsule.Width = textSize.Width + 50;
+            pnlStatsFlow.Controls.Clear();
+            pnlStatsFlow.Controls.Add(CreateStatChip(totalCount.ToString(), "Toplam Hedef"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(achievedCount.ToString(), "Gerçekleşen"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(pendingCount.ToString(), "Bekleyen"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(harcananText, "Harcanan"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(toplamText, "Toplam Tutar"));
+            PositionStatsFlow();
+
+            StartGoalsProgressAnimation();
+        }
+
+        // Alt bilgi şeridindeki tek bir istatistik kutucuğu: etiket üstte, değer altta (ikonsuz, tablo ile aynı renkler).
+        private Panel CreateStatChip(string value, string label)
+        {
+            Font valueFont = new Font("Segoe UI", 12F, FontStyle.Bold);
+            Font labelFont = new Font("Segoe UI", 9F);
+
+            Size valueSize = TextRenderer.MeasureText(value, valueFont, Size.Empty, TextFormatFlags.NoPadding);
+            Size labelSize = TextRenderer.MeasureText(label, labelFont, Size.Empty, TextFormatFlags.NoPadding);
+            int chipWidth = Math.Max(valueSize.Width, labelSize.Width) + 32;
+            const int chipHeight = 70;
+
+            Panel chip = new Panel { Width = chipWidth, Height = chipHeight, Margin = new Padding(6, 0, 6, 0) };
+            chip.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(chip.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, chip.Width - 1, chip.Height - 1), 10);
+                using var brush = new SolidBrush(CardBackColor);
+                e.Graphics.FillPath(brush, path);
+            };
+
+            Label lblLabel = new Label { Text = label, Font = labelFont, ForeColor = TextMuted, AutoSize = true, BackColor = Color.Transparent };
+            lblLabel.Left = (chipWidth - labelSize.Width) / 2;
+            lblLabel.Top = 12;
+
+            Label lblValue = new Label { Text = value, Font = valueFont, ForeColor = TextLight, AutoSize = true, BackColor = Color.Transparent };
+            lblValue.Left = (chipWidth - valueSize.Width) / 2;
+            lblValue.Top = 36;
+
+            chip.Controls.Add(lblLabel);
+            chip.Controls.Add(lblValue);
+            return chip;
+        }
+
+        // Şeridin sağ kenarı, tablonun sağ kenarıyla (pnlGrid'in 40px iç boşluğu + kart sarmalayıcının 2px'i) aynı hizada bitsin.
+        private const int GridRightInset = 42;
+
+        private void PositionStatsFlow()
+        {
+            pnlStatsFlow.Left = Math.Max(180, pnlBottom.ClientSize.Width - pnlStatsFlow.PreferredSize.Width - GridRightInset);
+            pnlStatsFlow.Top = (pnlBottom.ClientSize.Height - pnlStatsFlow.PreferredSize.Height) / 2;
         }
 
         private void ApplyAchievedStyling()
@@ -346,32 +438,17 @@ namespace PersonalFinanceApp
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
 
-        // Görünürlüğü artırılmış kapsül tasarımı (Daha tok zemin, net çizgiler)
-        private void SetupTranslucentCapsule(Panel pnl, Color fillColor, Color borderColor)
-        {
-            pnl.BackColor = AppBackColor;
-            pnl.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
-
-                var rect = new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1);
-
-                using (var path = GetRoundedRectPath(rect, pnl.Height / 2))
-                {
-                    // İç dolgu (Artık daha belirgin)
-                    using (var brush = new SolidBrush(fillColor))
-                        e.Graphics.FillPath(brush, path);
-
-                    // Dış çerçeve (Artık 2 piksel kalınlığında, dikkat çekici)
-                    using (var pen = new Pen(borderColor, 2f))
-                        e.Graphics.DrawPath(pen, path);
-                }
-            };
-            pnl.SizeChanged += (s, e) => pnl.Invalidate();
-        }
-
         private void SetupRoundedButton(Button btn, Color bgColor, Color textColor, bool isOutlined) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius) { var path = new System.Drawing.Drawing2D.GraphicsPath(); int d = Math.Max(radius * 2, 1); path.AddArc(rect.X, rect.Y, d, d, 180, 90); path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90); path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90); path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90); path.CloseFigure(); return path; }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
+        }
     }
 }

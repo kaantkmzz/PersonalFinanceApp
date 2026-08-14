@@ -16,7 +16,9 @@ CREATE TABLE users (
     wallet_balance        NUMERIC(14,2) NOT NULL DEFAULT 0,
     safe_balance           NUMERIC(14,2) NOT NULL DEFAULT 0,
     last_income_month     INTEGER,
-    last_income_year      INTEGER
+    last_income_year      INTEGER,
+    report_period_type    VARCHAR(10) NOT NULL DEFAULT 'monthly',
+    report_period_start   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE categories (
@@ -85,3 +87,20 @@ CREATE TABLE transfer_history (
     amount       NUMERIC(14,2) NOT NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE report_history (
+    report_id               SERIAL PRIMARY KEY,
+    user_id                 INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    period_type             VARCHAR(10) NOT NULL,
+    period_start            TIMESTAMP NOT NULL,
+    period_end              TIMESTAMP NOT NULL,
+    total_income            NUMERIC(14,2) NOT NULL DEFAULT 0,
+    total_expense           NUMERIC(14,2) NOT NULL DEFAULT 0,
+    total_goal               NUMERIC(14,2) NOT NULL DEFAULT 0,
+    income_breakdown_json   TEXT NOT NULL DEFAULT '[]',
+    expense_breakdown_json  TEXT NOT NULL DEFAULT '[]',
+    goal_breakdown_json     TEXT NOT NULL DEFAULT '[]',
+    created_at              TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_report_history_user_id ON report_history(user_id);

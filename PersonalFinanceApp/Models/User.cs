@@ -10,5 +10,8 @@
         public bool OnboardingCompleted { get; set; }
 
         public bool HideAmountsEnabled { get; set; }
+
+        public string ReportPeriodType { get; set; } = "monthly";
+        public DateTime ReportPeriodStart { get; set; } = DateTime.Now;
     }
 }

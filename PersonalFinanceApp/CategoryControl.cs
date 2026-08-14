@@ -14,25 +14,22 @@ namespace PersonalFinanceApp
         private readonly CategoryService _categoryService = new CategoryService();
         private readonly TransactionService _transactionService = new TransactionService();
 
-        private readonly AccountService _accountService = new AccountService(); // Kasa bakiyesini çekmek için
-        private Panel pnlSafeCapsule = new Panel();
-        private Label lblSafeBalance = new Label();
-
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color DangerColor = Color.FromArgb(220, 90, 90);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
-        private Panel pnlBottom = new Panel();
 
         private ComboBox cmbFilterType = new ComboBox();
         private TextBox txtNewCategory = new TextBox();
         private ComboBox cmbNewCategoryType = new ComboBox();
         private Button btnAdd = new Button();
+        private TextBox txtSearch = new TextBox();
+        private Button btnSearch = new Button();
         private Label lblStatus = new Label();
 
         private DataGridView dgvCategories = new DataGridView();
@@ -44,14 +41,12 @@ namespace PersonalFinanceApp
             InitializeComponent();
             SetupUI();
             LoadCategories();
-
-            this.Load += (s, e) => RefreshSafeBalance();
         }
 
         public void RefreshData()
         {
             LoadCategories();
-            RefreshSafeBalance();
+            pnlTop.Invalidate(true);
         }
 
         private void SetupUI()
@@ -66,33 +61,18 @@ namespace PersonalFinanceApp
             pnlTop.Height = 190;
             pnlTop.BackColor = AppBackColor;
 
-            Label lblTitle = new Label { Text = "Kategoriler", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
-            // --- KASA KAPSÜLÜ ---
-            pnlSafeCapsule.Height = 36;
-            pnlSafeCapsule.Top = 15; // Başlıkla aynı hizada
-                                     // Kasa için mavi tonlarında yumuşak şeffaf bir cam efekti
-            SetupTranslucentCapsule(pnlSafeCapsule, Color.FromArgb(25, 52, 152, 219), Color.FromArgb(80, 52, 152, 219));
-
-            lblSafeBalance.Dock = DockStyle.Fill;
-            lblSafeBalance.TextAlign = ContentAlignment.MiddleCenter;
-            lblSafeBalance.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblSafeBalance.ForeColor = Color.FromArgb(170, 215, 255);
-            lblSafeBalance.BackColor = Color.Transparent; // Altındaki şeffaflığın görünmesi için
-            pnlSafeCapsule.Controls.Add(lblSafeBalance);
-
-            pnlTop.Controls.Add(pnlSafeCapsule);
-            pnlTop.Resize += (s, e) => { pnlSafeCapsule.Left = pnlTop.Width - pnlSafeCapsule.Width - 40; }; // Sağa yaslı kalması için
+            Label lblTitle = new Label { Text = "Kategoriler", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, BackColor = AppBackColor, Left = 20, Top = 15, AutoSize = true };
 
             Label lblFilter = new Label { Text = "Göster:", Left = 20, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlFilter = new Panel { Left = 20, Top = 95, Width = 140, Height = 36 };
             cmbFilterType.Left = 5; cmbFilterType.Top = 7; cmbFilterType.Width = 135;
             cmbFilterType.Font = new Font("Segoe UI", 9.5F); cmbFilterType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.SelectedIndex = 0;
+            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.Items.Add("Hedef"); cmbFilterType.SelectedIndex = 0;
             cmbFilterType.SelectedIndexChanged += (s, e) => LoadCategories();
             pnlFilter.Controls.Add(cmbFilterType);
             SetupCustomComboBox(pnlFilter, cmbFilterType); // Beyazlık ve mavi renk düzeltildi
 
-            Label lblNew = new Label { Text = "Yeni Kategori Adı:", Left = 180, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Label lblNew = new Label { Text = "Yeni Kategori Adı:", Left = 180, Top = 70, ForeColor = TextMuted, BackColor = AppBackColor, AutoSize = true };
             Panel pnlNewCat = new Panel { Left = 180, Top = 95, Width = 220, Height = 36 };
             SetupSmoothContainer(pnlNewCat, 8, CardBackColor);
             txtNewCategory.Left = 10; txtNewCategory.Top = 8; txtNewCategory.Width = 200;
@@ -104,7 +84,7 @@ namespace PersonalFinanceApp
             Panel pnlNewType = new Panel { Left = 420, Top = 95, Width = 120, Height = 36 };
             cmbNewCategoryType.Left = 5; cmbNewCategoryType.Top = 7; cmbNewCategoryType.Width = 115;
             cmbNewCategoryType.Font = new Font("Segoe UI", 9.5F); cmbNewCategoryType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbNewCategoryType.Items.Add("Gelir"); cmbNewCategoryType.Items.Add("Gider"); cmbNewCategoryType.SelectedIndex = 1;
+            cmbNewCategoryType.Items.Add("Gelir"); cmbNewCategoryType.Items.Add("Gider"); cmbNewCategoryType.Items.Add("Hedef"); cmbNewCategoryType.SelectedIndex = 1;
             pnlNewType.Controls.Add(cmbNewCategoryType);
             SetupCustomComboBox(pnlNewType, cmbNewCategoryType); // Beyazlık ve mavi renk düzeltildi
 
@@ -113,16 +93,31 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
             btnAdd.Click += BtnAdd_Click;
 
+            // Arama kutusu, Ekle butonunun hemen yanında
+            Label lblSearch = new Label { Text = "Ara:", Left = 680, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 680, Top = 95, Width = 160, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 140;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
+            txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.TextChanged += (s, e) => LoadCategories();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍";
+            btnSearch.Left = 848; btnSearch.Top = 95; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White);
+            btnSearch.Click += (s, e) => LoadCategories();
+
             lblStatus.Left = 20;
             lblStatus.Top = 145;
             lblStatus.AutoSize = true;
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             lblStatus.Font = new Font("Segoe UI", 9F);
-            lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Font = new Font("Segoe UI", 9F);
 
             pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblFilter); pnlTop.Controls.Add(pnlFilter);
             pnlTop.Controls.Add(lblNew); pnlTop.Controls.Add(pnlNewCat); pnlTop.Controls.Add(lblNewType); pnlTop.Controls.Add(pnlNewType);
-            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblStatus);
+            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
+            pnlTop.Controls.Add(lblStatus);
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
@@ -142,7 +137,7 @@ namespace PersonalFinanceApp
             dgvCategories.CellDoubleClick += DgvCategories_CellDoubleClick;
 
             dgvCategories.BorderStyle = BorderStyle.None; dgvCategories.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            dgvCategories.GridColor = Color.FromArgb(55, 60, 80); dgvCategories.BackgroundColor = CardBackColor;
+            dgvCategories.GridColor = AppTheme.GridLineColor; dgvCategories.BackgroundColor = CardBackColor;
 
             // Renkler sadeleştirildi (Sadece düz beyaz)
             dgvCategories.DefaultCellStyle.BackColor = CardBackColor; dgvCategories.DefaultCellStyle.ForeColor = TextLight;
@@ -150,8 +145,8 @@ namespace PersonalFinanceApp
             dgvCategories.DefaultCellStyle.SelectionBackColor = AccentColor;
             dgvCategories.DefaultCellStyle.SelectionForeColor = Color.White;
 
-            dgvCategories.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(35, 39, 54); dgvCategories.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
-            dgvCategories.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(35, 39, 54); dgvCategories.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
+            dgvCategories.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvCategories.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
+            dgvCategories.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvCategories.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvCategories.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvCategories.EnableHeadersVisualStyles = false; dgvCategories.ColumnHeadersHeight = 40;
 
             dgvCategories.CellPainting += DgvCategories_CellPainting;
@@ -159,7 +154,7 @@ namespace PersonalFinanceApp
             pnlGridWrapper.Controls.Add(dgvCategories);
             pnlGrid.Controls.Add(pnlGridWrapper);
 
-            this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
+            this.Controls.Add(pnlGrid); this.Controls.Add(pnlTop);
         }
 
         private void DgvCategories_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -167,7 +162,7 @@ namespace PersonalFinanceApp
             if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvCategories.ColumnCount)
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(Color.FromArgb(50, 55, 75), 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+                using (Pen p = new Pen(AppTheme.RowSeparatorColor, 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
                 e.Handled = true;
             }
         }
@@ -197,16 +192,21 @@ namespace PersonalFinanceApp
         {
             string filter = cmbFilterType.SelectedItem?.ToString() ?? "Tümü";
             if (filter == "Tümü") _cachedCategories = _categoryService.GetUserCategories(_user.Id);
-            else _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, filter == "Gelir" ? "income" : "expense");
+            else _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, TrToType(filter));
 
             var totals = _transactionService.GetCategoryTotals(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            var displayList = _cachedCategories.Select(c => new
+            string searchText = txtSearch.Text.Trim();
+            var visibleCategories = string.IsNullOrEmpty(searchText)
+                ? _cachedCategories
+                : _cachedCategories.Where(c => tr.CompareInfo.IndexOf(c.Name, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0).ToList();
+
+            var displayList = visibleCategories.Select(c => new
             {
                 ID = c.Id,
                 Ad = c.Name,
-                Tip = c.Type == "income" ? "Gelir" : "Gider",
+                Tip = TypeToTr(c.Type),
                 ToplamTutar = (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
             }).ToList();
 
@@ -220,47 +220,14 @@ namespace PersonalFinanceApp
             }
         }
 
-        // Bakiyeyi veritabanından çekip etikete (Label) yazan metot
-        private void RefreshSafeBalance()
-        {
-            // _accountService.GetBalances metodundan 2. değeri (kasa) alıyoruz
-            var (_, safe) = _accountService.GetBalances(_user.Id);
-            var tr = new System.Globalization.CultureInfo("tr-TR");
-
-            lblSafeBalance.Text = _user.HideAmountsEnabled ? "🏦 Kasa: ••••••" : $"🏦 Kasa: {safe.ToString("#,##0", tr)} ₺";
-
-            // Metin uzunluğuna göre kapsülün genişliğini dinamik ayarlıyoruz
-            Size size = TextRenderer.MeasureText(lblSafeBalance.Text, lblSafeBalance.Font);
-            pnlSafeCapsule.Width = size.Width + 40;
-            pnlSafeCapsule.Left = pnlTop.Width - pnlSafeCapsule.Width - 40;
-
-            pnlSafeCapsule.Invalidate();
-            lblSafeBalance.Invalidate();
-        }
-
         // Şeffaf kapsül çizimini yapan yardımcı metot (Bu sınıfta olmadığı için eklememiz gerekiyor)
-        private void SetupTranslucentCapsule(Panel pnl, Color fillColor, Color borderColor)
-        {
-            pnl.BackColor = AppBackColor;
-            pnl.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
-                var rect = new Rectangle(1, 1, pnl.Width - 3, pnl.Height - 3);
-                using (var path = GetRoundedRectPath(rect, pnl.Height / 2))
-                {
-                    using (var brush = new SolidBrush(fillColor)) e.Graphics.FillPath(brush, path);
-                    using (var pen = new Pen(borderColor, 2f)) e.Graphics.DrawPath(pen, path);
-                }
-            };
-            pnl.SizeChanged += (s, e) => pnl.Invalidate();
-        }
-        
+        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
+        private static string TrToType(string tr) => tr switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
 
         private void BtnAdd_Click(object? sender, EventArgs e)
         {
             string name = txtNewCategory.Text.Trim();
-            string type = cmbNewCategoryType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
+            string type = TrToType(cmbNewCategoryType.SelectedItem?.ToString() ?? "Gider");
             if (_categoryService.AddCategory(_user.Id, name, type, out string errorMessage))
             {
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "Kategori eklendi."; txtNewCategory.Clear(); LoadCategories();
@@ -270,8 +237,6 @@ namespace PersonalFinanceApp
 
         
         
-
-        protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
         // --- GÖRSEL YARDIMCI METOTLAR ---
         private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
@@ -288,7 +253,7 @@ namespace PersonalFinanceApp
             {
                 if (e.Index < 0) return;
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-                Color bgColor = isSelected ? Color.FromArgb(60, 65, 85) : CardBackColor;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             };

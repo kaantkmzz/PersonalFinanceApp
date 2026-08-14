@@ -1,4 +1,4 @@
-﻿using PersonalFinanceApp.Data;
+using PersonalFinanceApp.Data;
 using PersonalFinanceApp.Models;
 
 namespace PersonalFinanceApp.Services
@@ -7,19 +7,19 @@ namespace PersonalFinanceApp.Services
     {
         private readonly TransactionRepository _repository = new TransactionRepository();
 
-        public MonthlyReport GenerateMonthlyReport(int userId, int year, int month)
+        public MonthlyReport GenerateReport(int userId, DateTime start, DateTime end)
         {
-            var report = new MonthlyReport
+            return new MonthlyReport
             {
-                Year = year,
-                Month = month,
-                TotalIncome = _repository.GetTotalByTypeAndMonth(userId, "income", year, month),
-                TotalExpense = _repository.GetTotalByTypeAndMonth(userId, "expense", year, month),
-                ExpenseBreakdown = _repository.GetCategoryBreakdown(userId, "expense", year, month),
-                IncomeBreakdown = _repository.GetCategoryBreakdown(userId, "income", year, month)
+                PeriodStart = start,
+                PeriodEnd = end,
+                TotalIncome = _repository.GetTotalByTypeAndDateRange(userId, "income", start, end),
+                TotalExpense = _repository.GetTotalByTypeAndDateRange(userId, "expense", start, end),
+                TotalGoal = _repository.GetTotalByTypeAndDateRange(userId, "goal", start, end),
+                ExpenseBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "expense", start, end),
+                IncomeBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "income", start, end),
+                GoalBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "goal", start, end)
             };
-
-            return report;
         }
 
         public CategorySummary? GetTopExpenseCategory(MonthlyReport report)
@@ -42,18 +42,6 @@ namespace PersonalFinanceApp.Services
             filledCount = Math.Clamp(filledCount, 0, barWidth);
 
             return new string('█', filledCount) + new string('░', barWidth - filledCount);
-        }
-
-        public MonthlyReport GetPreviousMonthReport(int userId, int year, int month)
-        {
-            int prevMonth = month - 1;
-            int prevYear = year;
-            if (prevMonth < 1)
-            {
-                prevMonth = 12;
-                prevYear -= 1;
-            }
-            return GenerateMonthlyReport(userId, prevYear, prevMonth);
         }
 
         // Bu ay ile geçen ayı karşılaştırıp, anlamlı değişiklikleri metin olarak listeler

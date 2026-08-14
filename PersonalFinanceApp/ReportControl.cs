@@ -1,4 +1,5 @@
-﻿using System.Windows.Forms.DataVisualization.Charting;
+using System.Windows.Forms.DataVisualization.Charting;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -10,39 +11,78 @@ namespace PersonalFinanceApp
         private readonly ReportService _reportService = new ReportService();
         private readonly AccountService _accountService = new AccountService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color IncomeColor = Color.FromArgb(60, 180, 110);
-        private static readonly Color ExpenseColor = Color.FromArgb(230, 100, 100);
-        private static readonly Color WalletColor = Color.FromArgb(120, 220, 150);
-        private static readonly Color SafeColor = Color.FromArgb(120, 180, 255);
-        private static readonly Color IdleColor = Color.FromArgb(230, 200, 80);
-        private static readonly Color SliceBorderColor = Color.FromArgb(24, 26, 38);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color IncomeColor => AppTheme.IncomeColor;
+        private static Color ExpenseColor => AppTheme.ExpenseColor;
+        private static Color SafeColor => AppTheme.SafeColor;
+        private static Color IdleColor => AppTheme.IdleColor;
+        private static Color GoalColor => AppTheme.GoalColor;
+        private static Color SliceBorderColor => AppTheme.SliceBorderColor;
 
-        private ComboBox cmbMonth = new ComboBox();
-        private NumericUpDown nudYear = new NumericUpDown();
-        private Button btnView = new Button();
+        private Button btnDaily = new Button();
+        private Button btnWeekly = new Button();
+        private Button btnMonthly = new Button();
         private Button btnExportReport = new Button();
+        private Button btnHistory = new Button();
         private MonthlyReport? _currentReport;
+        private decimal _currentWallet;
+        private decimal _currentSafe;
 
+        // null = birleşik (gelir+gider+hedef+boşta) görünüm; "income"/"expense"/"goal" = o türün kendi kırılımı
+        private string? _drillDownType;
+
+        private Label lblTitle = new Label();
         private Label lblIncome = new Label();
         private Label lblExpense = new Label();
         private Label lblNet = new Label();
-        private Label lblWalletBalance = new Label();
         private Label lblSafeBalance = new Label();
+        private readonly Dictionary<Label, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Label, System.Windows.Forms.Timer>();
 
         private Chart chart = new Chart();
         private int _hoveredPointIndex = -1;
+        private Panel pnlLegendWrapper = new Panel();
+        private FlowLayoutPanel pnlLegendFlow = new FlowLayoutPanel();
+
+        // Grafik açılış (saat 12'den başlayıp bir tur dönerek beliren) animasyonu
+        private Panel pnlChartReveal = new Panel();
+        private System.Windows.Forms.Timer _revealTimer = new System.Windows.Forms.Timer();
+        private System.Diagnostics.Stopwatch _revealStopwatch = new System.Diagnostics.Stopwatch();
+        private Bitmap? _chartSnapshot;
+        private float _revealSweep;
+        private const int RevealDurationMs = 700;
+
+        // İlk açılışta chart, gerçek (dock edilmiş) boyutuna ulaşmadan önce geçici bir boyutla
+        // bir-iki kez daha yeniden boyutlanıyor (bkz. pnlLeft'teki not). Animasyonu o geçici boyutla
+        // yakalayıp sonra aniden "zıplamaması" için, her Resize'da bu bekleme sayacını sıfırlıyoruz;
+        // sayaç kesintisiz doluyorsa boyut artık oturmuş demektir ve o zaman görüntü yakalanır.
+        private System.Windows.Forms.Timer _revealSettleTimer = new System.Windows.Forms.Timer { Interval = 60 };
 
         public ReportControl(User user)
         {
             _user = user;
             InitializeComponent();
             SetupUI();
+            chart.Resize += (s, e) => RequestChartReveal();
+            _revealSettleTimer.Tick += (s, e) => { _revealSettleTimer.Stop(); StartChartRevealAnimation(); };
             LoadReport();
+            this.Disposed += (s, e) =>
+            {
+                _chartSnapshot?.Dispose();
+                _revealTimer.Dispose();
+                _revealSettleTimer.Dispose();
+                foreach (var t in _cardAnimTimers.Values) { t.Stop(); t.Dispose(); }
+                _cardAnimTimers.Clear();
+            };
+        }
+
+        private void RequestChartReveal()
+        {
+            _revealSettleTimer.Stop();
+            _revealSettleTimer.Start();
         }
 
         public void RefreshData()
@@ -58,22 +98,24 @@ namespace PersonalFinanceApp
             this.Font = new Font("Segoe UI", 9F);
 
             // --- Sol taraf: başlık + grafik, kalan alanı otomatik dolduruyor ---
+            // Size, pnlLeft henüz bu.Controls'e eklenmeden (yani Dock=Fill henüz uygulanmadan) chart'a
+            // Bottom-dock'lu legend şeridiyle birlikte 0/negatif yükseklik verilmesini (Chart control'ün
+            // OnResize'da attığı sert bir ArgumentException) önlemek için geçici olarak makul bir başlangıç
+            // boyutu veriyoruz.
             Panel pnlLeft = new Panel
             {
                 Dock = DockStyle.Fill,
+                Size = new Size(900, 700),
                 BackColor = AppBackColor,
                 Padding = new Padding(20, 70, 20, 20)
             };
 
-            Label lblTitle = new Label
-            {
-                Text = "Rapor",
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                ForeColor = TextLight,
-                Left = 20,
-                Top = 15,
-                AutoSize = true
-            };
+            lblTitle.Text = "Rapor";
+            lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTitle.ForeColor = TextLight;
+            lblTitle.Left = 20;
+            lblTitle.Top = 15;
+            lblTitle.AutoSize = true;
 
             chart.Size = new Size(600, 500);
             chart.Dock = DockStyle.Fill;
@@ -86,13 +128,39 @@ namespace PersonalFinanceApp
             chartArea.BackColor = AppBackColor;
             chart.ChartAreas.Add(chartArea);
 
-            Legend legend = new Legend("legend") { BackColor = AppBackColor, ForeColor = TextLight, Docking = Docking.Bottom };
-            chart.Legends.Add(legend);
+            // Yüzdelik dağılımı, dilimlerin altında değil; grafiğin altında tek renk başına
+            // bir kutucuk halinde, ortalanmış özel bir şerit olarak gösteriyoruz (bkz. BuildLegend).
+            pnlLegendWrapper.Height = 40;
+            pnlLegendWrapper.Dock = DockStyle.Bottom;
+            pnlLegendWrapper.BackColor = AppBackColor;
+            pnlLegendFlow.FlowDirection = FlowDirection.LeftToRight;
+            pnlLegendFlow.AutoSize = true;
+            pnlLegendFlow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlLegendFlow.WrapContents = false;
+            pnlLegendFlow.BackColor = AppBackColor;
+            pnlLegendFlow.Top = 8;
+            pnlLegendWrapper.Controls.Add(pnlLegendFlow);
+            pnlLegendWrapper.Resize += (s, e) => CenterLegend();
+
+            // Grafiğin üstünü kaplayan, açılış animasyonu sırasında chart'ın anlık görüntüsünü
+            // saat 12'den başlayan bir dilim maskesiyle kademeli olarak ortaya çıkaran katman.
+            // Çift arabellek (double buffer) olmadan her kare doğrudan ekrana çizildiği için
+            // titreme/kasma oluyordu — bu yüzden burada da diğer canlı çizilen paneller gibi etkinleştiriyoruz.
+            pnlChartReveal.Dock = DockStyle.Fill;
+            pnlChartReveal.BackColor = AppBackColor;
+            pnlChartReveal.Visible = false;
+            pnlChartReveal.Paint += PnlChartReveal_Paint;
+            EnableDoubleBuffering(pnlChartReveal);
+
+            _revealTimer.Interval = 16;
+            _revealTimer.Tick += RevealTimer_Tick;
 
             pnlLeft.Controls.Add(chart);
+            pnlLeft.Controls.Add(pnlChartReveal);
+            pnlLeft.Controls.Add(pnlLegendWrapper);
             pnlLeft.Controls.Add(lblTitle);
 
-            // --- Sağ taraf: tarih + özet kartlar, sabit genişlikte, hep sağda kalır ---
+            // --- Sağ taraf: periyot seçimi + özet kartlar, sabit genişlikte, hep sağda kalır ---
             Panel pnlRight = new Panel
             {
                 Dock = DockStyle.Right,
@@ -101,70 +169,122 @@ namespace PersonalFinanceApp
                 Padding = new Padding(20, 15, 20, 20)
             };
 
-            string[] months = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
-            cmbMonth.Items.AddRange(months);
-            cmbMonth.SelectedIndex = DateTime.Today.Month - 1;
-            cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbMonth.Left = 0;
-            cmbMonth.Top = 0;
-            cmbMonth.Width = 130;
+            SetupPeriodButton(btnDaily, ReportPeriodHelper.Daily, "Günlük");
+            btnDaily.Left = 0; btnDaily.Top = 0; btnDaily.Width = 128; btnDaily.Height = 32;
 
-            nudYear.Minimum = 2000;
-            nudYear.Maximum = 2100;
-            nudYear.Value = DateTime.Today.Year;
-            nudYear.Left = 140;
-            nudYear.Top = 0;
-            nudYear.Width = 90;
+            SetupPeriodButton(btnWeekly, ReportPeriodHelper.Weekly, "Haftalık");
+            btnWeekly.Left = 138; btnWeekly.Top = 0; btnWeekly.Width = 128; btnWeekly.Height = 32;
 
-            btnView.Text = "Görüntüle";
-            btnView.Left = 240;
-            btnView.Top = -2;
-            btnView.Width = 110;
-            btnView.Height = 30;
-            btnView.FlatStyle = FlatStyle.Flat;
-            btnView.FlatAppearance.BorderSize = 0;
-            btnView.BackColor = AccentColor;
-            btnView.ForeColor = Color.White;
-            btnView.Cursor = Cursors.Hand;
-            btnView.Click += (s, e) => LoadReport();
+            SetupPeriodButton(btnMonthly, ReportPeriodHelper.Monthly, "Aylık");
+            btnMonthly.Left = 276; btnMonthly.Top = 0; btnMonthly.Width = 129; btnMonthly.Height = 32;
 
-            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 50, IncomeColor, lblIncome);
-            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 50, ExpenseColor, lblExpense);
-            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 155, TextLight, lblNet);
-            Panel cardWallet = CreateSummaryCard("Cüzdan", 210, 155, WalletColor, lblWalletBalance);
-            Panel cardSafe = CreateSummaryCard("Kasa", 0, 260, SafeColor, lblSafeBalance);
-            
+            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 52, IncomeColor, lblIncome);
+            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 52, ExpenseColor, lblExpense);
+            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 157, TextLight, lblNet);
+            Panel cardSafe = CreateSummaryCard("Kasa", 210, 157, SafeColor, lblSafeBalance);
+
             btnExportReport.Text = "Raporu CSV'ye Aktar";
             btnExportReport.Left = 0;
-            btnExportReport.Top = 360;
+            btnExportReport.Top = 267;
             btnExportReport.Width = 405;
             btnExportReport.Height = 34;
-            btnExportReport.FlatStyle = FlatStyle.Flat;
-            btnExportReport.FlatAppearance.BorderSize = 1;
-            btnExportReport.FlatAppearance.BorderColor = TextMuted;
-            btnExportReport.BackColor = AppBackColor;
-            btnExportReport.ForeColor = TextLight;
             btnExportReport.Cursor = Cursors.Hand;
             btnExportReport.Click += BtnExportReport_Click;
+            SetupOutlinedButton(btnExportReport, TextMuted, TextLight);
 
-            pnlRight.Controls.Add(cmbMonth);
-            pnlRight.Controls.Add(nudYear);
-            pnlRight.Controls.Add(btnView);
+            btnHistory.Text = "Geçmiş Raporlar";
+            btnHistory.Left = 0;
+            btnHistory.Top = 311;
+            btnHistory.Width = 405;
+            btnHistory.Height = 34;
+            btnHistory.Cursor = Cursors.Hand;
+            btnHistory.Click += (s, e) => { using var dialog = new ReportHistoryDialog(_user); dialog.ShowDialog(); };
+            SetupOutlinedButton(btnHistory, TextMuted, TextLight);
+
+            pnlRight.Controls.Add(btnDaily);
+            pnlRight.Controls.Add(btnWeekly);
+            pnlRight.Controls.Add(btnMonthly);
             pnlRight.Controls.Add(cardIncome);
             pnlRight.Controls.Add(cardExpense);
             pnlRight.Controls.Add(cardNet);
-            pnlRight.Controls.Add(cardWallet);
             pnlRight.Controls.Add(cardSafe);
             pnlRight.Controls.Add(btnExportReport);
+            pnlRight.Controls.Add(btnHistory);
 
             // Sıra önemli: önce Fill (sol), sonra Right (sağ) — böylece sağ blok sabit genişliğini korur, sol kalanı doldurur
             this.Controls.Add(pnlLeft);
             this.Controls.Add(pnlRight);
         }
 
+        private void SetupPeriodButton(Button btn, string periodType, string text)
+        {
+            btn.Text = text;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Cursor = Cursors.Hand;
+            btn.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+
+            bool isHovered = false;
+            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
+            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
+
+            btn.Paint += (s, e) =>
+            {
+                bool active = _user.ReportPeriodType == periodType;
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                if (active)
+                {
+                    using var brush = new SolidBrush(isHovered ? ControlPaint.Light(AccentColor) : AccentColor);
+                    e.Graphics.FillPath(brush, path);
+                }
+                else
+                {
+                    using var pen = new Pen(isHovered ? TextLight : TextMuted, 1.2f);
+                    e.Graphics.DrawPath(pen, path);
+                }
+
+                Color textColor = active ? Color.White : TextMuted;
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            btn.Click += (s, e) => SelectPeriod(periodType);
+        }
+
+        // Kullanıcı Günlük/Haftalık/Aylık'tan birine geçince o an açık periyodu bırakıp yeni bir periyot
+        // başlatıyoruz (tamamlanmamış periyotlar geçmişe otomatik kaydedilmez, sadece doğal süresi
+        // dolanlar kaydedilir — bkz. ReportHistoryService). Seçim veritabanına yazılıp kalıcı hâle geliyor.
+        private void SelectPeriod(string periodType)
+        {
+            if (_user.ReportPeriodType != periodType)
+            {
+                _user.ReportPeriodType = periodType;
+                _user.ReportPeriodStart = DateTime.Now;
+                _accountService.SetReportPeriod(_user.Id, periodType, _user.ReportPeriodStart);
+            }
+
+            btnDaily.Invalidate();
+            btnWeekly.Invalidate();
+            btnMonthly.Invalidate();
+
+            _drillDownType = null;
+            LoadReport();
+        }
+
         private Panel CreateSummaryCard(string title, int left, int top, Color valueColor, Label valueLabel)
         {
-            Panel card = new Panel { Left = left, Top = top, Width = 195, Height = 90, BackColor = CardBackColor };
+            Panel card = new Panel { Left = left, Top = top, Width = 195, Height = 90, BackColor = AppBackColor };
+            card.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(card.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, card.Width - 1, card.Height - 1), 12);
+                using var brush = new SolidBrush(CardBackColor);
+                e.Graphics.FillPath(brush, path);
+            };
 
             Label lblCardTitle = new Label
             {
@@ -173,7 +293,8 @@ namespace PersonalFinanceApp
                 Top = 14,
                 AutoSize = true,
                 ForeColor = TextMuted,
-                Font = new Font("Segoe UI", 9F)
+                Font = new Font("Segoe UI", 9F),
+                BackColor = Color.Transparent
             };
 
             valueLabel.Left = 15;
@@ -181,6 +302,8 @@ namespace PersonalFinanceApp
             valueLabel.AutoSize = true;
             valueLabel.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
             valueLabel.ForeColor = valueColor;
+            valueLabel.BackColor = Color.Transparent;
+            EnableDoubleBuffering(valueLabel);
 
             card.Controls.Add(lblCardTitle);
             card.Controls.Add(valueLabel);
@@ -188,76 +311,442 @@ namespace PersonalFinanceApp
             return card;
         }
 
-        private void LoadReport()
+        // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
+        private void AnimateCardValue(Label label, decimal targetValue, string suffix = " ₺")
         {
-            int year = (int)nudYear.Value;
-            int month = cmbMonth.SelectedIndex + 1;
-
-            var current = _reportService.GenerateMonthlyReport(_user.Id, year, month);
-            _currentReport = current;
-            var tr = new System.Globalization.CultureInfo("tr-TR");
-
-            var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            // Aynı karta ait önceki animasyon hâlâ çalışıyorsa (ör. rapor art arda hızlıca yenilendiğinde
+            // ya da animasyon sürerken "tutarları gizle" açıldığında), o zamanlayıcıyı iptal etmeden yeni
+            // bir tane daha başlatmak ikisinin de aynı Label'a yazmasına ve gizleme durumunun görmezden
+            // gelinmesine yol açıyordu. Önce eskisini durdurup atıyoruz.
+            if (_cardAnimTimers.TryGetValue(label, out var existingTimer))
+            {
+                existingTimer.Stop();
+                existingTimer.Dispose();
+                _cardAnimTimers.Remove(label);
+            }
 
             if (_user.HideAmountsEnabled)
             {
-                lblIncome.Text = "••••••";
-                lblExpense.Text = "••••••";
-                lblNet.Text = "••••••";
-                lblWalletBalance.Text = "••••••";
-                lblSafeBalance.Text = "••••••";
+                label.Text = "••••••";
+                return;
+            }
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var timer = new System.Windows.Forms.Timer { Interval = 16 };
+            const int durationMs = 800;
+            _cardAnimTimers[label] = timer;
+
+            timer.Tick += (s, e) =>
+            {
+                if (label.IsDisposed || _user.HideAmountsEnabled)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    _cardAnimTimers.Remove(label);
+                    if (!label.IsDisposed && _user.HideAmountsEnabled) label.Text = "••••••";
+                    return;
+                }
+
+                double t = sw.Elapsed.TotalMilliseconds / durationMs;
+                bool finished = t >= 1.0;
+                if (finished) t = 1.0;
+
+                double eased = 1 - Math.Pow(1 - t, 3);
+                decimal shown = finished ? targetValue : Math.Round(targetValue * (decimal)eased);
+                label.Text = shown.ToString("#,##0", tr) + suffix;
+
+                if (finished)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    _cardAnimTimers.Remove(label);
+                }
+            };
+            timer.Start();
+        }
+
+        // Seçili periyodun (henüz tamamlanmamış, o ana kadarki) verisini veritabanından çeker.
+        private void LoadReport()
+        {
+            DateTime start = _user.ReportPeriodStart;
+            DateTime end = DateTime.Now;
+            if (end <= start) end = start.AddMinutes(1);
+
+            _currentReport = _reportService.GenerateReport(_user.Id, start, end);
+            var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            _currentWallet = wallet;
+            _currentSafe = safe;
+
+            AnimateCardValue(lblIncome, _currentReport.TotalIncome);
+            AnimateCardValue(lblExpense, _currentReport.TotalExpense);
+            AnimateCardValue(lblNet, _currentReport.NetBalance);
+            AnimateCardValue(lblSafeBalance, safe);
+
+            _drillDownType = null;
+            RenderReport();
+        }
+
+        // Önbellekteki (_currentReport) veriden grafiği ve lejantı yeniden çizer; yeni veri çekmez.
+        // Hem ilk yüklemede hem de lejant tıklanıp birleşik/kırılım görünümü değiştiğinde kullanılır.
+        private void RenderReport()
+        {
+            if (_currentReport == null) return;
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            var current = _currentReport;
+
+            _hoveredPointIndex = -1;
+
+            decimal categorySum = current.IncomeBreakdown.Sum(x => x.TotalAmount) + current.ExpenseBreakdown.Sum(x => x.TotalAmount);
+            decimal idle = _currentWallet - categorySum;
+            if (idle < 0) idle = 0;
+            decimal goalTotal = current.GoalBreakdown.Sum(x => x.TotalAmount);
+            decimal pieTotal = categorySum + idle + goalTotal;
+
+            lblTitle.Text = _drillDownType switch
+            {
+                "income" => "Rapor — Gelir",
+                "expense" => "Rapor — Gider",
+                "goal" => "Rapor — Hedef",
+                _ => "Rapor"
+            };
+
+            BuildChart(current, idle, pieTotal);
+            BuildLegend(current, idle, goalTotal, pieTotal, tr);
+
+            // Animasyonu hemen değil, boyut oturana kadar erteleyerek başlatıyoruz (bkz. RequestChartReveal).
+            RequestChartReveal();
+        }
+
+        private void BuildChart(MonthlyReport current, decimal idle, decimal pieTotal)
+        {
+            chart.Series.Clear();
+            chart.Annotations.Clear();
+
+            Series series = new Series("İşlemler") { ChartType = SeriesChartType.Doughnut };
+            series["PieLabelStyle"] = "Outside";
+            series["PieLineColor"] = $"{TextMuted.R},{TextMuted.G},{TextMuted.B}";
+            series["DoughnutRadius"] = "62";
+            series["PieDrawingStyle"] = "SoftEdge";
+            series["PieStartAngle"] = "270";
+            series.Label = "#VALX #PERCENT{P0}";
+            series.Font = new Font("Segoe UI", 9F);
+            series.LabelForeColor = TextLight;
+
+            void AddPoint(string name, decimal amount, Color color, List<(string Name, decimal Amount)>? details = null)
+            {
+                int index = series.Points.AddXY(name, amount);
+                series.Points[index].Color = color;
+                series.Points[index].BorderColor = SliceBorderColor;
+                series.Points[index].BorderWidth = 2;
+                if (details != null) series.Points[index].Tag = details;
+            }
+
+            if (_drillDownType == null)
+            {
+                // Yüzdesi çok küçük dilimler (etiketleri dip dibe binen) tek tek gösterilmez;
+                // aynı renkteki (gelir/gider/hedef) küçük kategoriler "Diğer" adıyla tek dilimde birleştirilir.
+                decimal smallSliceThreshold = pieTotal * 0.04m;
+
+                void AddGroupedPoints(IEnumerable<(string Name, decimal Amount)> items, Color color)
+                {
+                    var large = items.Where(i => i.Amount >= smallSliceThreshold).ToList();
+                    var small = items.Where(i => i.Amount < smallSliceThreshold).ToList();
+
+                    foreach (var item in large)
+                        AddPoint(item.Name, item.Amount, color);
+
+                    if (small.Count == 1)
+                        AddPoint(small[0].Name, small[0].Amount, color);
+                    else if (small.Count > 1)
+                        AddPoint("Diğer", small.Sum(i => i.Amount), color, small);
+                }
+
+                AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor);
+                AddGroupedPoints(current.ExpenseBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), ExpenseColor);
+                AddGroupedPoints(current.GoalBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), GoalColor);
+
+                if (idle > 0 || series.Points.Count == 0)
+                    AddPoint("Boşta", idle, IdleColor);
             }
             else
             {
-                lblIncome.Text = current.TotalIncome.ToString("#,##0", tr) + " ₺";
-                lblExpense.Text = current.TotalExpense.ToString("#,##0", tr) + " ₺";
-                lblNet.Text = current.NetBalance.ToString("#,##0", tr) + " ₺";
-                lblWalletBalance.Text = wallet.ToString("#,##0", tr) + " ₺";
-                lblSafeBalance.Text = safe.ToString("#,##0", tr) + " ₺";
-            }
+                // Kırılım görünümü: seçilen türün (gelir/gider/hedef) HER kategorisi kendi dilimi olarak,
+                // tümü aynı temel rengin farklı bir tonuyla — kaç kategori olursa olsun (10, 100 fark etmez).
+                var items = _drillDownType switch
+                {
+                    "income" => current.IncomeBreakdown,
+                    "expense" => current.ExpenseBreakdown,
+                    _ => current.GoalBreakdown
+                };
+                Color baseColor = _drillDownType switch
+                {
+                    "income" => IncomeColor,
+                    "expense" => ExpenseColor,
+                    _ => GoalColor
+                };
 
-            _hoveredPointIndex = -1;
-            chart.Series.Clear();
+                var ordered = items.OrderByDescending(i => i.TotalAmount).ToList();
+                var shades = GenerateShades(baseColor, ordered.Count);
+                for (int i = 0; i < ordered.Count; i++)
+                    AddPoint(ordered[i].CategoryName, ordered[i].TotalAmount, shades[i]);
 
-            Series series = new Series("İşlemler") { ChartType = SeriesChartType.Pie };
-            series["PieLabelStyle"] = "Inside";
-            series.Label = "#PERCENT{P0}";
-            series.LabelForeColor = Color.White;
-
-            decimal categorySum = 0;
-
-            foreach (var item in current.IncomeBreakdown)
-            {
-                int index = series.Points.AddXY(item.CategoryName, item.TotalAmount);
-                series.Points[index].Color = IncomeColor;
-                series.Points[index].BorderColor = SliceBorderColor;
-                series.Points[index].BorderWidth = 2;
-                categorySum += item.TotalAmount;
-            }
-
-            foreach (var item in current.ExpenseBreakdown)
-            {
-                int index = series.Points.AddXY(item.CategoryName, item.TotalAmount);
-                series.Points[index].Color = ExpenseColor;
-                series.Points[index].BorderColor = SliceBorderColor;
-                series.Points[index].BorderWidth = 2;
-                categorySum += item.TotalAmount;
-            }
-
-            decimal idle = wallet - categorySum;
-            if (idle < 0) idle = 0;
-
-            if (idle > 0 || series.Points.Count == 0)
-            {
-                int idleIndex = series.Points.AddXY("Boşta", idle);
-                series.Points[idleIndex].Color = IdleColor;
-                series.Points[idleIndex].BorderColor = SliceBorderColor;
-                series.Points[idleIndex].BorderWidth = 2;
+                if (ordered.Count == 0)
+                    AddPoint("Veri yok", 1, Color.FromArgb(60, 64, 84));
             }
 
             series.ChartArea = "main";
-            series.Legend = "legend";
             chart.Series.Add(series);
+        }
+
+        // Grafiği saat 12 konumundan başlayıp tam tur atarak kademeli ortaya çıkarır.
+        private void StartChartRevealAnimation()
+        {
+            if (chart.Width <= 0 || chart.Height <= 0) return;
+
+            _revealTimer.Stop();
+            _chartSnapshot?.Dispose();
+            _chartSnapshot = new Bitmap(chart.Width, chart.Height);
+            chart.DrawToBitmap(_chartSnapshot, new Rectangle(0, 0, chart.Width, chart.Height));
+
+            _revealSweep = 0f;
+            chart.Visible = false;
+            pnlChartReveal.Visible = true;
+            pnlChartReveal.Invalidate();
+
+            _revealStopwatch.Restart();
+            _revealTimer.Start();
+        }
+
+        private void RevealTimer_Tick(object? sender, EventArgs e)
+        {
+            double t = _revealStopwatch.Elapsed.TotalMilliseconds / RevealDurationMs;
+            bool finished = t >= 1.0;
+            if (finished) t = 1.0;
+
+            double eased = 1 - Math.Pow(1 - t, 3); // ease-out: hızlı başlar, yumuşak biter
+            _revealSweep = (float)(eased * 360.0);
+            pnlChartReveal.Invalidate();
+
+            if (finished)
+            {
+                _revealTimer.Stop();
+                chart.Visible = true;
+                pnlChartReveal.Visible = false;
+            }
+        }
+
+        private void PnlChartReveal_Paint(object? sender, PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.Clear(AppBackColor);
+            if (_chartSnapshot == null || _revealSweep <= 0.01f) return;
+
+            var rect = new Rectangle(0, 0, pnlChartReveal.Width, pnlChartReveal.Height);
+            float diag = (float)Math.Sqrt((double)rect.Width * rect.Width + (double)rect.Height * rect.Height) * 1.2f;
+            var pieRect = new RectangleF(rect.Width / 2f - diag / 2f, rect.Height / 2f - diag / 2f, diag, diag);
+
+            using var path = new System.Drawing.Drawing2D.GraphicsPath();
+            path.AddPie(pieRect.X, pieRect.Y, pieRect.Width, pieRect.Height, -90f, Math.Min(_revealSweep, 359.9f));
+
+            var oldClip = e.Graphics.Clip;
+            e.Graphics.SetClip(path);
+            e.Graphics.DrawImage(_chartSnapshot, rect);
+            e.Graphics.Clip = oldClip;
+        }
+
+        // Dilimlerin altında kategori kategori değil; her renk için TEK bir kutucukta o rengin toplam
+        // yüzdesini gösteren, grafiğin altında ortalanmış özel bir şerit. Gelir/Gider/Hedef tıklanabilir:
+        // tıklanınca o türün kendi kategori kırılımına geçilir (bkz. BuildChart, BuildDrillDownLegend).
+        private void BuildLegend(MonthlyReport current, decimal idle, decimal goalTotal, decimal pieTotal, System.Globalization.CultureInfo tr)
+        {
+            pnlLegendFlow.Controls.Clear();
+
+            if (_drillDownType != null)
+            {
+                BuildDrillDownLegend(current);
+            }
+            else
+            {
+                if (pieTotal <= 0) return;
+
+                decimal incomeTotal = current.IncomeBreakdown.Sum(x => x.TotalAmount);
+                decimal expenseTotal = current.ExpenseBreakdown.Sum(x => x.TotalAmount);
+
+                if (incomeTotal > 0) AddLegendEntry(IncomeColor, "Gelir", incomeTotal, pieTotal, () => DrillInto("income"));
+                if (expenseTotal > 0) AddLegendEntry(ExpenseColor, "Gider", expenseTotal, pieTotal, () => DrillInto("expense"));
+                if (goalTotal > 0) AddLegendEntry(GoalColor, "Hedef", goalTotal, pieTotal, () => DrillInto("goal"));
+                if (idle > 0) AddLegendEntry(IdleColor, "Boşta", idle, pieTotal, null);
+            }
+
+            CenterLegend();
+        }
+
+        private void BuildDrillDownLegend(MonthlyReport current)
+        {
+            var items = _drillDownType switch
+            {
+                "income" => current.IncomeBreakdown,
+                "expense" => current.ExpenseBreakdown,
+                _ => current.GoalBreakdown
+            };
+            Color baseColor = _drillDownType switch
+            {
+                "income" => IncomeColor,
+                "expense" => ExpenseColor,
+                _ => GoalColor
+            };
+
+            AddBackLegendEntry();
+
+            decimal typeTotal = items.Sum(x => x.TotalAmount);
+            if (typeTotal <= 0 || items.Count == 0) return;
+
+            var ordered = items.OrderByDescending(i => i.TotalAmount).ToList();
+            var shades = GenerateShades(baseColor, ordered.Count);
+            for (int i = 0; i < ordered.Count; i++)
+                AddLegendEntry(shades[i], ordered[i].CategoryName, ordered[i].TotalAmount, typeTotal, null);
+        }
+
+        private void AddBackLegendEntry()
+        {
+            Label lbl = new Label
+            {
+                Text = "← Tüm Kategoriler",
+                AutoSize = true,
+                ForeColor = AccentColor,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 24, 0)
+            };
+            lbl.Click += (s, e) => { _drillDownType = null; RenderReport(); };
+            pnlLegendFlow.Controls.Add(lbl);
+        }
+
+        private void DrillInto(string type)
+        {
+            _drillDownType = type;
+            RenderReport();
+        }
+
+        private void AddLegendEntry(Color color, string label, decimal amount, decimal totalForPercent, Action? onClick)
+        {
+            int percent = totalForPercent > 0 ? (int)Math.Round(amount / totalForPercent * 100) : 0;
+            Font legendFont = new Font("Segoe UI", 9.5F);
+
+            const int dotSize = 16;
+            Size textSize = TextRenderer.MeasureText($"{label} %{percent}", legendFont);
+            int dotTopMargin = Math.Max(0, (textSize.Height - dotSize) / 2);
+
+            Panel dot = new Panel { Width = dotSize, Height = dotSize, Margin = new Padding(4, dotTopMargin, 4, 0) };
+            dot.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using var brush = new SolidBrush(color);
+                e.Graphics.FillEllipse(brush, 0, 0, dot.Width - 1, dot.Height - 1);
+            };
+
+            Label lbl = new Label
+            {
+                Text = $"{label} %{percent}",
+                AutoSize = true,
+                ForeColor = TextLight,
+                Font = legendFont,
+                Margin = new Padding(0, 0, 18, 0)
+            };
+
+            if (onClick != null)
+            {
+                dot.Cursor = Cursors.Hand;
+                lbl.Cursor = Cursors.Hand;
+                dot.Click += (s, e) => onClick();
+                lbl.Click += (s, e) => onClick();
+            }
+
+            pnlLegendFlow.Controls.Add(dot);
+            pnlLegendFlow.Controls.Add(lbl);
+        }
+
+        // Tek bir temel rengin (ör. yeşil) N farklı tonunu üretir; kaç kategori olursa olsun
+        // (10, 20, 100...) hiçbiri birebir aynı olmaz. Açıklık ekseninde eşit aralıklı, doygunlukta
+        // hafif rastgele görünümlü (altın oran tabanlı) bir kayma ile art arda gelen dilimlerin
+        // birbirine çok benzemesi engelleniyor.
+        private static List<Color> GenerateShades(Color baseColor, int count)
+        {
+            var colors = new List<Color>();
+            if (count <= 0) return colors;
+            if (count == 1) { colors.Add(baseColor); return colors; }
+
+            RgbToHsl(baseColor, out double h, out double s, out double l);
+
+            const double minL = 0.30, maxL = 0.74;
+            for (int i = 0; i < count; i++)
+            {
+                double t = (double)i / (count - 1);
+                double lShade = minL + (maxL - minL) * t;
+                double satJitter = (i * 0.6180339887) % 1.0;
+                double sShade = Math.Clamp(s * (0.8 + 0.35 * satJitter), 0.25, 1.0);
+                colors.Add(HslToRgb(h, sShade, lShade));
+            }
+            return colors;
+        }
+
+        private static void RgbToHsl(Color c, out double h, out double s, out double l)
+        {
+            double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            l = (max + min) / 2.0;
+
+            if (max == min)
+            {
+                h = 0; s = 0;
+            }
+            else
+            {
+                double d = max - min;
+                s = l > 0.5 ? d / (2.0 - max - min) : d / (max + min);
+                if (max == r) h = (g - b) / d + (g < b ? 6 : 0);
+                else if (max == g) h = (b - r) / d + 2;
+                else h = (r - g) / d + 4;
+                h /= 6.0;
+            }
+        }
+
+        private static Color HslToRgb(double h, double s, double l)
+        {
+            double r, g, b;
+            if (s == 0)
+            {
+                r = g = b = l;
+            }
+            else
+            {
+                double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                double p = 2 * l - q;
+                r = HueToRgb(p, q, h + 1.0 / 3.0);
+                g = HueToRgb(p, q, h);
+                b = HueToRgb(p, q, h - 1.0 / 3.0);
+            }
+            return Color.FromArgb(
+                (int)Math.Round(Math.Clamp(r, 0, 1) * 255),
+                (int)Math.Round(Math.Clamp(g, 0, 1) * 255),
+                (int)Math.Round(Math.Clamp(b, 0, 1) * 255));
+        }
+
+        private static double HueToRgb(double p, double q, double t)
+        {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1.0 / 6.0) return p + (q - p) * 6 * t;
+            if (t < 1.0 / 2.0) return q;
+            if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6;
+            return p;
+        }
+
+        private void CenterLegend()
+        {
+            pnlLegendFlow.Left = Math.Max(0, (pnlLegendWrapper.Width - pnlLegendFlow.PreferredSize.Width) / 2);
         }
 
         private void Chart_MouseMove(object? sender, MouseEventArgs e)
@@ -307,7 +796,18 @@ namespace PersonalFinanceApp
                 var tr = new System.Globalization.CultureInfo("tr-TR");
 
                 string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
-                MessageBox.Show($"{point.AxisLabel}\nTutar: {amountText}", "Kategori Bilgisi");
+
+                if (point.Tag is List<(string Name, decimal Amount)> details && details.Count > 0)
+                {
+                    var lines = details
+                        .OrderByDescending(d => d.Amount)
+                        .Select(d => $"   •  {d.Name}: {(_user.HideAmountsEnabled ? "••••••" : d.Amount.ToString("#,##0", tr) + " ₺")}");
+                    MessageBox.Show($"{point.AxisLabel} — Toplam: {amountText}\n\n{string.Join("\n", lines)}", "Kategori Bilgisi");
+                }
+                else
+                {
+                    MessageBox.Show($"{point.AxisLabel}\nTutar: {amountText}", "Kategori Bilgisi");
+                }
             }
         }
 
@@ -318,7 +818,7 @@ namespace PersonalFinanceApp
             using (var dialog = new SaveFileDialog())
             {
                 dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
-                dialog.FileName = $"rapor_{_currentReport.Year}_{_currentReport.Month:00}.csv";
+                dialog.FileName = $"rapor_{_currentReport.PeriodStart:yyyy_MM_dd}.csv";
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
@@ -338,6 +838,10 @@ namespace PersonalFinanceApp
                             {
                                 writer.WriteLine($"Gider;{item.CategoryName};{item.TotalAmount.ToString("0.00", tr)}");
                             }
+                            foreach (var item in _currentReport.GoalBreakdown)
+                            {
+                                writer.WriteLine($"Hedef;{item.CategoryName};{item.TotalAmount.ToString("0.00", tr)}");
+                            }
 
                             writer.WriteLine();
                             writer.WriteLine($"Toplam Gelir;;{_currentReport.TotalIncome.ToString("0.00", tr)}");
@@ -353,6 +857,51 @@ namespace PersonalFinanceApp
                     }
                 }
             }
+        }
+
+        private void SetupOutlinedButton(Button btn, Color borderColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+
+            bool isHovered = false;
+            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
+            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
+
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                using (var pen = new Pen(isHovered ? TextLight : borderColor, 1.2f))
+                    e.Graphics.DrawPath(pen, path);
+
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
         }
     }
 }

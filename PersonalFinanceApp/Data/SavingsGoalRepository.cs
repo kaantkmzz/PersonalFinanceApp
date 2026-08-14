@@ -110,5 +110,63 @@ namespace PersonalFinanceApp.Data
                 }
             }
         }
+
+        public void AddInvestment(int goalId, int userId, decimal amount)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+                    INSERT INTO savings_goal_investments (goal_id, user_id, amount, invested_at)
+                    VALUES (@goalId, @userId, @amount, @investedAt)";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@goalId", goalId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.Parameters.AddWithValue("@amount", amount);
+                    cmd.Parameters.AddWithValue("@investedAt", DateTime.Now);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public List<Models.SavingsGoalInvestment> GetInvestmentHistory(int goalId, int userId)
+        {
+            var history = new List<Models.SavingsGoalInvestment>();
+
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+                    SELECT investment_id, goal_id, user_id, amount, invested_at
+                    FROM savings_goal_investments
+                    WHERE goal_id = @goalId AND user_id = @userId
+                    ORDER BY invested_at DESC";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@goalId", goalId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            history.Add(new Models.SavingsGoalInvestment
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("investment_id")),
+                                GoalId = reader.GetInt32(reader.GetOrdinal("goal_id")),
+                                UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
+                                Amount = reader.GetDecimal(reader.GetOrdinal("amount")),
+                                InvestedAt = reader.GetDateTime(reader.GetOrdinal("invested_at"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return history;
+        }
     }
 }

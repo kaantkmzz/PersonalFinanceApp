@@ -1,4 +1,4 @@
-﻿using PersonalFinanceApp.Services;
+using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
 {
@@ -9,19 +9,17 @@ namespace PersonalFinanceApp
 
         private static readonly Color AppBackColor = Color.FromArgb(24, 27, 38);
         private static readonly Color CardBackColor = Color.FromArgb(37, 41, 59);
+        private static readonly Color FieldBackColor = Color.FromArgb(46, 50, 70);
         private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
         private static readonly Color TextLight = Color.White;
+        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
+        private static readonly Color DangerColor = Color.FromArgb(230, 120, 120);
 
         private Panel pnlCard = new Panel();
-        private Panel pnlStep1 = new Panel();
-        private Panel pnlStep2 = new Panel();
+        private Panel pnlStep = new Panel();
 
-        private TextBox txtMonthlyIncome = new TextBox();
         private TextBox txtInitialSavings = new TextBox();
-        private Label lblError1 = new Label();
-        private Label lblError2 = new Label();
-
-        private decimal _monthlyIncomeValue;
+        private Label lblError = new Label();
 
         public OnboardingForm(int userId)
         {
@@ -43,98 +41,104 @@ namespace PersonalFinanceApp
             this.ControlBox = false;
 
             pnlCard.Width = 480;
-            pnlCard.Height = 360;
-            pnlCard.BackColor = CardBackColor;
-
-            // --- Adım 1: Cüzdan / Aylık Gelir ---
-            pnlStep1.Dock = DockStyle.Fill;
-            pnlStep1.BackColor = CardBackColor;
-
-            Label lblIcon1 = new Label { Text = "👛", Font = new Font("Segoe UI", 40F), AutoSize = true, Left = 200, Top = 40 };
-            Label lblPrompt1 = new Label { Text = "Aylık toplam gelirinizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true, Left = 60, Top = 130 };
-
-            txtMonthlyIncome.Left = 60;
-            txtMonthlyIncome.Top = 195;
-            txtMonthlyIncome.Width = 360;
-            txtMonthlyIncome.Font = new Font("Segoe UI", 12F);
-            txtMonthlyIncome.TextAlign = HorizontalAlignment.Center;
-
-            lblError1.Left = 60;
-            lblError1.Top = 230;
-            lblError1.Width = 360;
-            lblError1.Height = 30;
-            lblError1.ForeColor = Color.FromArgb(255, 140, 140);
-            lblError1.TextAlign = ContentAlignment.MiddleCenter;
-
-            Button btnNext = new Button
+            pnlCard.Height = 400;
+            pnlCard.BackColor = AppBackColor;
+            pnlCard.Paint += (s, e) =>
             {
-                Text = "Devam Et",
-                Left = 140,
-                Top = 280,
-                Width = 200,
-                Height = 42,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = AccentColor,
-                ForeColor = Color.White,
-                Cursor = Cursors.Hand
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnlCard.Width - 1, pnlCard.Height - 1), 18);
+                using var brush = new SolidBrush(CardBackColor);
+                e.Graphics.FillPath(brush, path);
             };
-            btnNext.FlatAppearance.BorderSize = 0;
-            btnNext.Click += BtnNext_Click;
 
-            pnlStep1.Controls.Add(lblIcon1);
-            pnlStep1.Controls.Add(lblPrompt1);
-            pnlStep1.Controls.Add(txtMonthlyIncome);
-            pnlStep1.Controls.Add(lblError1);
-            pnlStep1.Controls.Add(btnNext);
+            // --- Kasa / Toplam Birikim (tek adım; cüzdan artık burada sorulmuyor, 0 ile başlıyor) ---
+            pnlStep.Dock = DockStyle.Fill;
+            PaintCardShape(pnlStep);
 
-            // --- Adım 2: Kasa / Toplam Birikim ---
-            pnlStep2.Dock = DockStyle.Fill;
-            pnlStep2.BackColor = CardBackColor;
-            pnlStep2.Visible = false;
+            Panel pnlIconBadge = CreateIconBadge("🏦");
+            Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            Label lblHint = new Label { Text = "Kasanızda şu an bulunan\ntoplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 50, TextAlign = ContentAlignment.TopLeft };
 
-            Label lblIcon2 = new Label { Text = "🏦", Font = new Font("Segoe UI", 40F), AutoSize = true, Left = 200, Top = 40 };
-            Label lblPrompt2 = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true, Left = 80, Top = 130 };
-
-            txtInitialSavings.Left = 60;
-            txtInitialSavings.Top = 195;
-            txtInitialSavings.Width = 360;
-            txtInitialSavings.Font = new Font("Segoe UI", 12F);
+            Panel pnlField = new Panel { Left = 60, Top = 216, Width = 360, Height = 48 };
+            SetupSmoothContainer(pnlField, 10, FieldBackColor);
+            txtInitialSavings.BorderStyle = BorderStyle.None;
+            txtInitialSavings.BackColor = FieldBackColor;
+            txtInitialSavings.ForeColor = TextLight;
+            txtInitialSavings.Font = new Font("Segoe UI", 13F);
             txtInitialSavings.TextAlign = HorizontalAlignment.Center;
+            txtInitialSavings.Location = new Point(0, 13);
+            txtInitialSavings.Width = 360;
+            txtInitialSavings.TextChanged += (s, e) => SmartFormatAmount(txtInitialSavings);
+            pnlField.Controls.Add(txtInitialSavings);
 
-            lblError2.Left = 60;
-            lblError2.Top = 230;
-            lblError2.Width = 360;
-            lblError2.Height = 30;
-            lblError2.ForeColor = Color.FromArgb(255, 140, 140);
-            lblError2.TextAlign = ContentAlignment.MiddleCenter;
+            lblError.Left = 60;
+            lblError.Top = 270;
+            lblError.Width = 360;
+            lblError.Height = 24;
+            lblError.ForeColor = DangerColor;
+            lblError.BackColor = Color.Transparent;
+            lblError.Font = new Font("Segoe UI", 9F);
+            lblError.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnFinish = new Button
-            {
-                Text = "Tamamla",
-                Left = 140,
-                Top = 280,
-                Width = 200,
-                Height = 42,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = AccentColor,
-                ForeColor = Color.White,
-                Cursor = Cursors.Hand
-            };
-            btnFinish.FlatAppearance.BorderSize = 0;
+            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 306, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnFinish, AccentColor, Color.White);
             btnFinish.Click += BtnFinish_Click;
 
-            pnlStep2.Controls.Add(lblIcon2);
-            pnlStep2.Controls.Add(lblPrompt2);
-            pnlStep2.Controls.Add(txtInitialSavings);
-            pnlStep2.Controls.Add(lblError2);
-            pnlStep2.Controls.Add(btnFinish);
+            CenterHorizontally(pnlIconBadge, 0, 36);
+            CenterHorizontally(lblPrompt, 0, 118);
+            CenterHorizontally(lblHint, 0, 154);
 
-            pnlCard.Controls.Add(pnlStep1);
-            pnlCard.Controls.Add(pnlStep2);
+            pnlStep.Controls.Add(pnlIconBadge);
+            pnlStep.Controls.Add(lblPrompt);
+            pnlStep.Controls.Add(lblHint);
+            pnlStep.Controls.Add(pnlField);
+            pnlStep.Controls.Add(lblError);
+            pnlStep.Controls.Add(btnFinish);
+
+            pnlCard.Controls.Add(pnlStep);
             this.Controls.Add(pnlCard);
 
             this.Resize += (s, e) => CenterCard();
             CenterCard();
+        }
+
+        private Panel CreateIconBadge(string emoji)
+        {
+            Panel badge = new Panel { Width = 76, Height = 76 };
+            badge.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(CardBackColor);
+                using var brush = new SolidBrush(Color.FromArgb(40, AccentColor));
+                e.Graphics.FillEllipse(brush, 0, 0, badge.Width - 1, badge.Height - 1);
+                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 28F), badge.ClientRectangle, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+            return badge;
+        }
+
+        private void CenterHorizontally(Control control, int unusedLeft, int top)
+        {
+            control.Top = top;
+            control.Left = (pnlCard.Width - control.Width) / 2;
+        }
+
+        private bool _suppressFormatting = false;
+
+        private void SmartFormatAmount(TextBox txt)
+        {
+            if (_suppressFormatting || string.IsNullOrWhiteSpace(txt.Text)) return;
+            string value = new string(txt.Text.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(value)) return;
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                string formatted = amount.ToString("#,##0");
+                if (txt.Text == formatted) return;
+                _suppressFormatting = true;
+                txt.Text = formatted;
+                txt.SelectionStart = txt.Text.Length;
+                _suppressFormatting = false;
+            }
         }
 
         private void CenterCard()
@@ -143,30 +147,82 @@ namespace PersonalFinanceApp
             pnlCard.Top = (this.ClientSize.Height - pnlCard.Height) / 2;
         }
 
-        private void BtnNext_Click(object? sender, EventArgs e)
-        {
-            if (!decimal.TryParse(txtMonthlyIncome.Text, out decimal income) || income < 0)
-            {
-                lblError1.Text = "Geçerli bir tutar girin.";
-                return;
-            }
-
-            _monthlyIncomeValue = income;
-            pnlStep1.Visible = false;
-            pnlStep2.Visible = true;
-        }
-
         private void BtnFinish_Click(object? sender, EventArgs e)
         {
-            if (!decimal.TryParse(txtInitialSavings.Text, out decimal savings) || savings < 0)
+            string raw = new string(txtInitialSavings.Text.Where(char.IsDigit).ToArray());
+            if (!decimal.TryParse(raw, out decimal savings) || savings < 0)
             {
-                lblError2.Text = "Geçerli bir tutar girin.";
+                lblError.Text = "Geçerli bir tutar girin.";
                 return;
             }
 
-            _accountService.CompleteOnboarding(_userId, _monthlyIncomeValue, savings);
+            // Cüzdan artık onboarding'de sorulmuyor; 0 bakiyeyle başlıyor.
+            _accountService.CompleteOnboarding(_userId, 0, savings);
             this.DialogResult = DialogResult.OK;
             this.Close();
+        }
+
+        // pnlCard'ın yuvarlatılmış köşeleriyle aynı şekli, üstünü tamamen kaplayan adım paneli için de çizer
+        // (Dock=Fill bir çocuk, ebeveynin köşe yuvarlamasını düz bir dikdörtgenle kapatmasın diye).
+        private void PaintCardShape(Panel panel)
+        {
+            panel.BackColor = AppBackColor;
+            panel.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), 18);
+                using var brush = new SolidBrush(CardBackColor);
+                e.Graphics.FillPath(brush, path);
+            };
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = CardBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                // Ebeveyn (adım paneli) kendi BackColor özelliği değil, özel Paint ile CardBackColor görünür
+                // olduğu için burada da doğrudan CardBackColor kullanıyoruz (parent.BackColor yanlış olurdu).
+                e.Graphics.Clear(CardBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+            };
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+
+            bool isHovered = false;
+            btn.MouseEnter += (s, e) => { isHovered = true; btn.Invalidate(); };
+            btn.MouseLeave += (s, e) => { isHovered = false; btn.Invalidate(); };
+
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(CardBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 10);
+                using var brush = new SolidBrush(isHovered ? ControlPaint.Light(bgColor) : bgColor);
+                e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(e.Graphics, btn.Text, new Font("Segoe UI", 10.5F, FontStyle.Bold), new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }

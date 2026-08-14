@@ -10,6 +10,8 @@ namespace PersonalFinanceApp.Services
     {
         private readonly SavingsGoalRepository _repository = new SavingsGoalRepository();
         private readonly AccountService _accountService = new AccountService();
+        private readonly CategoryService _categoryService = new CategoryService();
+        private readonly TransactionService _transactionService = new TransactionService();
 
         public List<SavingsGoal> GetUserGoals(int userId)
         {
@@ -112,10 +114,14 @@ namespace PersonalFinanceApp.Services
             // 1. Parayı kasadan düş
             _accountService.AdjustSafeBalance(userId, -amount);
 
-            // 2. Hedefe parayı ekle
-            goal.CurrentAmount += amount;
+            // 2. Yatırım geçmişine kaydet
+            _repository.AddInvestment(goalId, userId, amount);
 
-            // 3. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
+            // 3. Hedefe parayı ekle
+            goal.CurrentAmount += amount;
+            decimal actualInvested = amount;
+
+            // 4. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
             if (goal.CurrentAmount >= goal.TargetAmount)
             {
                 goal.IsAchieved = true;
@@ -126,17 +132,33 @@ namespace PersonalFinanceApp.Services
                 {
                     goal.CurrentAmount = goal.TargetAmount;
                     _accountService.AdjustSafeBalance(userId, overpaid);
+                    actualInvested -= overpaid;
                 }
             }
 
-            // 4. Veritabanını güncelle
+            // 5. Veritabanını güncelle
             _repository.Update(goal);
+
+            // 6. İşlemler ve Kategoriler ekranlarında da görünsün diye, hedefin adını kategori
+            // olarak kullanan "goal" tipinde bir işlem kaydı düş (cüzdanı etkilemez, sadece log).
+            if (actualInvested > 0)
+            {
+                var category = _categoryService.GetOrCreateCategory(userId, goal.GoalName, "goal");
+                _transactionService.AddTransaction(userId, category.Id, actualInvested, "goal",
+                    $"'{goal.GoalName}' hedefine yatırım", out _);
+            }
+
             return true;
         }
 
         public void DeleteGoal(int goalId, int userId)
         {
             _repository.Delete(goalId, userId);
+        }
+
+        public List<Models.SavingsGoalInvestment> GetInvestmentHistory(int goalId, int userId)
+        {
+            return _repository.GetInvestmentHistory(goalId, userId);
         }
     }
 }

@@ -13,17 +13,19 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly ReminderService _reminderService = new ReminderService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(31, 34, 48);
-        private static readonly Color CardBackColor = Color.FromArgb(40, 44, 60);
-        private static readonly Color MonthCardColor = Color.FromArgb(45, 50, 68);
-        private static readonly Color CardBorderColor = Color.FromArgb(60, 65, 85);
-        private static readonly Color TodayColor = Color.FromArgb(60, 64, 90);
-        private static readonly Color TextLight = Color.White;
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color MonthCardColor => AppTheme.MonthCardColor;
+        private static Color CardBorderColor => AppTheme.CardBorderColor;
+        private static Color TodayColor => AppTheme.TodayColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
 
         // Aktif hatırlatıcılar için kapsül rengi (Hafif saydam kırmızı)
-        private static readonly Color ActiveReminderColor = Color.FromArgb(160, 220, 90, 90);
+        private static Color ActiveReminderColor => AppTheme.ActiveReminderColor;
         // Normal kapsül rengi (Daha şeffaf)
-        private static readonly Color DefaultCapsuleColor = Color.FromArgb(18, 255, 255, 255);
+        private static Color DefaultCapsuleColor => AppTheme.DefaultCapsuleColor;
 
         private Panel pnlTop = new Panel();
         private Panel pnlCalendar = new Panel();
@@ -186,6 +188,11 @@ namespace PersonalFinanceApp
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
         {
+            SetupSmoothContainer(pnl, radius, bgColor, CardBorderColor, 1f);
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor, Color borderColor, float borderWidth)
+        {
             pnl.BackColor = AppBackColor;
             pnl.Paint += (s, e) =>
             {
@@ -198,7 +205,7 @@ namespace PersonalFinanceApp
                     {
                         e.Graphics.FillPath(brush, path);
                     }
-                    using (var pen = new Pen(CardBorderColor, 1))
+                    using (var pen = new Pen(borderColor, borderWidth))
                     {
                         e.Graphics.DrawPath(pen, path);
                     }
@@ -240,18 +247,45 @@ namespace PersonalFinanceApp
             tblMonths.ResumeLayout(true);
         }
 
+        private static readonly string[] WeekdayInitials = { "Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pa" };
+
         private Panel BuildMiniMonthCard(int year, int month)
         {
+            bool isCurrentMonth = year == DateTime.Today.Year && month == DateTime.Today.Month;
+
             Panel card = new Panel
             {
                 Dock = DockStyle.Fill,
                 Margin = new Padding(6)
             };
 
-            SetupSmoothContainer(card, 12, MonthCardColor);
+            if (isCurrentMonth)
+                SetupSmoothContainer(card, 12, MonthCardColor, AccentColor, 1.6f);
+            else
+                SetupSmoothContainer(card, 12, MonthCardColor);
             EnableDoubleBuffering(card);
 
             var dayGrid = BuildDayGrid(year, month);
+
+            Panel pnlWeekdayHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                BackColor = Color.Transparent
+            };
+            pnlWeekdayHeader.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                Font wdFont = new Font("Segoe UI", 7.5F, FontStyle.Bold);
+                float colWidth = pnlWeekdayHeader.Width / 7f;
+                var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using var brush = new SolidBrush(TextMuted);
+                for (int i = 0; i < 7; i++)
+                {
+                    var cellRect = new RectangleF(colWidth * i, 0, colWidth, pnlWeekdayHeader.Height);
+                    e.Graphics.DrawString(WeekdayInitials[i], wdFont, brush, cellRect, format);
+                }
+            };
 
             Panel pnlMonthTitle = new Panel
             {
@@ -261,10 +295,11 @@ namespace PersonalFinanceApp
             };
 
             string monthText = MonthNames[month - 1];
+            Color titleChipColor = isCurrentMonth ? AccentColor : DefaultCapsuleColor;
             pnlMonthTitle.Paint += (s, e) =>
             {
                 DrawSoftChip(e.Graphics, pnlMonthTitle.Width, pnlMonthTitle.Height - 4, monthText,
-                    new Font("Segoe UI", 9.5F, FontStyle.Bold), 0, 24, true, DefaultCapsuleColor, 85, 12);
+                    new Font("Segoe UI", 9.5F, FontStyle.Bold), 0, 24, true, titleChipColor, 85, 12);
 
                 using (var pen = new Pen(Color.FromArgb(40, 255, 255, 255), 1))
                 {
@@ -273,6 +308,7 @@ namespace PersonalFinanceApp
             };
 
             card.Controls.Add(dayGrid);
+            card.Controls.Add(pnlWeekdayHeader);
             card.Controls.Add(pnlMonthTitle);
 
             return card;
@@ -333,6 +369,11 @@ namespace PersonalFinanceApp
                     Cursor = Cursors.Hand
                 };
 
+                EnableDoubleBuffering(dayCell);
+                bool isHovering = false;
+                dayCell.MouseEnter += (s, e) => { isHovering = true; dayCell.Invalidate(); };
+                dayCell.MouseLeave += (s, e) => { isHovering = false; dayCell.Invalidate(); };
+
                 string dayText = thisDay.ToString();
                 dayCell.Paint += (s, e) =>
                 {
@@ -342,8 +383,8 @@ namespace PersonalFinanceApp
 
                     Font dayFont = new Font("Segoe UI Semibold", 8.5F, isToday ? FontStyle.Bold : FontStyle.Regular);
 
-                    // Eğer aktif hatırlatıcı varsa arka planı kırmızı kapsül yap, yoksa normal şeffaf rengini ver
-                    Color capsuleColor = hasActiveReminders ? ActiveReminderColor : DefaultCapsuleColor;
+                    // Eğer aktif hatırlatıcı varsa arka planı kırmızı kapsül yap, üzerine gelinmişse hafif aydınlat, yoksa normal şeffaf rengini ver
+                    Color capsuleColor = hasActiveReminders ? ActiveReminderColor : (isHovering ? Color.FromArgb(45, 255, 255, 255) : DefaultCapsuleColor);
 
                     DrawSoftChip(e.Graphics, dayCell.Width, dayCell.Height, dayText,
                         dayFont, 0, chipHeight, true, capsuleColor, chipWidth, cornerRadius);

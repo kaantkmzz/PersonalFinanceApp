@@ -13,7 +13,7 @@ namespace PersonalFinanceApp.Services
             return _repository.GetByUserId(userId);
         }
 
-        public bool AddRecurring(int userId, string categoryName, string type, decimal amount, string? description, out string errorMessage)
+        public bool AddRecurring(int userId, string categoryName, string type, decimal amount, string? description, string frequency, out string errorMessage)
         {
             errorMessage = string.Empty;
 
@@ -38,7 +38,8 @@ namespace PersonalFinanceApp.Services
                 Amount = amount,
                 Type = type,
                 Description = description,
-                IsActive = true
+                IsActive = true,
+                Frequency = frequency
             });
 
             return true;
@@ -54,24 +55,21 @@ namespace PersonalFinanceApp.Services
             _repository.Delete(recurringId, userId);
         }
 
-        // Giriş yapıldığında çağrılır: bu ay için henüz işlenmemiş, aktif tekrarlayan işlemleri gerçek işlem olarak ekler
+        // Giriş yapıldığında çağrılır: seçilen sıklığa göre (günlük/haftalık/aylık) süresi gelmiş,
+        // aktif tekrarlayan işlemleri gerçek işlem olarak ekler
         public (List<string> Added, List<string> Failed) ProcessDueRecurring(int userId)
         {
             var added = new List<string>();
             var failed = new List<string>();
 
             var recurringList = _repository.GetByUserId(userId).Where(r => r.IsActive).ToList();
-            int currentMonth = DateTime.Today.Month;
-            int currentYear = DateTime.Today.Year;
+            var today = DateTime.Today;
 
             var transactionService = new TransactionService();
 
             foreach (var r in recurringList)
             {
-                if (r.LastProcessedMonth == currentMonth && r.LastProcessedYear == currentYear)
-                {
-                    continue;
-                }
+                if (!IsDue(r, today)) continue;
 
                 bool success = transactionService.AddTransaction(userId, r.CategoryId, r.Amount, r.Type, r.Description, out string errorMessage);
 
@@ -84,10 +82,23 @@ namespace PersonalFinanceApp.Services
                     failed.Add($"{r.CategoryName}: {errorMessage}");
                 }
 
-                _repository.UpdateLastProcessed(r.Id, userId, currentMonth, currentYear);
+                _repository.UpdateLastProcessedDate(r.Id, userId, today);
             }
 
             return (added, failed);
+        }
+
+        private static bool IsDue(RecurringTransaction r, DateTime today)
+        {
+            if (r.LastProcessedDate == null) return true;
+            var last = r.LastProcessedDate.Value.Date;
+
+            return r.Frequency switch
+            {
+                "daily" => last < today,
+                "weekly" => (today - last).Days >= 7,
+                _ => last.Month != today.Month || last.Year != today.Year // "monthly"
+            };
         }
     }
 }

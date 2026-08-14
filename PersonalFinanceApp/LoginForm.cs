@@ -1,4 +1,4 @@
-﻿using PersonalFinanceApp.Models;
+using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 using PersonalFinanceApp.Helpers;
 
@@ -7,129 +7,126 @@ namespace PersonalFinanceApp
     public partial class LoginForm : Form
     {
         private readonly AuthService _authService = new AuthService();
-        private readonly AccountService _accountService = new AccountService();
 
-        private static readonly Color AppBackColor = Color.FromArgb(24, 27, 38);
-        private static readonly Color CardBackColor = Color.FromArgb(37, 41, 59);
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color TextMuted = Color.FromArgb(170, 173, 190);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color FieldBackColor => AppTheme.HoverBackColor;
 
         private Panel pnlCard = new Panel();
         private TextBox txtUsernameOrEmail = new TextBox();
         private TextBox txtPassword = new TextBox();
-        private CheckBox chkShowPassword = new CheckBox();
+        private Panel pnlTogglePassword = new Panel();
+        private bool _passwordVisible = false;
+        private CheckBox chkRememberMe = new CheckBox();
         private Button btnLogin = new Button();
         private Button btnGoToRegister = new Button();
         private Label lblStatus = new Label();
-        private CheckBox chkRememberMe = new CheckBox();
 
         public LoginForm()
         {
             InitializeComponent();
-            SetupUI();
-            TryAutoLogin();   // ← BU SATIRI EKLE
-        }
-
-        private void SetupUI()
-        {
             this.AutoScaleMode = AutoScaleMode.None;
             this.Text = "Kişisel Finans Takip Sistemi";
             this.WindowState = FormWindowState.Maximized;
             this.MinimumSize = new Size(900, 600);
-            this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 10F);
+            this.Resize += (s, e) => CenterCard();
+            this.FormClosing += LoginForm_FormClosing;
 
-            pnlCard.Width = 520;
-            pnlCard.Height = 440;
-            pnlCard.BackColor = CardBackColor;
+            BuildCard();
+            this.Load += (s, e) => DarkTitleBarHelper.SetTitleBarDarkMode(this, AppTheme.IsDark);
+            TryAutoLogin();
+        }
+
+        // Kartı ve içindeki tüm denetimleri geçerli AppTheme renkleriyle sıfırdan kurar.
+        // Oturum kapatılıp bu ekrana dönüldüğünde tema (dark/light) değişmiş olabileceğinden,
+        // önceki kartı atıp yeniden kuruyoruz (canlı renk mutasyonu yerine MainForm'daki
+        // tema değişimi ile aynı "yeniden kur" yaklaşımı).
+        private void BuildCard()
+        {
+            this.SuspendLayout();
+
+            this.Controls.Remove(pnlCard);
+            pnlCard.Dispose();
+            pnlCard = new Panel { Width = 520, Height = 460 };
+            SetupSmoothContainer(pnlCard, 16, CardBackColor, AppBackColor);
+
+            this.BackColor = AppBackColor;
 
             Label lblTitle = new Label
             {
                 Text = "Kişisel Finans Takip Sistemi",
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = TextLight,
+                BackColor = Color.Transparent,
                 AutoSize = true,
                 Left = 45,
                 Top = 35
             };
 
-            Label lblUsername = new Label { Text = "Kullanıcı Adı / E-posta:", Left = 45, Top = 100, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, AutoSize = true };
-            txtUsernameOrEmail.Left = 45;
-            txtUsernameOrEmail.Top = 135;
-            txtUsernameOrEmail.Width = 430;
+            Label lblUsername = new Label { Text = "Kullanıcı Adı / E-posta:", Left = 45, Top = 100, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlUsername = new Panel { Left = 45, Top = 130, Width = 430, Height = 42 };
+            SetupSmoothContainer(pnlUsername, 10, FieldBackColor, CardBackColor);
+            txtUsernameOrEmail = new TextBox { Left = 14, Top = 12, Width = 402, Font = new Font("Segoe UI", 10.5F), BorderStyle = BorderStyle.None, BackColor = FieldBackColor, ForeColor = TextLight };
+            pnlUsername.Controls.Add(txtUsernameOrEmail);
 
-            Label lblPassword = new Label { Text = "Şifre:", Left = 45, Top = 180, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, AutoSize = true };
-            txtPassword.Left = 45;
-            txtPassword.Top = 210;
-            txtPassword.Width = 430;
-            txtPassword.Width = 430;
-            txtPassword.UseSystemPasswordChar = true;
+            Label lblPassword = new Label { Text = "Şifre:", Left = 45, Top = 190, Font = new Font("Segoe UI", 11F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlPassword = new Panel { Left = 45, Top = 220, Width = 430, Height = 42 };
+            SetupSmoothContainer(pnlPassword, 10, FieldBackColor, CardBackColor);
+            txtPassword = new TextBox { Left = 14, Top = 12, Width = 366, Font = new Font("Segoe UI", 10.5F), BorderStyle = BorderStyle.None, BackColor = FieldBackColor, ForeColor = TextLight, UseSystemPasswordChar = true };
+            pnlPassword.Controls.Add(txtPassword);
 
-            chkShowPassword.Text = "Şifreyi göster";
-            chkShowPassword.Left = 45;
-            chkShowPassword.Top = 245;
-            chkShowPassword.AutoSize = true;
-            chkShowPassword.ForeColor = TextMuted;
-            chkShowPassword.CheckedChanged += (s, e) =>
+            _passwordVisible = false;
+            pnlTogglePassword = new Panel { Size = new Size(26, 26), Left = pnlPassword.Width - 34, Top = 8, Cursor = Cursors.Hand, BackColor = Color.Transparent };
+            pnlTogglePassword.Paint += (s, e) =>
             {
-                txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                DrawEyeIcon(e.Graphics, pnlTogglePassword.ClientRectangle, !_passwordVisible);
             };
+            pnlTogglePassword.Click += (s, e) =>
+            {
+                _passwordVisible = !_passwordVisible;
+                txtPassword.UseSystemPasswordChar = !_passwordVisible;
+                pnlTogglePassword.Invalidate();
+            };
+            pnlPassword.Controls.Add(pnlTogglePassword);
 
-            chkRememberMe.Text = "Beni hatırla";
-            chkRememberMe.Left = 250;
-            chkRememberMe.Top = 245;
-            chkRememberMe.AutoSize = true;
-            chkRememberMe.ForeColor = TextMuted;
+            chkRememberMe = new CheckBox { Text = "Beni hatırla", Left = 45, Top = 275, AutoSize = true, ForeColor = TextMuted, BackColor = Color.Transparent };
 
-            btnLogin.Text = "Giriş Yap";
-            btnLogin.Left = 45;
-            btnLogin.Top = 290;
-            btnLogin.Width = 205;
-            btnLogin.Height = 44;
-            btnLogin.Font = new Font("Segoe UI", 10.5F);
-            btnLogin.FlatStyle = FlatStyle.Flat;
-            btnLogin.FlatAppearance.BorderSize = 0;
-            btnLogin.BackColor = AccentColor;
-            btnLogin.ForeColor = Color.White;
-            btnLogin.Cursor = Cursors.Hand;
+            btnLogin = new Button { Text = "Giriş Yap", Left = 45, Top = 320, Width = 205, Height = 44, Font = new Font("Segoe UI", 10.5F), Cursor = Cursors.Hand };
+            SetupRoundedButton(btnLogin, AccentColor, Color.White);
             btnLogin.Click += BtnLogin_Click;
 
-            btnGoToRegister.Text = "Kayıt Ol";
-            btnGoToRegister.Left = 270;
-            btnGoToRegister.Top = 290;
-            btnGoToRegister.Width = 205;
-            btnGoToRegister.Height = 44;
-            btnGoToRegister.Font = new Font("Segoe UI", 10.5F);
-            btnGoToRegister.FlatStyle = FlatStyle.Flat;
-            btnGoToRegister.FlatAppearance.BorderSize = 1;
-            btnGoToRegister.FlatAppearance.BorderColor = TextMuted;
-            btnGoToRegister.BackColor = CardBackColor;
-            btnGoToRegister.ForeColor = TextLight;
-            btnGoToRegister.Cursor = Cursors.Hand;
+            btnGoToRegister = new Button { Text = "Kayıt Ol", Left = 270, Top = 320, Width = 205, Height = 44, Font = new Font("Segoe UI", 10.5F), Cursor = Cursors.Hand };
+            SetupRoundedButton(btnGoToRegister, FieldBackColor, TextLight);
             btnGoToRegister.Click += BtnGoToRegister_Click;
 
-            lblStatus.Left = 45;
-            lblStatus.Top = 355;
-            lblStatus.Width = 430;
-            lblStatus.Height = 70;
-            lblStatus.ForeColor = Color.FromArgb(255, 120, 120);
-            lblStatus.Font = new Font("Segoe UI", 9.5F);
-            lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+            lblStatus = new Label
+            {
+                Left = 45,
+                Top = 385,
+                Width = 430,
+                Height = 70,
+                BackColor = Color.Transparent,
+                ForeColor = Color.FromArgb(255, 120, 120),
+                Font = new Font("Segoe UI", 9.5F),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
 
             pnlCard.Controls.Add(lblTitle);
             pnlCard.Controls.Add(lblUsername);
-            pnlCard.Controls.Add(txtUsernameOrEmail);
+            pnlCard.Controls.Add(pnlUsername);
             pnlCard.Controls.Add(lblPassword);
-            pnlCard.Controls.Add(txtPassword);
-            pnlCard.Controls.Add(chkShowPassword);
+            pnlCard.Controls.Add(pnlPassword);
             pnlCard.Controls.Add(chkRememberMe);
             pnlCard.Controls.Add(btnLogin);
             pnlCard.Controls.Add(btnGoToRegister);
             pnlCard.Controls.Add(lblStatus);
 
             this.Controls.Add(pnlCard);
-
             this.AcceptButton = btnLogin;
 
             txtUsernameOrEmail.PreviewKeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) e.IsInputKey = true; };
@@ -153,10 +150,12 @@ namespace PersonalFinanceApp
                 }
             };
 
-            this.Resize += (s, e) => CenterCard();
             CenterCard();
 
-            this.FormClosing += LoginForm_FormClosing;
+            if (this.IsHandleCreated)
+                DarkTitleBarHelper.SetTitleBarDarkMode(this, AppTheme.IsDark);
+
+            this.ResumeLayout(true);
         }
 
         private void CenterCard()
@@ -211,13 +210,13 @@ namespace PersonalFinanceApp
                     user.OnboardingCompleted = true;
                 }
 
-                bool creditedIncome = _accountService.CheckAndCreditMonthlyIncome(user.Id);
-
                 var recurringService = new RecurringTransactionService();
                 var (addedRecurring, failedRecurring) = recurringService.ProcessDueRecurring(user.Id);
 
+                // Seçili rapor periyodu (günlük/haftalık/aylık) tamamlanmışsa geçmişe kaydedip yenisini başlatır.
+                user.ReportPeriodStart = new ReportHistoryService().CheckAndSnapshotCompletedPeriods(user.Id, user.ReportPeriodType, user.ReportPeriodStart);
+
                 var infoMessages = new List<string>();
-                if (creditedIncome) infoMessages.Add("Bu ayın gelirinizi cüzdanınıza ekledik.");
                 if (addedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklendi:\n- " + string.Join("\n- ", addedRecurring));
                 if (failedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklenemedi:\n- " + string.Join("\n- ", failedRecurring));
 
@@ -229,14 +228,18 @@ namespace PersonalFinanceApp
                 MainForm mainForm = new MainForm(user);
                 mainForm.ShowDialog();
 
+                if (mainForm.ExitRequested)
+                {
+                    Environment.Exit(0);
+                    return true;
+                }
+
                 if (this.IsDisposed)
                 {
                     return true;
                 }
 
-                txtUsernameOrEmail.Clear();
-                txtPassword.Clear();
-                chkRememberMe.Checked = false;
+                BuildCard();
                 lblStatus.Text = string.Empty;
                 this.Show();
 
@@ -278,6 +281,70 @@ namespace PersonalFinanceApp
         {
             RegisterForm registerForm = new RegisterForm();
             registerForm.ShowDialog();
+        }
+
+        // Tutarları gizle/göster butonuyla aynı mantıkta çalışan göz ikonu (açık/kapalı göz)
+        private static void DrawEyeIcon(Graphics g, Rectangle r, bool hidden)
+        {
+            Color iconColor = TextMuted;
+            using var pen = new Pen(iconColor, 1.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+            int w = (int)(r.Width * 0.72);
+            int h = (int)(r.Height * 0.4);
+            var eyeRect = new Rectangle(r.Left + (r.Width - w) / 2, r.Top + (r.Height - h) / 2, w, h);
+            g.DrawEllipse(pen, eyeRect);
+
+            int pupilSize = Math.Max(2, h / 2);
+            var pupilRect = new Rectangle(eyeRect.Left + (w - pupilSize) / 2, eyeRect.Top + (h - pupilSize) / 2, pupilSize, pupilSize);
+            using var brush = new SolidBrush(iconColor);
+            g.FillEllipse(brush, pupilRect);
+
+            if (hidden)
+            {
+                g.DrawLine(pen, r.Left + r.Width / 2 - w / 2 - 1, r.Top + r.Height / 2 + h / 2 + 1, r.Left + r.Width / 2 + w / 2 + 1, r.Top + r.Height / 2 - h / 2 - 1);
+            }
+        }
+
+        // --- GÖRSEL YARDIMCI METOTLAR ---
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor, Color clearColor)
+        {
+            pnl.BackColor = clearColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(clearColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = Math.Max(radius * 2, 1);
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }

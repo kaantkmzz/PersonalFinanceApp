@@ -9,9 +9,9 @@ namespace PersonalFinanceApp
         public decimal Amount { get; private set; }
         public TransferDirection Direction { get; private set; }
 
-        private static readonly Color AppBackColor = Color.FromArgb(37, 41, 59);
-        private static readonly Color TextLight = Color.White;
-        private static readonly Color AccentColor = Color.FromArgb(99, 102, 241);
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color AccentColor => AppTheme.AccentColor;
 
         private RadioButton rbToSafe = new RadioButton();
         private RadioButton rbToWallet = new RadioButton();
@@ -55,6 +55,7 @@ namespace PersonalFinanceApp
             txtAmount.Left = 30;
             txtAmount.Top = 135;
             txtAmount.Width = 300;
+            txtAmount.TextChanged += (s, e) => SmartFormatAmount(txtAmount);
 
             lblError.Left = 30;
             lblError.Top = 170;
@@ -85,9 +86,29 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnOk);
         }
 
+        private bool _suppressAmountFormatting = false;
+
+        // Tutar kutusuna yazılan rakamları "10.000" gibi binlik ayraçlarla biçimlendirir.
+        private void SmartFormatAmount(TextBox txt)
+        {
+            if (_suppressAmountFormatting || string.IsNullOrWhiteSpace(txt.Text)) return;
+            string value = new string(txt.Text.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(value)) return;
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                string formatted = amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+                if (txt.Text == formatted) return;
+                _suppressAmountFormatting = true;
+                txt.Text = formatted;
+                txt.SelectionStart = txt.Text.Length;
+                _suppressAmountFormatting = false;
+            }
+        }
+
         private void BtnOk_Click(object? sender, EventArgs e)
         {
-            if (!decimal.TryParse(txtAmount.Text, out decimal amount) || amount <= 0)
+            string rawAmount = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+            if (!decimal.TryParse(rawAmount, out decimal amount) || amount <= 0)
             {
                 lblError.Text = "Geçerli bir tutar girin.";
                 return;

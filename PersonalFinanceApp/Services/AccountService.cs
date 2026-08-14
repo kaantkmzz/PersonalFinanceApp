@@ -91,5 +91,15 @@ namespace PersonalFinanceApp.Services
         {
             _repository.SetHideAmounts(userId, hideAmounts);
         }
+
+        public (string PeriodType, DateTime PeriodStart) GetReportPeriod(int userId)
+        {
+            return _repository.GetReportPeriod(userId);
+        }
+
+        public void SetReportPeriod(int userId, string periodType, DateTime periodStart)
+        {
+            _repository.SetReportPeriod(userId, periodType, periodStart);
+        }
     }
 }

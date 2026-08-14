@@ -145,10 +145,6 @@ namespace PersonalFinanceApp.Services
                     }
                 }
 
-                // Kullanıcı başarıyla oluşturuldu, şimdi varsayılan kategorilerini ekleyelim
-                var categoryService = new CategoryService();
-                categoryService.CreateDefaultCategories(newUserId);
-
                 return true;
             }
             catch (Exception ex)
@@ -177,7 +173,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, report_period_type, report_period_start FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -193,6 +189,8 @@ namespace PersonalFinanceApp.Services
                                 int createdAtOrdinal = reader.GetOrdinal("created_at");
                                 int onboardingOrdinal = reader.GetOrdinal("onboarding_completed");
                                 int hideAmountsOrdinal = reader.GetOrdinal("hide_amounts");
+                                int reportPeriodTypeOrdinal = reader.GetOrdinal("report_period_type");
+                                int reportPeriodStartOrdinal = reader.GetOrdinal("report_period_start");
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
@@ -208,7 +206,9 @@ namespace PersonalFinanceApp.Services
                                         PasswordHash = storedHash,
                                         CreatedAt = reader.GetDateTime(createdAtOrdinal),
                                         OnboardingCompleted = reader.GetBoolean(onboardingOrdinal),
-                                        HideAmountsEnabled = reader.GetBoolean(hideAmountsOrdinal)
+                                        HideAmountsEnabled = reader.GetBoolean(hideAmountsOrdinal),
+                                        ReportPeriodType = reader.GetString(reportPeriodTypeOrdinal),
+                                        ReportPeriodStart = reader.GetDateTime(reportPeriodStartOrdinal)
                                     };
                                 }
                             }

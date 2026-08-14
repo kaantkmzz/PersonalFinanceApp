@@ -27,7 +27,7 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense")
+            if (type != "income" && type != "expense" && type != "goal")
             {
                 errorMessage = "Geçersiz işlem tipi.";
                 return false;
@@ -44,7 +44,7 @@ namespace PersonalFinanceApp.Services
 
             if (category.Type != type)
             {
-                errorMessage = $"Seçilen kategori bir '{(type == "income" ? "gelir" : "gider")}' işlemi için uygun değil.";
+                errorMessage = $"Seçilen kategori bir '{TypeLabel(type)}' işlemi için uygun değil.";
                 return false;
             }
 
@@ -66,16 +66,25 @@ namespace PersonalFinanceApp.Services
                 Amount = amount,
                 Type = type,
                 Description = description,
-                TransactionDate = DateTime.Today
+                TransactionDate = DateTime.Now
             };
 
             _repository.Add(transaction);
 
-            decimal delta = type == "income" ? amount : -amount;
-            _accountService.AdjustWalletBalance(userId, delta);
+            // "goal" (hedef yatırımı) işlemleri cüzdanı etkilemez; kasadan düşme işlemi
+            // SavingsGoalService.InvestInGoal içinde ayrıca yapılıyor, burada tekrar düşülmesin.
+            decimal delta = type == "income" ? amount : type == "expense" ? -amount : 0;
+            if (delta != 0) _accountService.AdjustWalletBalance(userId, delta);
 
             return true;
         }
+
+        private static string TypeLabel(string type) => type switch
+        {
+            "income" => "gelir",
+            "expense" => "gider",
+            _ => "hedef"
+        };
 
         public bool DeleteTransaction(int transactionId, int userId, out string errorMessage)
         {
@@ -90,8 +99,8 @@ namespace PersonalFinanceApp.Services
 
             _repository.Delete(transactionId, userId);
 
-            decimal delta = existing.Type == "income" ? -existing.Amount : existing.Amount;
-            _accountService.AdjustWalletBalance(userId, delta);
+            decimal delta = existing.Type == "income" ? -existing.Amount : existing.Type == "expense" ? existing.Amount : 0;
+            if (delta != 0) _accountService.AdjustWalletBalance(userId, delta);
 
             return true;
         }
@@ -128,15 +137,16 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense")
+            if (type != "income" && type != "expense" && type != "goal")
             {
                 errorMessage = "Geçersiz işlem tipi.";
                 return false;
             }
 
             // Eski işlemin cüzdana etkisini geri al, yeni değerlerin etkisini uygula
-            decimal reverseOldDelta = existing.Type == "income" ? -existing.Amount : existing.Amount;
-            decimal applyNewDelta = type == "income" ? amount : -amount;
+            // ("goal" tipi cüzdanı hiç etkilemez)
+            decimal reverseOldDelta = existing.Type == "income" ? -existing.Amount : existing.Type == "expense" ? existing.Amount : 0;
+            decimal applyNewDelta = type == "income" ? amount : type == "expense" ? -amount : 0;
 
             if (type == "expense")
             {
