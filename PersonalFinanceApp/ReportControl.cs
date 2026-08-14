@@ -129,13 +129,13 @@ namespace PersonalFinanceApp
 
             // Yüzdelik dağılımı, dilimlerin altında değil; grafiğin altında tek renk başına
             // bir kutucuk halinde, ortalanmış özel bir şerit olarak gösteriyoruz (bkz. BuildLegend).
-            pnlLegendWrapper.Height = 40;
+            pnlLegendWrapper.Height = 76;
             pnlLegendWrapper.Dock = DockStyle.Bottom;
             pnlLegendWrapper.BackColor = AppBackColor;
             pnlLegendFlow.FlowDirection = FlowDirection.LeftToRight;
             pnlLegendFlow.AutoSize = true;
             pnlLegendFlow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            pnlLegendFlow.WrapContents = false;
+            pnlLegendFlow.WrapContents = true;
             pnlLegendFlow.BackColor = AppBackColor;
             pnlLegendFlow.Top = 8;
             pnlLegendWrapper.Controls.Add(pnlLegendFlow);
@@ -428,13 +428,14 @@ namespace PersonalFinanceApp
             series.Font = new Font("Segoe UI", 9F);
             series.LabelForeColor = TextLight;
 
-            void AddPoint(string name, decimal amount, Color color, List<(string Name, decimal Amount)>? details = null)
+            int AddPoint(string name, decimal amount, Color color, List<(string Name, decimal Amount)>? details = null)
             {
                 int index = series.Points.AddXY(name, amount);
                 series.Points[index].Color = color;
                 series.Points[index].BorderColor = SliceBorderColor;
                 series.Points[index].BorderWidth = 2;
                 if (details != null) series.Points[index].Tag = details;
+                return index;
             }
 
             if (_drillDownType == null)
@@ -483,8 +484,19 @@ namespace PersonalFinanceApp
 
                 var ordered = items.OrderByDescending(i => i.TotalAmount).ToList();
                 var shades = GenerateShades(baseColor, ordered.Count);
+
+                // Kırılım görünümünde her kategori kendi dilimi olduğundan, çok sayıda küçük dilim
+                // aynı bölgede toplanıp dış etiketlerin (ve bağlantı çizgilerinin) üst üste binmesine
+                // yol açabiliyordu. Payı %3'ün altında kalan dilimler için etiketi gizliyoruz;
+                // dilim yine grafikte görünür, sadece çakışan metni çizilmiyor.
+                decimal typeTotal = ordered.Sum(i => i.TotalAmount);
+                decimal labelThreshold = typeTotal * 0.03m;
                 for (int i = 0; i < ordered.Count; i++)
-                    AddPoint(ordered[i].CategoryName, ordered[i].TotalAmount, shades[i]);
+                {
+                    int idx = AddPoint(ordered[i].CategoryName, ordered[i].TotalAmount, shades[i]);
+                    if (ordered[i].TotalAmount < labelThreshold)
+                        series.Points[idx].Label = " ";
+                }
 
                 if (ordered.Count == 0)
                     AddPoint("Veri yok", 1, Color.FromArgb(60, 64, 84));
@@ -741,7 +753,11 @@ namespace PersonalFinanceApp
 
         private void CenterLegend()
         {
+            // Lejant tek satıra sığmadığında (ör. çok sayıda kategori) sağ kenardan taşıp kırpılmak
+            // yerine alt satıra kaysın diye genişliği sarmalayıcı panelin genişliğiyle sınırlıyoruz.
+            pnlLegendFlow.MaximumSize = new Size(Math.Max(100, pnlLegendWrapper.Width - 20), 0);
             pnlLegendFlow.Left = Math.Max(0, (pnlLegendWrapper.Width - pnlLegendFlow.PreferredSize.Width) / 2);
+            pnlLegendFlow.Top = Math.Max(4, (pnlLegendWrapper.Height - pnlLegendFlow.PreferredSize.Height) / 2);
         }
 
         private void Chart_MouseMove(object? sender, MouseEventArgs e)
