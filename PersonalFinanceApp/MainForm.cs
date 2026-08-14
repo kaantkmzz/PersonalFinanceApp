@@ -32,6 +32,7 @@ namespace PersonalFinanceApp
 
         private Panel pnlSidebar = new Panel();
         private Panel pnlContent = new Panel();
+        private Button? _profileMenuButton;
 
         public MainForm(User user, bool startOnProfile = false)
         {
@@ -39,8 +40,8 @@ namespace PersonalFinanceApp
             if (startOnProfile)
             {
                 _activeContentKey = "profile";
-                _activeContentFactory = () => new ProfileControl(_user);
-                _activeMenuLabel = "Profil";
+                _activeContentFactory = () => new ProfileControl(_user, onAvatarSaved: BuildSidebar);
+                _activeMenuLabel = "Profilim";
             }
             else
             {
@@ -116,6 +117,8 @@ namespace PersonalFinanceApp
             };
             pnlSidebar.Controls.Add(lblLogo);
 
+            BuildAvatarWidget();
+
             string[] menuItems =
             {
                 "Ana Sayfa",
@@ -125,15 +128,18 @@ namespace PersonalFinanceApp
                 "Hedefler",
                 "Notlar",
                 "Hatırlatıcılar",
-                "Profil",
+                "Profilim",
+                "Ayarlar",
                 "Şifre Değiştir"
             };
 
-            int menuTop = 90;
+            int menuTop = 148;
             foreach (var item in menuItems)
             {
                 Button btn = CreateSidebarButton(item, menuTop);
                 pnlSidebar.Controls.Add(btn);
+
+                if (item == "Profilim") _profileMenuButton = btn;
 
                 if (item == _activeMenuLabel)
                 {
@@ -156,6 +162,41 @@ namespace PersonalFinanceApp
             BuildBottomBar();
 
             this.Controls.Add(pnlSidebar);
+        }
+
+        // "Finans Takip" başlığının altında, kullanıcının baş harflerini gösteren tıklanabilir
+        // dairesel avatar; tıklanınca doğrudan Profilim ekranına gider.
+        private void BuildAvatarWidget()
+        {
+            Color avatarColor = AvatarHelper.ParseColor(_user.AvatarColor, AppTheme.AccentColor);
+            string initials = AvatarHelper.GetInitials(_user);
+
+            Panel avatar = new Panel { Left = 20, Top = 68, Width = 64, Height = 64, Cursor = Cursors.Hand };
+
+            bool isHovered = false;
+            avatar.MouseEnter += (s, e) => { isHovered = true; avatar.Invalidate(); };
+            avatar.MouseLeave += (s, e) => { isHovered = false; avatar.Invalidate(); };
+
+            avatar.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(SidebarColor);
+                Color fill = isHovered ? ControlPaint.Light(avatarColor, 0.15f) : avatarColor;
+                using (var brush = new SolidBrush(fill))
+                    e.Graphics.FillEllipse(brush, 0, 0, avatar.Width - 1, avatar.Height - 1);
+                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 19F);
+                using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold))
+                    TextRenderer.DrawText(e.Graphics, initials, font, avatar.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+
+            avatar.Click += (s, e) =>
+            {
+                _activeMenuLabel = "Profilim";
+                if (_profileMenuButton != null) SetActiveButton(_profileMenuButton);
+                ShowCachedContent("profile", () => new ProfileControl(_user, onAvatarSaved: BuildSidebar));
+            };
+
+            pnlSidebar.Controls.Add(avatar);
         }
 
         // Kenar çubuğunun en altındaki üç ikon buton: Kapat, Tutarları Göster/Gizle, Tema
@@ -342,6 +383,21 @@ namespace PersonalFinanceApp
             public override Color ImageMarginGradientBegin => AppTheme.CardBackColor;
             public override Color ImageMarginGradientMiddle => AppTheme.CardBackColor;
             public override Color ImageMarginGradientEnd => AppTheme.CardBackColor;
+        }
+
+        // Ayarlar ekranından tema değişikliği istendiğinde çağrılır (bkz. HandleMenuClick "Ayarlar").
+        private void OnThemeToggleRequested()
+        {
+            AppTheme.Toggle();
+            RebuildForThemeChange();
+        }
+
+        // Ayarlar ekranından "Tutarları Gizle" değiştirildiğinde çağrılır.
+        private void OnHideAmountsToggleRequested()
+        {
+            _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
+            _accountService.SetHideAmounts(_user.Id, _user.HideAmountsEnabled);
+            RefreshAllCachedScreens();
         }
 
         // Tema değişince tüm önbelleklenmiş ekranları atıp kenar çubuğunu ve o an açık ekranı yeniden kurar.
@@ -571,8 +627,11 @@ namespace PersonalFinanceApp
                 case "Hatırlatıcılar":
                     ShowCachedContent("reminders", () => new ReminderControl(_user));
                     break;
-                case "Profil":
-                    ShowCachedContent("profile", () => new ProfileControl(_user));
+                case "Profilim":
+                    ShowCachedContent("profile", () => new ProfileControl(_user, onAvatarSaved: BuildSidebar));
+                    break;
+                case "Ayarlar":
+                    ShowCachedContent("settings", () => new SettingsControl(_user, OnThemeToggleRequested, OnHideAmountsToggleRequested));
                     break;
                 case "Şifre Değiştir":
                     ShowCachedContent("password", () => new PasswordChangeControl(_user));

@@ -20,7 +20,8 @@ CREATE TABLE users (
     full_name                    TEXT NOT NULL DEFAULT '',
     cleanup_frequency            VARCHAR(10) NOT NULL DEFAULT 'never',
     cleanup_period_start         TIMESTAMP NOT NULL DEFAULT NOW(),
-    cleanup_export_before_clear  BOOLEAN NOT NULL DEFAULT FALSE
+    cleanup_export_before_clear  BOOLEAN NOT NULL DEFAULT FALSE,
+    avatar_color                 VARCHAR(7) NOT NULL DEFAULT '#6366F1'
 );
 
 CREATE TABLE categories (
