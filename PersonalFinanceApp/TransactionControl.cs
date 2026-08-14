@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Linq;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -365,6 +366,46 @@ namespace PersonalFinanceApp
         protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
         // --- GÖRSEL YARDIMCI METOTLAR ---
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct COMBOBOXINFO
+        {
+            public int cbSize;
+            public RECT rcItem;
+            public RECT rcButton;
+            public IntPtr stateButton;
+            public IntPtr hwndCombo;
+            public IntPtr hwndItem;
+            public IntPtr hwndList;
+        }
+
+        private const int CB_GETCOMBOBOXINFO = 0x0164;
+        private const int EM_SETRECT = 0x00B3;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetComboBoxInfo(IntPtr hwndCombo, ref COMBOBOXINFO pcbi);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref RECT lParam);
+
+        // Düzenlenebilir ComboBox'ın native metin kutusunun biçimlendirme dikdörtgenini üstten
+        // genişleterek yazının dikey olarak birkaç piksel yukarı kaymasını sağlar.
+        private static void ShiftEditTextUp(ComboBox cmb, int pixels)
+        {
+            var info = new COMBOBOXINFO { cbSize = Marshal.SizeOf<COMBOBOXINFO>() };
+            if (!GetComboBoxInfo(cmb.Handle, ref info) || info.hwndItem == IntPtr.Zero) return;
+
+            if (!GetClientRect(info.hwndItem, out RECT rect)) return;
+            rect.Top -= pixels;
+            SendMessage(info.hwndItem, EM_SETRECT, IntPtr.Zero, ref rect);
+        }
+
         private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
         {
             SetupSmoothContainer(pnl, 8, CardBackColor);
@@ -384,10 +425,18 @@ namespace PersonalFinanceApp
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             };
 
-            // 2. Sadece dıştaki ince beyaz çerçeveyi tıraşlıyoruz
-            // Alt kenarı kırpmıyoruz (sadece üst/sol/sağ): kırpma "g, y, ç" gibi alt çıkıntılı (descender)
-            // harflerin editable Kategori kutusunda kesilmesine yol açıyordu.
-            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 1));
+            // 2. Dıştaki ince beyaz çerçeveyi tıraşlıyoruz
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+
+            // Düzenlenebilir (editable) kutularda native metin kutusu alt sınıra çok yakın yazıyor;
+            // bu da "g, y, ç" gibi alt çıkıntılı (descender) harflerin üstteki kırpmayla kesilmesine
+            // yol açıyordu. Çözüm olarak metnin kendisini native edit kontrolü içinde birkaç piksel
+            // yukarı kaydırıyoruz (EM_SETRECT), böylece hem çerçeve gizli kalıyor hem de harfler tam görünüyor.
+            if (cmb.DropDownStyle == ComboBoxStyle.DropDown)
+            {
+                cmb.HandleCreated += (s, e) => ShiftEditTextUp(cmb, 3);
+                if (cmb.IsHandleCreated) ShiftEditTextUp(cmb, 3);
+            }
 
             // 3. Oku ve beyaz çizgiyi gizlemek için örtü paneli (Overlay)
             Panel pnlArrow = new Panel();
