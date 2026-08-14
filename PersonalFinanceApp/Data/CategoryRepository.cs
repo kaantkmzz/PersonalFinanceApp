@@ -55,6 +55,27 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        // Temizleme sıklığı ayarı tarafından kullanılır: kullanıcının, aktif bir tekrarlanan işlem
+        // tarafından kullanılmayan kategorilerini siler (tekrarlanan işlemler temizlik sonrası da
+        // çalışmaya devam etmeli, bu yüzden onların bağlı olduğu kategoriler korunur).
+        public void DeleteUnusedByRecurring(int userId)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+                    DELETE FROM categories
+                    WHERE user_id = @userId
+                      AND category_id NOT IN (SELECT category_id FROM recurring_transactions WHERE user_id = @userId)";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         public void Delete(int categoryId, int userId)
         {
             using (var conn = DatabaseHelper.GetConnection())

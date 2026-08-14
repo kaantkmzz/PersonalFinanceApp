@@ -13,6 +13,7 @@ namespace PersonalFinanceApp
         private static Color TextLight => AppTheme.TextLight;
         private static Color AccentColor => AppTheme.AccentColor;
 
+        private Label lblWelcome = new Label();
         private Label lblWalletAmount = new Label();
         private Label lblSafeAmount = new Label();
         private Label lblStatus = new Label();
@@ -32,15 +33,12 @@ namespace PersonalFinanceApp
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
-            Label lblWelcome = new Label
-            {
-                Text = $"Hoş geldin, {_user.Username}",
-                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
-                ForeColor = TextLight,
-                AutoSize = true,
-                Left = 20,
-                Top = 20
-            };
+            lblWelcome.Text = $"Hoş geldin, {DisplayName}";
+            lblWelcome.Font = new Font("Segoe UI", 22F, FontStyle.Bold);
+            lblWelcome.ForeColor = TextLight;
+            lblWelcome.AutoSize = true;
+            lblWelcome.Left = 20;
+            lblWelcome.Top = 20;
 
             Panel pnlWallet = new Panel { Left = 20, Top = 100, Width = 320, Height = 240 };
             SetupSmoothContainer(pnlWallet, 16, CardBackColor);
@@ -172,8 +170,11 @@ namespace PersonalFinanceApp
             return path;
         }
 
+        private string DisplayName => string.IsNullOrWhiteSpace(_user.FullName) ? _user.Username : _user.FullName;
+
         public void RefreshData()
         {
+            lblWelcome.Text = $"Hoş geldin, {DisplayName}";
             RefreshBalances();
         }
 
