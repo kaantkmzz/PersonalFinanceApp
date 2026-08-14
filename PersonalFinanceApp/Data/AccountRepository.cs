@@ -207,5 +207,46 @@ namespace PersonalFinanceApp.Data
                 }
             }
         }
+
+        public (string PeriodType, DateTime PeriodStart) GetReportPeriod(int userId)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "SELECT report_period_type, report_period_start FROM users WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return (reader.GetString(0), reader.GetDateTime(1));
+                        }
+                    }
+                }
+            }
+
+            return ("monthly", DateTime.Now);
+        }
+
+        public void SetReportPeriod(int userId, string periodType, DateTime periodStart)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET report_period_type = @periodType, report_period_start = @periodStart WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@periodType", periodType);
+                    cmd.Parameters.AddWithValue("@periodStart", periodStart);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }
