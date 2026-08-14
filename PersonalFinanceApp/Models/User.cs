@@ -15,5 +15,6 @@
         public string CleanupFrequency { get; set; } = "never";
         public DateTime CleanupPeriodStart { get; set; } = DateTime.Now;
         public bool CleanupExportBeforeClear { get; set; }
+        public string AvatarColor { get; set; } = "#6366F1";
     }
 }

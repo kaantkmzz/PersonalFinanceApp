@@ -173,7 +173,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, full_name, cleanup_frequency, cleanup_period_start, cleanup_export_before_clear FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, full_name, cleanup_frequency, cleanup_period_start, cleanup_export_before_clear, avatar_color FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -193,6 +193,7 @@ namespace PersonalFinanceApp.Services
                                 int cleanupFrequencyOrdinal = reader.GetOrdinal("cleanup_frequency");
                                 int cleanupPeriodStartOrdinal = reader.GetOrdinal("cleanup_period_start");
                                 int cleanupExportOrdinal = reader.GetOrdinal("cleanup_export_before_clear");
+                                int avatarColorOrdinal = reader.GetOrdinal("avatar_color");
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
@@ -212,7 +213,8 @@ namespace PersonalFinanceApp.Services
                                         FullName = reader.GetString(fullNameOrdinal),
                                         CleanupFrequency = reader.GetString(cleanupFrequencyOrdinal),
                                         CleanupPeriodStart = reader.GetDateTime(cleanupPeriodStartOrdinal),
-                                        CleanupExportBeforeClear = reader.GetBoolean(cleanupExportOrdinal)
+                                        CleanupExportBeforeClear = reader.GetBoolean(cleanupExportOrdinal),
+                                        AvatarColor = reader.GetString(avatarColorOrdinal)
                                     };
                                 }
                             }

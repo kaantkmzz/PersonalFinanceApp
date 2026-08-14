@@ -111,5 +111,10 @@ namespace PersonalFinanceApp.Services
         {
             _repository.SetCleanupExportBeforeClear(userId, exportBeforeClear);
         }
+
+        public void SetAvatarColor(int userId, string hexColor)
+        {
+            _repository.SetAvatarColor(userId, hexColor);
+        }
     }
 }

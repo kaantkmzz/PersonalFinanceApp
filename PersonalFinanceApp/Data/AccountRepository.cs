@@ -272,5 +272,21 @@ namespace PersonalFinanceApp.Data
                 }
             }
         }
+
+        public void SetAvatarColor(int userId, string hexColor)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET avatar_color = @avatarColor WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@avatarColor", hexColor);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }
