@@ -15,8 +15,10 @@ namespace PersonalFinanceApp.Services
                 Month = month,
                 TotalIncome = _repository.GetTotalByTypeAndMonth(userId, "income", year, month),
                 TotalExpense = _repository.GetTotalByTypeAndMonth(userId, "expense", year, month),
+                TotalGoal = _repository.GetTotalByTypeAndMonth(userId, "goal", year, month),
                 ExpenseBreakdown = _repository.GetCategoryBreakdown(userId, "expense", year, month),
-                IncomeBreakdown = _repository.GetCategoryBreakdown(userId, "income", year, month)
+                IncomeBreakdown = _repository.GetCategoryBreakdown(userId, "income", year, month),
+                GoalBreakdown = _repository.GetCategoryBreakdown(userId, "goal", year, month)
             };
 
             return report;

@@ -28,6 +28,8 @@ namespace PersonalFinanceApp
         private TextBox txtNewCategory = new TextBox();
         private ComboBox cmbNewCategoryType = new ComboBox();
         private Button btnAdd = new Button();
+        private TextBox txtSearch = new TextBox();
+        private Button btnSearch = new Button();
         private Label lblStatus = new Label();
 
         private DataGridView dgvCategories = new DataGridView();
@@ -91,6 +93,21 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
             btnAdd.Click += BtnAdd_Click;
 
+            // Arama kutusu, Ekle butonunun hemen yanında
+            Label lblSearch = new Label { Text = "Ara:", Left = 680, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 680, Top = 95, Width = 160, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 140;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
+            txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.TextChanged += (s, e) => LoadCategories();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍";
+            btnSearch.Left = 848; btnSearch.Top = 95; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White);
+            btnSearch.Click += (s, e) => LoadCategories();
+
             lblStatus.Left = 20;
             lblStatus.Top = 145;
             lblStatus.AutoSize = true;
@@ -99,7 +116,8 @@ namespace PersonalFinanceApp
 
             pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblFilter); pnlTop.Controls.Add(pnlFilter);
             pnlTop.Controls.Add(lblNew); pnlTop.Controls.Add(pnlNewCat); pnlTop.Controls.Add(lblNewType); pnlTop.Controls.Add(pnlNewType);
-            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblStatus);
+            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
+            pnlTop.Controls.Add(lblStatus);
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
@@ -179,7 +197,12 @@ namespace PersonalFinanceApp
             var totals = _transactionService.GetCategoryTotals(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            var displayList = _cachedCategories.Select(c => new
+            string searchText = txtSearch.Text.Trim();
+            var visibleCategories = string.IsNullOrEmpty(searchText)
+                ? _cachedCategories
+                : _cachedCategories.Where(c => tr.CompareInfo.IndexOf(c.Name, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0).ToList();
+
+            var displayList = visibleCategories.Select(c => new
             {
                 ID = c.Id,
                 Ad = c.Name,

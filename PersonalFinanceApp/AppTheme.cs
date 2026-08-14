@@ -44,6 +44,7 @@ namespace PersonalFinanceApp
         public static Color WalletColor => IsDark ? Color.FromArgb(120, 220, 150) : Color.FromArgb(30, 140, 75);
         public static Color SafeColor => IsDark ? Color.FromArgb(120, 180, 255) : Color.FromArgb(35, 100, 195);
         public static Color IdleColor => IsDark ? Color.FromArgb(230, 200, 80) : Color.FromArgb(185, 145, 20);
+        public static Color GoalColor => IsDark ? Color.FromArgb(190, 130, 240) : Color.FromArgb(130, 70, 190);
         public static Color SliceBorderColor => AppBackColor;
 
         // --- Hatırlatıcı takvimi ---

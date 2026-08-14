@@ -20,6 +20,7 @@ namespace PersonalFinanceApp
         private static Color WalletColor => AppTheme.WalletColor;
         private static Color SafeColor => AppTheme.SafeColor;
         private static Color IdleColor => AppTheme.IdleColor;
+        private static Color GoalColor => AppTheme.GoalColor;
         private static Color SliceBorderColor => AppTheme.SliceBorderColor;
 
         private ComboBox cmbMonth = new ComboBox();
@@ -33,6 +34,7 @@ namespace PersonalFinanceApp
         private Label lblNet = new Label();
         private Label lblWalletBalance = new Label();
         private Label lblSafeBalance = new Label();
+        private readonly Dictionary<Label, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Label, System.Windows.Forms.Timer>();
 
         private Chart chart = new Chart();
         private int _hoveredPointIndex = -1;
@@ -61,7 +63,14 @@ namespace PersonalFinanceApp
             chart.Resize += (s, e) => RequestChartReveal();
             _revealSettleTimer.Tick += (s, e) => { _revealSettleTimer.Stop(); StartChartRevealAnimation(); };
             LoadReport();
-            this.Disposed += (s, e) => { _chartSnapshot?.Dispose(); _revealTimer.Dispose(); _revealSettleTimer.Dispose(); };
+            this.Disposed += (s, e) =>
+            {
+                _chartSnapshot?.Dispose();
+                _revealTimer.Dispose();
+                _revealSettleTimer.Dispose();
+                foreach (var t in _cardAnimTimers.Values) { t.Stop(); t.Dispose(); }
+                _cardAnimTimers.Clear();
+            };
         }
 
         private void RequestChartReveal()
@@ -251,6 +260,17 @@ namespace PersonalFinanceApp
         // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
         private void AnimateCardValue(Label label, decimal targetValue, string suffix = " ₺")
         {
+            // Aynı karta ait önceki animasyon hâlâ çalışıyorsa (ör. rapor art arda hızlıca yenilendiğinde
+            // ya da animasyon sürerken "tutarları gizle" açıldığında), o zamanlayıcıyı iptal etmeden yeni
+            // bir tane daha başlatmak ikisinin de aynı Label'a yazmasına ve gizleme durumunun görmezden
+            // gelinmesine yol açıyordu. Önce eskisini durdurup atıyoruz.
+            if (_cardAnimTimers.TryGetValue(label, out var existingTimer))
+            {
+                existingTimer.Stop();
+                existingTimer.Dispose();
+                _cardAnimTimers.Remove(label);
+            }
+
             if (_user.HideAmountsEnabled)
             {
                 label.Text = "••••••";
@@ -261,10 +281,18 @@ namespace PersonalFinanceApp
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var timer = new System.Windows.Forms.Timer { Interval = 16 };
             const int durationMs = 800;
+            _cardAnimTimers[label] = timer;
 
             timer.Tick += (s, e) =>
             {
-                if (label.IsDisposed) { timer.Stop(); timer.Dispose(); return; }
+                if (label.IsDisposed || _user.HideAmountsEnabled)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    _cardAnimTimers.Remove(label);
+                    if (!label.IsDisposed && _user.HideAmountsEnabled) label.Text = "••••••";
+                    return;
+                }
 
                 double t = sw.Elapsed.TotalMilliseconds / durationMs;
                 bool finished = t >= 1.0;
@@ -278,6 +306,7 @@ namespace PersonalFinanceApp
                 {
                     timer.Stop();
                     timer.Dispose();
+                    _cardAnimTimers.Remove(label);
                 }
             };
             timer.Start();
@@ -317,7 +346,8 @@ namespace PersonalFinanceApp
             decimal categorySum = current.IncomeBreakdown.Sum(x => x.TotalAmount) + current.ExpenseBreakdown.Sum(x => x.TotalAmount);
             decimal idle = wallet - categorySum;
             if (idle < 0) idle = 0;
-            decimal pieTotal = categorySum + idle;
+            decimal goalTotal = current.GoalBreakdown.Sum(x => x.TotalAmount);
+            decimal pieTotal = categorySum + idle + goalTotal;
 
             // Yüzdesi çok küçük dilimler (etiketleri dip dibe binen) tek tek gösterilmez;
             // aynı renkteki (gelir/gider) küçük kategoriler "Diğer" adıyla tek dilimde birleştirilir.
@@ -348,6 +378,7 @@ namespace PersonalFinanceApp
 
             AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor);
             AddGroupedPoints(current.ExpenseBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), ExpenseColor);
+            AddGroupedPoints(current.GoalBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), GoalColor);
 
             if (idle > 0 || series.Points.Count == 0)
             {
@@ -357,7 +388,7 @@ namespace PersonalFinanceApp
             series.ChartArea = "main";
             chart.Series.Add(series);
 
-            BuildLegend(current, idle, pieTotal, tr);
+            BuildLegend(current, idle, goalTotal, pieTotal, tr);
 
             // Animasyonu hemen değil, boyut oturana kadar erteleyerek başlatıyoruz (bkz. RequestChartReveal).
             RequestChartReveal();
@@ -421,7 +452,7 @@ namespace PersonalFinanceApp
 
         // Dilimlerin altında kategori kategori değil; her renk için TEK bir kutucukta
         // o rengin toplam yüzdesini gösteren, grafiğin altında ortalanmış özel bir şerit.
-        private void BuildLegend(MonthlyReport current, decimal idle, decimal pieTotal, System.Globalization.CultureInfo tr)
+        private void BuildLegend(MonthlyReport current, decimal idle, decimal goalTotal, decimal pieTotal, System.Globalization.CultureInfo tr)
         {
             pnlLegendFlow.Controls.Clear();
             if (pieTotal <= 0) return;
@@ -431,6 +462,7 @@ namespace PersonalFinanceApp
 
             if (incomeTotal > 0) AddLegendEntry(IncomeColor, "Gelir", incomeTotal, pieTotal);
             if (expenseTotal > 0) AddLegendEntry(ExpenseColor, "Gider", expenseTotal, pieTotal);
+            if (goalTotal > 0) AddLegendEntry(GoalColor, "Hedef", goalTotal, pieTotal);
             if (idle > 0) AddLegendEntry(IdleColor, "Boşta", idle, pieTotal);
 
             CenterLegend();
