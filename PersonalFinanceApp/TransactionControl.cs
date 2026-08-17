@@ -71,6 +71,9 @@ namespace PersonalFinanceApp
             // Girdi Alanları
             Label lblType = new Label { Text = "Tip:", Left = 20, Top = 75, ForeColor = TextMuted, AutoSize = true };
             Panel pnlType = new Panel { Left = 20, Top = 100, Width = 140, Height = 36 };
+            // Name: tema değişince ekran yeniden kurulduğunda yarım kalmış form verisi kaybolmasın
+            // diye MainForm.CaptureFormState/RestoreFormState bu isimle eşleştiriyor.
+            cmbType.Name = "TransactionType";
             cmbType.Left = 5; cmbType.Top = 7; cmbType.Width = 135;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.SelectedIndex = 1;
@@ -80,6 +83,7 @@ namespace PersonalFinanceApp
 
             Label lblCategory = new Label { Text = "Kategori:", Left = 180, Top = 75, ForeColor = TextMuted, AutoSize = true };
             Panel pnlCategory = new Panel { Left = 180, Top = 100, Width = 200, Height = 36 };
+            cmbCategory.Name = "TransactionCategory";
             cmbCategory.Left = 5; cmbCategory.Top = 7; cmbCategory.Width = 195;
             cmbCategory.Font = new Font("Segoe UI", 9.5F); cmbCategory.DropDownStyle = ComboBoxStyle.DropDown;
             cmbCategory.AutoCompleteMode = AutoCompleteMode.SuggestAppend; cmbCategory.AutoCompleteSource = AutoCompleteSource.ListItems;
@@ -89,6 +93,7 @@ namespace PersonalFinanceApp
             Label lblAmount = new Label { Text = "Tutar:", Left = 400, Top = 75, ForeColor = TextMuted, AutoSize = true };
             Panel pnlAmount = new Panel { Left = 400, Top = 100, Width = 120, Height = 36 };
             SetupSmoothContainer(pnlAmount, 8, CardBackColor);
+            txtAmount.Name = "TransactionAmount";
             txtAmount.Left = 10; txtAmount.Top = 8; txtAmount.Width = 100;
             txtAmount.Font = new Font("Segoe UI", 10.5F); txtAmount.BorderStyle = BorderStyle.None;
             txtAmount.BackColor = CardBackColor; txtAmount.ForeColor = TextLight;
@@ -98,6 +103,7 @@ namespace PersonalFinanceApp
             Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 150, ForeColor = TextMuted, AutoSize = true };
             Panel pnlDesc = new Panel { Left = 20, Top = 175, Width = 500, Height = 36 };
             SetupSmoothContainer(pnlDesc, 8, CardBackColor);
+            txtDescription.Name = "TransactionDescription";
             txtDescription.Left = 10; txtDescription.Top = 8; txtDescription.Width = 480;
             txtDescription.Font = new Font("Segoe UI", 10.5F); txtDescription.BorderStyle = BorderStyle.None;
             txtDescription.BackColor = CardBackColor; txtDescription.ForeColor = TextLight;
