@@ -47,7 +47,7 @@ namespace PersonalFinanceApp
             else
             {
                 _activeContentKey = "home";
-                _activeContentFactory = () => new HomeControl(_user);
+                _activeContentFactory = () => new HomeControl(_user, onNavigate: NavigateTo);
                 _activeMenuLabel = "Ana Sayfa";
             }
             InitializeComponent();
@@ -673,6 +673,17 @@ namespace PersonalFinanceApp
             return btn;
         }
 
+        // Ana Sayfa'daki mini-widget'lar gibi ekran içi kısayolların sidebar navigasyonunu tetiklemesi
+        // için: CreateSidebarButton'ın Click handler'ıyla birebir aynı üçlü (aktif etiket, aktif buton
+        // vurgusu, içerik değişimi), tek bir yerde.
+        private void NavigateTo(string menuText)
+        {
+            _activeMenuLabel = menuText;
+            var btn = pnlSidebar.Controls.OfType<Button>().FirstOrDefault(b => b.Text == menuText);
+            if (btn != null) SetActiveButton(btn);
+            HandleMenuClick(menuText);
+        }
+
         private void SetActiveButton(Button btn)
         {
             var previous = _activeButton;
@@ -705,7 +716,7 @@ namespace PersonalFinanceApp
             switch (menuText)
             {
                 case "Ana Sayfa":
-                    ShowCachedContent("home", () => new HomeControl(_user));
+                    ShowCachedContent("home", () => new HomeControl(_user, onNavigate: NavigateTo));
                     break;
                 case "İşlemler":
                     ShowCachedContent("transactions", () => new TransactionControl(_user));

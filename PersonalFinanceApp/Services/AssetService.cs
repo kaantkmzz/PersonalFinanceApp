@@ -15,8 +15,6 @@ namespace PersonalFinanceApp.Services
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly AssetPriceService _priceService = new AssetPriceService();
 
-        private const string InvestCategoryName = "Yatırım";
-
         public List<UserHolding> GetHoldings(int userId)
         {
             return _repository.GetHoldings(userId).Where(h => h.Quantity > 0).ToList();
@@ -130,7 +128,7 @@ namespace PersonalFinanceApp.Services
                 TotalTry = totalTry
             });
 
-            LogInvestTransaction(userId, $"{catalogItem.Name} alımı ({quantity:0.########} adet)", totalTry);
+            LogInvestTransaction(userId, catalogItem.Name, $"Alım · {quantity:0.########} adet", totalTry);
 
             return (true, string.Empty);
         }
@@ -170,17 +168,18 @@ namespace PersonalFinanceApp.Services
                 TotalTry = totalTry
             });
 
-            LogInvestTransaction(userId, $"{catalogItem.Name} satışı ({quantity:0.########} adet)", totalTry);
+            LogInvestTransaction(userId, catalogItem.Name, $"Satış · {quantity:0.########} adet", totalTry);
 
             return (true, string.Empty);
         }
 
-        // Alım/satımın İşlemler ve Kategoriler ekranlarında görünmesi için tek bir "Yatırım" kategorisinde
-        // "invest" tipinde log kaydı düşer. Bu kayıt cüzdanı/kasayı etkilemez (bkz. TransactionService),
-        // yatırım bakiyesi değişikliği yukarıda ayrıca yapılıyor.
-        private void LogInvestTransaction(int userId, string description, decimal amount)
+        // Alım/satımın İşlemler ve Kategoriler ekranlarında görünmesi için, varlığın kendi adını taşıyan
+        // bir kategoride (ör. "Gram Altın", "Bitcoin") "invest" tipinde log kaydı düşer — Tip sütununda
+        // "Yatırım" (bkz. TransactionControl.TypeToTr), Kategori sütununda alınan varlık görünür. Bu kayıt
+        // cüzdanı/kasayı etkilemez (bkz. TransactionService), yatırım bakiyesi değişikliği yukarıda ayrıca yapılıyor.
+        private void LogInvestTransaction(int userId, string categoryName, string description, decimal amount)
         {
-            var category = _categoryService.GetOrCreateCategory(userId, InvestCategoryName, "invest");
+            var category = _categoryService.GetOrCreateCategory(userId, categoryName, "invest");
             _transactionService.AddTransaction(userId, category.Id, amount, "invest", description, out _);
         }
     }

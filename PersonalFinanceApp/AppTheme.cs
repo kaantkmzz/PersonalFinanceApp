@@ -45,6 +45,7 @@ namespace PersonalFinanceApp
         public static Color SafeColor => IsDark ? Color.FromArgb(120, 180, 255) : Color.FromArgb(35, 100, 195);
         public static Color IdleColor => IsDark ? Color.FromArgb(230, 200, 80) : Color.FromArgb(185, 145, 20);
         public static Color GoalColor => IsDark ? Color.FromArgb(190, 130, 240) : Color.FromArgb(130, 70, 190);
+        public static Color InvestColor => IsDark ? Color.FromArgb(80, 200, 195) : Color.FromArgb(15, 140, 135);
         // Dilimler arasındaki ayraç çizgisi: eskiden arka planla aynıydı (AppBackColor), bu da
         // light modda beyaz olup açık pembe dilimlerde neredeyse görünmez oluyordu. Artık her iki
         // temada da sabit koyu bir renk; hem tutarlı "siyah çizgi" görünümü hem de tüm dilim
