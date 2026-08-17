@@ -22,9 +22,12 @@ namespace PersonalFinanceApp
         private static Color IdleColor => AppTheme.IdleColor;
         private static Color GoalColor => AppTheme.GoalColor;
         private static Color SliceBorderColor => AppTheme.SliceBorderColor;
-        // Dilim/lejant üzerine gelindiğinde vurgu çerçevesi: dark modda beyaz, light modda (beyaz
-        // arka planla karışmaması için) koyu renk.
-        private static Color HoverHighlightColor => AppTheme.TextLight;
+        // Dilim/lejant üzerine gelindiğinde vurgu çerçevesi. SliceBorderColor artık her iki temada
+        // da sabit koyu bir renk olduğu için (bkz. AppTheme.SliceBorderColor), TextLight kullanmak
+        // light modda ikisini neredeyse aynı renk yapıp "seçili" hissini kayboluyordu. AccentColor
+        // hem dilim renklerine hem de normal ayraç rengine karşı her iki temada da net bir kontrast
+        // sağlıyor.
+        private static Color HoverHighlightColor => AppTheme.AccentColor;
 
         private ComboBox cmbMonth = new ComboBox();
         private NumericUpDown nudYear = new NumericUpDown();
@@ -685,18 +688,19 @@ namespace PersonalFinanceApp
                 using (var brush = new SolidBrush(isHovered ? ControlPaint.Light(AccentColor) : AccentColor))
                     e.Graphics.FillEllipse(brush, 0, 0, btnBack.Width - 1, btnBack.Height - 1);
 
-                using var pen = new Pen(Color.White, 2.6f)
+                using var pen = new Pen(Color.White, 2.2f)
                 {
                     StartCap = System.Drawing.Drawing2D.LineCap.Round,
                     EndCap = System.Drawing.Drawing2D.LineCap.Round,
                     LineJoin = System.Drawing.Drawing2D.LineJoin.Round
                 };
                 int cx = btnBack.Width / 2, cy = btnBack.Height / 2;
+                // Uç (sol) ile üst/alt (sağ) noktalar cx'e göre simetrik: gerçekten ortalanmış olsun.
                 e.Graphics.DrawLines(pen, new PointF[]
                 {
-                    new PointF(cx + 6, cy - 8),
-                    new PointF(cx - 7, cy),
-                    new PointF(cx + 6, cy + 8)
+                    new PointF(cx + 4, cy - 5),
+                    new PointF(cx - 4, cy),
+                    new PointF(cx + 4, cy + 5)
                 });
             };
 
