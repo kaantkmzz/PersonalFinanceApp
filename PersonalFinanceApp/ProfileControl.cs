@@ -74,8 +74,12 @@ namespace PersonalFinanceApp
             pnlScroll.Left = 30;
             pnlScroll.Top = 70;
             pnlScroll.AutoScroll = true;
+            pnlScroll.HorizontalScroll.Enabled = false;
+            pnlScroll.HorizontalScroll.Visible = false;
             pnlScroll.BackColor = AppBackColor;
+            EnableDoubleBuffering(pnlScroll);
             this.Controls.Add(pnlScroll);
+            DarkTitleBarHelper.SetScrollBarDarkMode(pnlScroll, AppTheme.IsDark);
             this.Resize += (s, e) => ResizeScrollArea();
             ResizeScrollArea();
 
@@ -456,6 +460,8 @@ namespace PersonalFinanceApp
             section.Card.Height = AccordionSection.HeaderHeight;
             SetupSmoothContainer(section.Card, 14, CardBackColor);
             section.Card.Cursor = Cursors.Hand;
+            EnableDoubleBuffering(section.Card);
+            EnableDoubleBuffering(section.Body);
 
             Label lblSectionTitle = new Label
             {
@@ -542,6 +548,24 @@ namespace PersonalFinanceApp
                 section.Card.Top = y;
                 y += section.Card.Height + 16;
             }
+
+            // Genişliği hep 0 olarak sabitliyoruz ki içerik hiçbir zaman yatay kaydırma
+            // gerektirmesin (sığdığı halde ara sıra yatay kaydırma çubuğu çıkıyordu); dikey
+            // kaydırma için gereken yüksekliği ise burada kendimiz belirliyoruz.
+            pnlScroll.AutoScrollMinSize = new Size(0, y);
+        }
+
+        // MainForm'daki EnableDoubleBuffering ile aynı: kaydırılabilir alan çift arabellekli
+        // olmayınca (özellikle özel çizimli kartlarla) kaydırma sırasında eski karelerden kalma
+        // izler ("hayalet" koyu kutular) görülebiliyordu.
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
         }
 
         // --- GÖRSEL YARDIMCI METOTLAR ---

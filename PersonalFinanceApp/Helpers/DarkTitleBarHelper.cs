@@ -38,6 +38,13 @@ namespace PersonalFinanceApp.Helpers
             try { SetWindowTheme(control.Handle, "", ""); } catch { }
         }
 
+        // Panel.AutoScroll gibi yerleşik kaydırma çubuklarını (Windows 10 1809+ üzerinde) koyu
+        // temaya uygun renklendirir; aksi halde koyu temada bile hep açık/beyaz görünürler.
+        public static void SetScrollBarDarkMode(Control control, bool dark)
+        {
+            try { SetWindowTheme(control.Handle, dark ? "DarkMode_Explorer" : "Explorer", null); } catch { }
+        }
+
         // DateTimePicker'ın açılır takvim penceresi ayrı bir sistem penceresi olduğundan,
         // açıldığı anda o pencereyi bulup koyu tema (immersive dark mode) uyguluyoruz.
         public static void EnableDarkCalendarPopup(DateTimePicker dtp)
