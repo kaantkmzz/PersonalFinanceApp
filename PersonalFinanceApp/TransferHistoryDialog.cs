@@ -98,6 +98,17 @@ namespace PersonalFinanceApp
             pnl.SizeChanged += (s, e) => pnl.Invalidate();
         }
 
+        private static string DirectionLabel(string direction) => direction switch
+        {
+            "wallet_to_safe" => "Cüzdan → Kasa",
+            "safe_to_wallet" => "Kasa → Cüzdan",
+            "wallet_to_invest" => "Cüzdan → Yatırım",
+            "safe_to_invest" => "Kasa → Yatırım",
+            "invest_to_wallet" => "Yatırım → Cüzdan",
+            "invest_to_safe" => "Yatırım → Kasa",
+            _ => direction
+        };
+
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
         {
             var path = new System.Drawing.Drawing2D.GraphicsPath();
@@ -118,7 +129,7 @@ namespace PersonalFinanceApp
             var displayList = history.Select(h => new
             {
                 Tarih = h.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
-                Yön = h.Direction == "wallet_to_safe" ? "Cüzdan → Kasa" : "Kasa → Cüzdan",
+                Yön = DirectionLabel(h.Direction),
                 Tutar = h.Amount.ToString("#,##0", tr) + " ₺"
             }).ToList();
 

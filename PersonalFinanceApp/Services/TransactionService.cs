@@ -27,7 +27,7 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense" && type != "goal")
+            if (type != "income" && type != "expense" && type != "goal" && type != "invest")
             {
                 errorMessage = "Geçersiz işlem tipi.";
                 return false;
@@ -71,8 +71,9 @@ namespace PersonalFinanceApp.Services
 
             _repository.Add(transaction);
 
-            // "goal" (hedef yatırımı) işlemleri cüzdanı etkilemez; kasadan düşme işlemi
-            // SavingsGoalService.InvestInGoal içinde ayrıca yapılıyor, burada tekrar düşülmesin.
+            // "goal" (hedef yatırımı) ve "invest" (varlık alım/satımı) işlemleri cüzdanı etkilemez;
+            // kasadan/yatırım bakiyesinden düşme işlemi ilgili servis (SavingsGoalService, AssetService)
+            // içinde ayrıca yapılıyor, burada tekrar düşülmesin.
             decimal delta = type == "income" ? amount : type == "expense" ? -amount : 0;
             if (delta != 0) _accountService.AdjustWalletBalance(userId, delta);
 
@@ -83,6 +84,7 @@ namespace PersonalFinanceApp.Services
         {
             "income" => "gelir",
             "expense" => "gider",
+            "invest" => "yatırım",
             _ => "hedef"
         };
 
@@ -137,14 +139,14 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense" && type != "goal")
+            if (type != "income" && type != "expense" && type != "goal" && type != "invest")
             {
                 errorMessage = "Geçersiz işlem tipi.";
                 return false;
             }
 
             // Eski işlemin cüzdana etkisini geri al, yeni değerlerin etkisini uygula
-            // ("goal" tipi cüzdanı hiç etkilemez)
+            // ("goal"/"invest" tipleri cüzdanı hiç etkilemez)
             decimal reverseOldDelta = existing.Type == "income" ? -existing.Amount : existing.Type == "expense" ? existing.Amount : 0;
             decimal applyNewDelta = type == "income" ? amount : type == "expense" ? -amount : 0;
 

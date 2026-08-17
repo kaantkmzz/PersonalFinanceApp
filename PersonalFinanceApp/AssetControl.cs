@@ -1,0 +1,390 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using PersonalFinanceApp.Models;
+using PersonalFinanceApp.Services;
+
+namespace PersonalFinanceApp
+{
+    public partial class AssetControl : UserControl, IRefreshable
+    {
+        private readonly User _user;
+        private readonly AssetService _assetService = new AssetService();
+        private readonly AccountService _accountService = new AccountService();
+
+        private static Color AppBackColor => AppTheme.AppBackColor;
+        private static Color CardBackColor => AppTheme.CardBackColor;
+        private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
+        private static Color AccentColor => AppTheme.AccentColor;
+        private static Color IncomeColor => AppTheme.IncomeColor;
+        private static Color ExpenseColor => AppTheme.ExpenseColor;
+
+        private Panel pnlTop = new Panel();
+        private Panel pnlGrid = new Panel();
+        private Panel pnlBottom = new Panel();
+
+        private Label lblInvestBalance = new Label();
+        private ComboBox cmbSearch = new ComboBox();
+        private Label lblSelectedPrice = new Label();
+        private TextBox txtBuyQuantity = new TextBox();
+        private Button btnBuy = new Button();
+        private Label lblStatus = new Label();
+
+        private FlowLayoutPanel pnlStatsFlow = new FlowLayoutPanel();
+        private DataGridView dgvHoldings = new DataGridView();
+
+        private readonly System.Windows.Forms.Timer _refreshTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+
+        private class HoldingRow
+        {
+            public string Sembol { get; set; } = string.Empty;
+            public string Miktar { get; set; } = string.Empty;
+            public string OrtMaliyet { get; set; } = string.Empty;
+            public string GuncelFiyat { get; set; } = string.Empty;
+            public string GuncelDeğer { get; set; } = string.Empty;
+            public string KarZarar { get; set; } = string.Empty;
+            public double KarZararRaw { get; set; }
+            public bool FiyatVar { get; set; }
+        }
+
+        public AssetControl(User user)
+        {
+            _user = user;
+            InitializeComponent();
+            SetupUI();
+            _refreshTimer.Tick += async (s, e) => await LoadHoldingsAsync();
+            _refreshTimer.Start();
+            this.Disposed += (s, e) => _refreshTimer.Dispose();
+            _ = LoadHoldingsAsync();
+        }
+
+        public void RefreshData()
+        {
+            RefreshInvestBalance();
+            _ = LoadHoldingsAsync();
+        }
+
+        private void SetupUI()
+        {
+            this.AutoScaleMode = AutoScaleMode.None;
+            this.Dock = DockStyle.Fill;
+            this.BackColor = AppBackColor;
+            this.Font = new Font("Segoe UI", 9F);
+
+            // --- ÜST PANEL ---
+            pnlTop.Dock = DockStyle.Top;
+            pnlTop.Height = 235;
+            pnlTop.BackColor = AppBackColor;
+
+            Label lblTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
+
+            lblInvestBalance.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+            lblInvestBalance.ForeColor = Color.FromArgb(120, 220, 150);
+            lblInvestBalance.Left = 20; lblInvestBalance.Top = 55; lblInvestBalance.AutoSize = true;
+            lblInvestBalance.Text = "Yatırım Bakiyesi: ...";
+
+            Button btnTransfer = new Button { Text = "🔁 Bakiye Transferi", Left = 20, Top = 90, Width = 190, Height = 34, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F) };
+            SetupRoundedButton(btnTransfer, Color.FromArgb(80, 85, 105), Color.White);
+            btnTransfer.Click += BtnTransfer_Click;
+
+            // İkinci satır: arama/alım araç çubuğu (üstteki bakiye satırıyla çakışmasın diye ayrı bir satırda)
+            const int row2Top = 150;
+
+            Label lblSearch = new Label { Text = "Varlık Ara:", Left = 20, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
+            cmbSearch.Left = 20; cmbSearch.Top = row2Top + 24; cmbSearch.Width = 220; cmbSearch.Font = new Font("Segoe UI", 10F);
+            cmbSearch.DropDownStyle = ComboBoxStyle.DropDownList;
+            foreach (var item in AssetCatalog.Items)
+            {
+                cmbSearch.Items.Add($"{item.Symbol} — {item.Name}");
+            }
+            cmbSearch.SelectedIndexChanged += CmbSearch_SelectedIndexChanged;
+
+            lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + 56; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 20;
+            lblSelectedPrice.ForeColor = TextMuted;
+
+            Label lblQty = new Label { Text = "Miktar:", Left = 260, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlQty = new Panel { Left = 260, Top = row2Top + 24, Width = 130, Height = 34 };
+            SetupSmoothContainer(pnlQty, 8, CardBackColor);
+            txtBuyQuantity.BorderStyle = BorderStyle.None; txtBuyQuantity.Font = new Font("Segoe UI", 10F); txtBuyQuantity.BackColor = CardBackColor; txtBuyQuantity.ForeColor = TextLight; txtBuyQuantity.Width = 110; txtBuyQuantity.Location = new Point(10, 6);
+            pnlQty.Controls.Add(txtBuyQuantity);
+
+            btnBuy.Text = "➕ Satın Al";
+            btnBuy.Left = 410; btnBuy.Top = row2Top + 24; btnBuy.Width = 150; btnBuy.Height = 34; btnBuy.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnBuy, AccentColor, Color.White);
+            btnBuy.Click += BtnBuy_Click;
+
+            lblStatus.Left = 580; lblStatus.Top = row2Top; lblStatus.Width = 400; lblStatus.Height = 58;
+            lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+
+            pnlTop.Controls.Add(lblTitle);
+            pnlTop.Controls.Add(lblInvestBalance);
+            pnlTop.Controls.Add(btnTransfer);
+            pnlTop.Controls.Add(lblSearch);
+            pnlTop.Controls.Add(cmbSearch);
+            pnlTop.Controls.Add(lblSelectedPrice);
+            pnlTop.Controls.Add(lblQty);
+            pnlTop.Controls.Add(pnlQty);
+            pnlTop.Controls.Add(btnBuy);
+            pnlTop.Controls.Add(lblStatus);
+
+            // --- ORTA PANEL (Tablo) ---
+            pnlGrid.Dock = DockStyle.Fill;
+            pnlGrid.Padding = new Padding(20, 0, 40, 0);
+            pnlGrid.BackColor = AppBackColor;
+
+            Panel pnlGridWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2, 6, 2, 6) };
+            SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
+
+            dgvHoldings.Dock = DockStyle.Fill;
+            dgvHoldings.AllowUserToAddRows = false; dgvHoldings.AllowUserToDeleteRows = false; dgvHoldings.AllowUserToResizeColumns = false; dgvHoldings.AllowUserToResizeRows = false;
+            dgvHoldings.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgvHoldings.MultiSelect = false; dgvHoldings.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvHoldings.RowHeadersVisible = false; dgvHoldings.Font = new Font("Segoe UI", 9.5F); dgvHoldings.RowTemplate.Height = 44;
+
+            dgvHoldings.BorderStyle = BorderStyle.None; dgvHoldings.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvHoldings.GridColor = AppTheme.GridLineColor; dgvHoldings.BackgroundColor = CardBackColor;
+            dgvHoldings.DefaultCellStyle.BackColor = CardBackColor; dgvHoldings.DefaultCellStyle.ForeColor = TextLight;
+            dgvHoldings.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
+            dgvHoldings.DefaultCellStyle.SelectionBackColor = AccentColor; dgvHoldings.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            dgvHoldings.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvHoldings.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
+            dgvHoldings.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvHoldings.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
+            dgvHoldings.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvHoldings.EnableHeadersVisualStyles = false; dgvHoldings.ColumnHeadersHeight = 40;
+
+            dgvHoldings.CellFormatting += DgvHoldings_CellFormatting;
+            dgvHoldings.CellDoubleClick += DgvHoldings_CellDoubleClick;
+            EnableDoubleBuffering(dgvHoldings);
+
+            pnlGridWrapper.Controls.Add(dgvHoldings);
+            pnlGrid.Controls.Add(pnlGridWrapper);
+
+            // --- ALT PANEL (İstatistik kutucukları) ---
+            pnlBottom.Dock = DockStyle.Bottom;
+            pnlBottom.Height = 96;
+            pnlBottom.Padding = new Padding(20, 15, 30, 15);
+            pnlBottom.BackColor = AppBackColor;
+
+            pnlStatsFlow.FlowDirection = FlowDirection.LeftToRight;
+            pnlStatsFlow.AutoSize = true;
+            pnlStatsFlow.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlStatsFlow.WrapContents = false;
+            pnlStatsFlow.BackColor = AppBackColor;
+            pnlStatsFlow.Margin = new Padding(0);
+
+            pnlBottom.Controls.Add(pnlStatsFlow);
+            pnlBottom.Resize += (s, e) => PositionStatsFlow();
+
+            this.Controls.Add(pnlGrid);
+            this.Controls.Add(pnlBottom);
+            this.Controls.Add(pnlTop);
+
+            RefreshInvestBalance();
+        }
+
+        private void RefreshInvestBalance()
+        {
+            decimal balance = _accountService.GetInvestBalance(_user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            lblInvestBalance.Text = _user.HideAmountsEnabled
+                ? "Yatırım Bakiyesi: ••••••"
+                : $"Yatırım Bakiyesi: {balance.ToString("#,##0.00", tr)} ₺";
+        }
+
+        private async void CmbSearch_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (cmbSearch.SelectedIndex < 0) return;
+            var item = AssetCatalog.Items[cmbSearch.SelectedIndex];
+            lblSelectedPrice.Text = "Fiyat alınıyor...";
+
+            var priceService = new AssetPriceService();
+            decimal? price = await priceService.GetPriceTryAsync(item.Symbol, item.AssetType);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            lblSelectedPrice.Text = price.HasValue ? $"Güncel Fiyat: {price.Value.ToString("#,##0.00", tr)} ₺" : "Fiyat alınamadı";
+        }
+
+        private void BtnTransfer_Click(object? sender, EventArgs e)
+        {
+            using (var dialog = new AssetTransferDialog(_user.Id))
+            {
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    RefreshInvestBalance();
+                }
+            }
+        }
+
+        private async void BtnBuy_Click(object? sender, EventArgs e)
+        {
+            if (cmbSearch.SelectedIndex < 0)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Önce bir varlık seçin."; return;
+            }
+
+            string raw = new string(txtBuyQuantity.Text.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.');
+            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity) || quantity <= 0)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = "Geçerli bir miktar girin."; return;
+            }
+
+            var item = AssetCatalog.Items[cmbSearch.SelectedIndex];
+            var (success, error) = await _assetService.BuyAssetAsync(_user.Id, item.Symbol, quantity);
+
+            if (success)
+            {
+                lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "Alım başarılı.";
+                txtBuyQuantity.Clear();
+                RefreshInvestBalance();
+                await LoadHoldingsAsync();
+            }
+            else
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = error;
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadHoldingsAsync()
+        {
+            var views = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            var rows = views.Select(v => new HoldingRow
+            {
+                Sembol = v.Symbol,
+                Miktar = v.Quantity.ToString("0.########", tr),
+                OrtMaliyet = v.AvgCostTry.ToString("#,##0.00", tr) + " ₺",
+                GuncelFiyat = v.CurrentPriceTry.HasValue ? v.CurrentPriceTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A",
+                GuncelDeğer = v.CurrentValueTry.HasValue ? v.CurrentValueTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A",
+                KarZarar = v.ProfitLossTry.HasValue
+                    ? $"{v.ProfitLossTry.Value.ToString("+#,##0.00;-#,##0.00", tr)} ₺ (%{v.ProfitLossPercent!.Value.ToString("+0.00;-0.00", tr)})"
+                    : "N/A",
+                KarZararRaw = (double)(v.ProfitLossTry ?? 0),
+                FiyatVar = v.CurrentPriceTry.HasValue
+            }).ToList();
+
+            dgvHoldings.DataSource = rows;
+
+            if (dgvHoldings.Columns["Sembol"] != null)
+            {
+                dgvHoldings.Columns["KarZararRaw"]!.Visible = false;
+                dgvHoldings.Columns["FiyatVar"]!.Visible = false;
+                dgvHoldings.Columns["Sembol"]!.FillWeight = 60;
+                dgvHoldings.Columns["Miktar"]!.FillWeight = 75;
+                dgvHoldings.Columns["OrtMaliyet"]!.FillWeight = 80;
+                dgvHoldings.Columns["OrtMaliyet"]!.HeaderText = "Ort. Maliyet";
+                dgvHoldings.Columns["GuncelFiyat"]!.FillWeight = 80;
+                dgvHoldings.Columns["GuncelFiyat"]!.HeaderText = "Güncel Fiyat";
+                dgvHoldings.Columns["GuncelDeğer"]!.FillWeight = 80;
+                dgvHoldings.Columns["GuncelDeğer"]!.HeaderText = "Güncel Değer";
+                dgvHoldings.Columns["KarZarar"]!.FillWeight = 110;
+                dgvHoldings.Columns["KarZarar"]!.HeaderText = "Kâr / Zarar";
+
+                foreach (DataGridViewColumn col in dgvHoldings.Columns)
+                {
+                    if (col.Name != "Sembol" && col.Visible) col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                }
+            }
+
+            decimal totalValue = views.Sum(v => v.CurrentValueTry ?? 0);
+            decimal totalCost = views.Sum(v => v.AvgCostTry * v.Quantity);
+            decimal totalPl = totalValue - totalCost;
+
+            string totalValueText = _user.HideAmountsEnabled ? "••••••" : totalValue.ToString("#,##0", tr) + " ₺";
+            string totalCostText = _user.HideAmountsEnabled ? "••••••" : totalCost.ToString("#,##0", tr) + " ₺";
+            string totalPlText = _user.HideAmountsEnabled ? "••••••" : totalPl.ToString("+#,##0;-#,##0", tr) + " ₺";
+
+            pnlStatsFlow.Controls.Clear();
+            pnlStatsFlow.Controls.Add(CreateStatChip(views.Count.ToString(), "Pozisyon"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(totalCostText, "Toplam Maliyet"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(totalValueText, "Güncel Değer"));
+            pnlStatsFlow.Controls.Add(CreateStatChip(totalPlText, "Kâr / Zarar"));
+            PositionStatsFlow();
+        }
+
+        private void DgvHoldings_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (dgvHoldings.Columns[e.ColumnIndex].Name != "KarZarar") return;
+
+            bool fiyatVar = dgvHoldings.Rows[e.RowIndex].Cells["FiyatVar"].Value is bool b && b;
+            if (!fiyatVar) { e.CellStyle!.ForeColor = TextMuted; return; }
+
+            double raw = dgvHoldings.Rows[e.RowIndex].Cells["KarZararRaw"].Value is double d ? d : 0;
+            e.CellStyle!.ForeColor = raw >= 0 ? IncomeColor : ExpenseColor;
+        }
+
+        private void DgvHoldings_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            string symbol = dgvHoldings.Rows[e.RowIndex].Cells["Sembol"].Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(symbol)) return;
+
+            using (var dialog = new AssetDetailDialog(_user, symbol))
+            {
+                dialog.ShowDialog();
+                if (dialog.ChangesMade)
+                {
+                    RefreshInvestBalance();
+                    _ = LoadHoldingsAsync();
+                }
+            }
+        }
+
+        // Alt bilgi şeridindeki tek bir istatistik kutucuğu: etiket üstte, değer altta.
+        private Panel CreateStatChip(string value, string label)
+        {
+            Font valueFont = new Font("Segoe UI", 12F, FontStyle.Bold);
+            Font labelFont = new Font("Segoe UI", 9F);
+
+            Size valueSize = TextRenderer.MeasureText(value, valueFont, Size.Empty, TextFormatFlags.NoPadding);
+            Size labelSize = TextRenderer.MeasureText(label, labelFont, Size.Empty, TextFormatFlags.NoPadding);
+            int chipWidth = Math.Max(valueSize.Width, labelSize.Width) + 32;
+            const int chipHeight = 70;
+
+            Panel chip = new Panel { Width = chipWidth, Height = chipHeight, Margin = new Padding(6, 0, 6, 0) };
+            chip.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(chip.Parent?.BackColor ?? AppBackColor);
+                using var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, chip.Width - 1, chip.Height - 1), 10);
+                using var brush = new SolidBrush(CardBackColor);
+                e.Graphics.FillPath(brush, path);
+            };
+
+            Label lblLabel = new Label { Text = label, Font = labelFont, ForeColor = TextMuted, AutoSize = true, BackColor = Color.Transparent };
+            lblLabel.Left = (chipWidth - labelSize.Width) / 2;
+            lblLabel.Top = 12;
+
+            Label lblValue = new Label { Text = value, Font = valueFont, ForeColor = TextLight, AutoSize = true, BackColor = Color.Transparent };
+            lblValue.Left = (chipWidth - valueSize.Width) / 2;
+            lblValue.Top = 36;
+
+            chip.Controls.Add(lblLabel);
+            chip.Controls.Add(lblValue);
+            return chip;
+        }
+
+        private const int GridRightInset = 42;
+
+        private void PositionStatsFlow()
+        {
+            pnlStatsFlow.Left = Math.Max(20, pnlBottom.ClientSize.Width - pnlStatsFlow.PreferredSize.Width - GridRightInset);
+            pnlStatsFlow.Top = (pnlBottom.ClientSize.Height - pnlStatsFlow.PreferredSize.Height) / 2;
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor) { btn.FlatStyle = FlatStyle.Flat; btn.FlatAppearance.BorderSize = 0; btn.BackColor = Color.Transparent; btn.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }; }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
+        }
+    }
+}
