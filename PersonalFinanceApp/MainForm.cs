@@ -33,6 +33,7 @@ namespace PersonalFinanceApp
         private Panel pnlSidebar = new Panel();
         private Panel pnlContent = new Panel();
         private Button? _profileMenuButton;
+        private Button? _eyeButton;
 
         public MainForm(User user, bool startOnProfile = false)
         {
@@ -127,8 +128,7 @@ namespace PersonalFinanceApp
                 "Notlar",
                 "Hatırlatıcılar",
                 "Profilim",
-                "Ayarlar",
-                "Şifre Değiştir"
+                "Ayarlar"
             };
 
             int menuTop = 80;
@@ -182,7 +182,7 @@ namespace PersonalFinanceApp
                 Color fill = isHovered ? ControlPaint.Light(avatarColor, 0.15f) : avatarColor;
                 using (var brush = new SolidBrush(fill))
                     e.Graphics.FillEllipse(brush, 0, 0, avatar.Width - 1, avatar.Height - 1);
-                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 12F);
+                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, size * 0.3F);
                 using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold))
                     TextRenderer.DrawText(e.Graphics, initials, font, avatar.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
@@ -197,11 +197,12 @@ namespace PersonalFinanceApp
             return avatar;
         }
 
-        // Kenar çubuğunun en altındaki satır: solda kullanıcı avatarı, yanında üç küçük ikon
-        // buton (Kapat, Tutarları Göster/Gizle, Tema) — hepsi aynı hizada.
+        // Kenar çubuğunun en altındaki satır: solda kullanıcı avatarı (diğerlerinden büyük),
+        // yanında üç küçük ikon buton (Kapat, Tutarları Göster/Gizle, Tema) — hepsi aynı hizada.
         private void BuildBottomBar()
         {
             const int rowHeight = 76;
+            const int avatarSize = 52;
             const int itemSize = 40;
             const int margin = 15;
             const int gap = 13;
@@ -213,11 +214,12 @@ namespace PersonalFinanceApp
                 BackColor = SidebarColor
             };
 
+            int avatarTop = (rowHeight - avatarSize) / 2;
             int itemTop = (rowHeight - itemSize) / 2;
             int left = margin;
 
-            Panel avatar = BuildAvatarWidget(left, itemTop, itemSize);
-            left += itemSize + gap;
+            Panel avatar = BuildAvatarWidget(left, avatarTop, avatarSize);
+            left += avatarSize + gap;
 
             Button btnPower = CreateIconButton(left, itemTop, itemSize, DrawPowerIcon);
             btnPower.Click += (s, e) => ShowPowerMenu(btnPower);
@@ -231,6 +233,7 @@ namespace PersonalFinanceApp
                 RefreshAllCachedScreens();
                 btnEye.Invalidate();
             };
+            _eyeButton = btnEye;
             left += itemSize + gap;
 
             Button btnTheme = CreateIconButton(left, itemTop, itemSize, DrawThemeIcon);
@@ -408,12 +411,21 @@ namespace PersonalFinanceApp
             _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
             _accountService.SetHideAmounts(_user.Id, _user.HideAmountsEnabled);
             RefreshAllCachedScreens();
+            _eyeButton?.Invalidate();
         }
 
         // Tema değişince tüm önbelleklenmiş ekranları atıp kenar çubuğunu ve o an açık ekranı yeniden kurar.
         private void RebuildForThemeChange()
         {
             this.SuspendLayout();
+
+            // Rapor ekranı o an açıksa ve bir kırılım (drill-down) görünümü inceleniyorsa, ekran
+            // sıfırdan kurulacağı için bu durumu yakalayıp yeni örneğe geri uyguluyoruz.
+            string? reportDrillDownType = null;
+            if (_activeContentKey == "report" && _screenCache.TryGetValue("report", out var activeReportControl) && activeReportControl is ReportControl activeReport)
+            {
+                reportDrillDownType = activeReport.DrillDownType;
+            }
 
             foreach (var control in _screenCache.Values)
             {
@@ -428,6 +440,11 @@ namespace PersonalFinanceApp
 
             BuildSidebar();
             ShowCachedContent(_activeContentKey, _activeContentFactory);
+
+            if (reportDrillDownType != null && _screenCache.TryGetValue("report", out var newReportControl) && newReportControl is ReportControl newReport)
+            {
+                newReport.RestoreDrillDownType(reportDrillDownType);
+            }
 
             this.ResumeLayout(true);
         }
@@ -642,9 +659,6 @@ namespace PersonalFinanceApp
                     break;
                 case "Ayarlar":
                     ShowCachedContent("settings", () => new SettingsControl(_user, OnThemeToggleRequested, OnHideAmountsToggleRequested));
-                    break;
-                case "Şifre Değiştir":
-                    ShowCachedContent("password", () => new PasswordChangeControl(_user));
                     break;
                 default:
                     MessageBox.Show("Bu özellik yakında eklenecek.", "Bilgi");
