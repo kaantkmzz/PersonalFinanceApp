@@ -189,6 +189,7 @@ namespace PersonalFinanceApp
         {
             Panel pnlFullName = new Panel { Left = 24, Top = 10, Width = width - 24 - 100 - 20 - 24, Height = 42 };
             SetupSmoothContainer(pnlFullName, 8, FieldBackColor, CardBackColor);
+            txtFullName.Name = "FullName";
             txtFullName.Left = 10; txtFullName.Top = 11; txtFullName.Width = pnlFullName.Width - 20;
             txtFullName.Font = new Font("Segoe UI", 10.5F); txtFullName.BorderStyle = BorderStyle.None;
             txtFullName.BackColor = FieldBackColor; txtFullName.ForeColor = TextLight;

@@ -281,6 +281,7 @@ namespace PersonalFinanceApp
             Label lblCurrent = new Label { Text = "Mevcut Şifre:", Left = 24, Top = 10, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
             Panel pnlCurrent = new Panel { Left = 24, Top = 36, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlCurrent, 8, FieldBackColor, CardBackColor);
+            txtCurrentPassword.Name = "CurrentPassword";
             txtCurrentPassword.Left = 10; txtCurrentPassword.Top = 10; txtCurrentPassword.Width = fieldWidth - 20;
             txtCurrentPassword.Font = new Font("Segoe UI", 10.5F); txtCurrentPassword.BorderStyle = BorderStyle.None;
             txtCurrentPassword.BackColor = FieldBackColor; txtCurrentPassword.ForeColor = TextLight; txtCurrentPassword.UseSystemPasswordChar = true;
@@ -289,6 +290,7 @@ namespace PersonalFinanceApp
             Label lblNew = new Label { Text = "Yeni Şifre (en az 6 karakter):", Left = 24, Top = 92, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
             Panel pnlNew = new Panel { Left = 24, Top = 118, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlNew, 8, FieldBackColor, CardBackColor);
+            txtNewPassword.Name = "NewPassword";
             txtNewPassword.Left = 10; txtNewPassword.Top = 10; txtNewPassword.Width = fieldWidth - 20;
             txtNewPassword.Font = new Font("Segoe UI", 10.5F); txtNewPassword.BorderStyle = BorderStyle.None;
             txtNewPassword.BackColor = FieldBackColor; txtNewPassword.ForeColor = TextLight; txtNewPassword.UseSystemPasswordChar = true;
@@ -297,6 +299,7 @@ namespace PersonalFinanceApp
             Label lblConfirm = new Label { Text = "Yeni Şifre (tekrar):", Left = 24, Top = 174, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
             Panel pnlConfirm = new Panel { Left = 24, Top = 200, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlConfirm, 8, FieldBackColor, CardBackColor);
+            txtConfirmPassword.Name = "ConfirmPassword";
             txtConfirmPassword.Left = 10; txtConfirmPassword.Top = 10; txtConfirmPassword.Width = fieldWidth - 20;
             txtConfirmPassword.Font = new Font("Segoe UI", 10.5F); txtConfirmPassword.BorderStyle = BorderStyle.None;
             txtConfirmPassword.BackColor = FieldBackColor; txtConfirmPassword.ForeColor = TextLight; txtConfirmPassword.UseSystemPasswordChar = true;

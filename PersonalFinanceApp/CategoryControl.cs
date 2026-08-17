@@ -77,6 +77,7 @@ namespace PersonalFinanceApp
             Label lblNew = new Label { Text = "Yeni Kategori Adı:", Left = 180, Top = 70, ForeColor = TextMuted, BackColor = AppBackColor, AutoSize = true };
             Panel pnlNewCat = new Panel { Left = 180, Top = 95, Width = 220, Height = 36 };
             SetupSmoothContainer(pnlNewCat, 8, CardBackColor);
+            txtNewCategory.Name = "NewCategoryName";
             txtNewCategory.Left = 10; txtNewCategory.Top = 8; txtNewCategory.Width = 200;
             txtNewCategory.Font = new Font("Segoe UI", 10.5F); txtNewCategory.BorderStyle = BorderStyle.None;
             txtNewCategory.BackColor = CardBackColor; txtNewCategory.ForeColor = TextLight;
@@ -84,6 +85,7 @@ namespace PersonalFinanceApp
 
             Label lblNewType = new Label { Text = "Tip:", Left = 420, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlNewType = new Panel { Left = 420, Top = 95, Width = 120, Height = 36 };
+            cmbNewCategoryType.Name = "NewCategoryType";
             cmbNewCategoryType.Left = 5; cmbNewCategoryType.Top = 7; cmbNewCategoryType.Width = 115;
             cmbNewCategoryType.Font = new Font("Segoe UI", 9.5F); cmbNewCategoryType.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbNewCategoryType.Items.Add("Gelir"); cmbNewCategoryType.Items.Add("Gider"); cmbNewCategoryType.Items.Add("Hedef"); cmbNewCategoryType.SelectedIndex = 1;
