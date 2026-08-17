@@ -1,4 +1,5 @@
-﻿using PersonalFinanceApp.Models;
+using System.Windows.Forms.DataVisualization.Charting;
+using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
@@ -6,8 +7,12 @@ namespace PersonalFinanceApp
     public partial class HomeControl : UserControl, IRefreshable
     {
         private readonly User _user;
+        private readonly Action<string>? _onNavigate;
         private readonly AccountService _accountService = new AccountService();
         private readonly AssetService _assetService = new AssetService();
+        private readonly ReminderService _reminderService = new ReminderService();
+        private readonly TransactionService _transactionService = new TransactionService();
+        private readonly ReportService _reportService = new ReportService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -17,18 +22,32 @@ namespace PersonalFinanceApp
         private static Color IncomeColor => AppTheme.IncomeColor;
         private static Color ExpenseColor => AppTheme.ExpenseColor;
 
+        private const int CardLeft1 = 20;
+        private const int CardLeft2 = 360;
+        private const int CardLeft3 = 700;
+        private const int CardWidth = 320;
+        private const int AllCardsRight = CardLeft3 + CardWidth; // 1020
+
         private Label lblWalletAmount = new Label();
         private Label lblSafeAmount = new Label();
+        private Label lblInvestAmount = new Label();
         private Label lblStatus = new Label();
         private Panel pnlNotifications = new Panel();
 
-        public HomeControl(User user)
+        private const int MiniRowTop = 630;
+        private const int MiniRowHeight = 210;
+
+        public HomeControl(User user, Action<string>? onNavigate = null)
         {
             _user = user;
+            _onNavigate = onNavigate;
             InitializeComponent();
             SetupUI();
             RefreshBalances();
             _ = LoadNotificationsAsync();
+            LoadReminderWidget();
+            LoadMiniReportWidget();
+            LoadRecentTransactionsWidget();
         }
 
         private void SetupUI()
@@ -38,7 +57,7 @@ namespace PersonalFinanceApp
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
-            Panel pnlWallet = new Panel { Left = 20, Top = 30, Width = 320, Height = 240 };
+            Panel pnlWallet = new Panel { Left = CardLeft1, Top = 30, Width = CardWidth, Height = 240 };
             SetupSmoothContainer(pnlWallet, 16, CardBackColor);
             Label lblWalletIcon = new Label { Text = "💳", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
             Label lblWalletTitle = new Label { Text = "Cüzdan", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
@@ -53,7 +72,7 @@ namespace PersonalFinanceApp
             pnlWallet.Controls.Add(lblWalletTitle);
             pnlWallet.Controls.Add(lblWalletAmount);
 
-            Panel pnlSafe = new Panel { Left = 360, Top = 30, Width = 320, Height = 240 };
+            Panel pnlSafe = new Panel { Left = CardLeft2, Top = 30, Width = CardWidth, Height = 240 };
             SetupSmoothContainer(pnlSafe, 16, CardBackColor);
             Label lblSafeIcon = new Label { Text = "🏦", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
             Label lblSafeTitle = new Label { Text = "Kasa", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
@@ -68,16 +87,30 @@ namespace PersonalFinanceApp
             pnlSafe.Controls.Add(lblSafeTitle);
             pnlSafe.Controls.Add(lblSafeAmount);
 
-            // Butonlar, Kasa kutucuğunun sağ kenarıyla hizalı, kutucukların hemen altında (sağ alt)
-            const int cardsRight = 360 + 320; // pnlSafe.Left + pnlSafe.Width
-            const int buttonsTop = 30 + 240 + 16; // kutucukların altı + küçük boşluk
+            Panel pnlInvest = new Panel { Left = CardLeft3, Top = 30, Width = CardWidth, Height = 240 };
+            SetupSmoothContainer(pnlInvest, 16, CardBackColor);
+            Label lblInvestIcon = new Label { Text = "📈", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
+            Label lblInvestTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
+            lblInvestAmount.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblInvestAmount.ForeColor = Color.FromArgb(120, 220, 210);
+            lblInvestAmount.Left = 20;
+            lblInvestAmount.Top = 165;
+            lblInvestAmount.AutoSize = true;
+            lblInvestAmount.BackColor = Color.Transparent;
+            EnableDoubleBuffering(lblInvestAmount);
+            pnlInvest.Controls.Add(lblInvestIcon);
+            pnlInvest.Controls.Add(lblInvestTitle);
+            pnlInvest.Controls.Add(lblInvestAmount);
+
+            // Butonlar Cüzdan kutucuğunun altına, sol hizalı (üç kutu eklenince sağa hizalama anlamını yitirdi)
+            const int buttonsTop = 30 + 240 + 16;
             const int btnWidth = 190;
             const int btnGap = 14;
 
             Button btnTransfer = new Button
             {
                 Text = "Transfer Et",
-                Left = cardsRight - (btnWidth * 2 + btnGap),
+                Left = CardLeft1,
                 Top = buttonsTop,
                 Width = btnWidth,
                 Height = 42,
@@ -90,7 +123,7 @@ namespace PersonalFinanceApp
             Button btnHistory = new Button
             {
                 Text = "Transfer Geçmişi",
-                Left = cardsRight - btnWidth,
+                Left = CardLeft1 + btnWidth + btnGap,
                 Top = buttonsTop,
                 Width = btnWidth,
                 Height = 42,
@@ -106,7 +139,7 @@ namespace PersonalFinanceApp
                 }
             };
 
-            lblStatus.Left = 20;
+            lblStatus.Left = CardLeft1;
             lblStatus.Top = buttonsTop + 55;
             lblStatus.Width = 500;
             lblStatus.Height = 25;
@@ -114,18 +147,203 @@ namespace PersonalFinanceApp
 
             // Varlıklarım'da pozisyonu olan kullanıcılar için kâr/zarar bildirim kartı; pozisyon yoksa
             // (bkz. LoadNotificationsAsync) tamamen gizlenir, boş kart gösterilmez.
-            pnlNotifications.Left = 20;
+            pnlNotifications.Left = CardLeft1;
             pnlNotifications.Top = lblStatus.Top + 40;
-            pnlNotifications.Width = cardsRight;
+            pnlNotifications.Width = AllCardsRight - CardLeft1;
             pnlNotifications.Visible = false;
             SetupSmoothContainer(pnlNotifications, 16, CardBackColor);
 
             this.Controls.Add(pnlWallet);
             this.Controls.Add(pnlSafe);
+            this.Controls.Add(pnlInvest);
             this.Controls.Add(btnTransfer);
             this.Controls.Add(btnHistory);
             this.Controls.Add(lblStatus);
             this.Controls.Add(pnlNotifications);
+
+            SetupMiniWidgets();
+        }
+
+        // Ana Sayfa'yı çeşitlendiren üç küçük, tıklanabilir önizleme: yaklaşan hatırlatıcılar,
+        // bu ayın rapor özeti ve son işlemler — her biri kendi tam ekranına götürür.
+        private Panel pnlReminderWidget = new Panel();
+        private Panel pnlMiniReportWidget = new Panel();
+        private Panel pnlRecentTxWidget = new Panel();
+
+        private void SetupMiniWidgets()
+        {
+            pnlReminderWidget = CreateWidgetCard(CardLeft1, "⏰ Yaklaşan Hatırlatıcılar", "Hatırlatıcılar");
+            pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "📊 Bu Ayın Özeti", "Rapor");
+            pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "🧾 Son İşlemler", "İşlemler");
+
+            this.Controls.Add(pnlReminderWidget);
+            this.Controls.Add(pnlMiniReportWidget);
+            this.Controls.Add(pnlRecentTxWidget);
+        }
+
+        private Panel CreateWidgetCard(int left, string titleText, string navigateTarget)
+        {
+            Panel card = new Panel { Left = left, Top = MiniRowTop, Width = CardWidth, Height = MiniRowHeight };
+            SetupSmoothContainer(card, 16, CardBackColor);
+
+            Label lblTitle = new Label
+            {
+                Text = titleText,
+                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 18,
+                Top = 14,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            card.Controls.Add(lblTitle);
+
+            MakeClickable(card, () => _onNavigate?.Invoke(navigateTarget));
+            return card;
+        }
+
+        // Panel ve içindeki her denetim (WinForms'ta Click yukarı aktarılmaz) için tıklanabilir
+        // el imleci ve navigasyon davranışı ekler.
+        private void MakeClickable(Control root, Action onClick)
+        {
+            root.Cursor = Cursors.Hand;
+            root.Click += (s, e) => onClick();
+            foreach (Control child in root.Controls)
+            {
+                MakeClickable(child, onClick);
+            }
+        }
+
+        private void LoadReminderWidget()
+        {
+            var upcoming = _reminderService.GetUserReminders(_user.Id)
+                .Where(r => !r.IsCompleted && r.ReminderDate >= DateTime.Now)
+                .OrderBy(r => r.ReminderDate)
+                .Take(3)
+                .ToList();
+
+            Action goToReminders = () => _onNavigate?.Invoke("Hatırlatıcılar");
+
+            int top = 48;
+            if (upcoming.Count == 0)
+            {
+                AddWidgetLine(pnlReminderWidget, "Yaklaşan hatırlatıcı yok.", top, TextMuted, 18, goToReminders);
+                return;
+            }
+
+            foreach (var r in upcoming)
+            {
+                string line = $"{r.Title}  —  {r.ReminderDate:dd.MM.yyyy}";
+                AddWidgetLine(pnlReminderWidget, line, top, TextLight, 18, goToReminders);
+                top += 30;
+            }
+        }
+
+        private void LoadRecentTransactionsWidget()
+        {
+            var recent = _transactionService.GetUserTransactions(_user.Id).Take(3).ToList();
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            int top = 48;
+            if (recent.Count == 0)
+            {
+                AddWidgetLine(pnlRecentTxWidget, "Henüz işlem yok.", top, TextMuted, 18, () => _onNavigate?.Invoke("İşlemler"));
+                return;
+            }
+
+            foreach (var t in recent)
+            {
+                Color amountColor = t.Type == "income" ? IncomeColor : ExpenseColor;
+                string amountText = _user.HideAmountsEnabled ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺";
+
+                Label lblCategory = new Label
+                {
+                    Text = t.CategoryName,
+                    ForeColor = TextLight,
+                    Left = 18,
+                    Top = top,
+                    AutoSize = true,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                Label lblAmount = new Label
+                {
+                    Text = amountText,
+                    ForeColor = amountColor,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    Left = CardWidth - 150,
+                    Top = top,
+                    Width = 130,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent
+                };
+                pnlRecentTxWidget.Controls.Add(lblCategory);
+                pnlRecentTxWidget.Controls.Add(lblAmount);
+                MakeClickable(lblCategory, () => _onNavigate?.Invoke("İşlemler"));
+                MakeClickable(lblAmount, () => _onNavigate?.Invoke("İşlemler"));
+                top += 30;
+            }
+        }
+
+        private void LoadMiniReportWidget()
+        {
+            DateTime start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            DateTime end = start.AddMonths(1);
+            var report = _reportService.GenerateReport(_user.Id, start, end);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            Chart miniChart = new Chart { Left = 18, Top = 44, Width = 100, Height = 100, BackColor = CardBackColor };
+            ChartArea area = new ChartArea("mini") { BackColor = CardBackColor };
+            area.Position = new ElementPosition(0, 0, 100, 100);
+            area.InnerPlotPosition = new ElementPosition(0, 0, 100, 100);
+            miniChart.ChartAreas.Add(area);
+
+            Series series = new Series { ChartType = SeriesChartType.Doughnut, ChartArea = "mini" };
+            series["DoughnutRadius"] = "55";
+            series["PieLabelStyle"] = "Disabled";
+
+            if (report.TotalIncome > 0 || report.TotalExpense > 0)
+            {
+                int i1 = series.Points.AddY((double)report.TotalIncome);
+                series.Points[i1].Color = IncomeColor;
+                int i2 = series.Points.AddY((double)report.TotalExpense);
+                series.Points[i2].Color = ExpenseColor;
+            }
+            else
+            {
+                int i1 = series.Points.AddY(1);
+                series.Points[i1].Color = TextMuted;
+            }
+            miniChart.Series.Add(series);
+            pnlMiniReportWidget.Controls.Add(miniChart);
+
+            string incomeText = _user.HideAmountsEnabled ? "••••••" : report.TotalIncome.ToString("#,##0", tr) + " ₺";
+            string expenseText = _user.HideAmountsEnabled ? "••••••" : report.TotalExpense.ToString("#,##0", tr) + " ₺";
+
+            Action goToReport = () => _onNavigate?.Invoke("Rapor");
+            AddWidgetLine(pnlMiniReportWidget, $"Gelir: {incomeText}", 44, IncomeColor, 130, goToReport);
+            AddWidgetLine(pnlMiniReportWidget, $"Gider: {expenseText}", 74, ExpenseColor, 130, goToReport);
+
+            MakeClickable(miniChart, goToReport);
+        }
+
+        // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
+        // SONRA eklendiği için o ilk MakeClickable taramasına dahil değil — burada ayrıca sarmalıyoruz.
+        private void AddWidgetLine(Panel parent, string text, int top, Color color, int left, Action onClick)
+        {
+            Label lbl = new Label
+            {
+                Text = text,
+                ForeColor = color,
+                Left = left,
+                Top = top,
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI", 9.5F),
+                MaximumSize = new Size(CardWidth - left - 16, 0)
+            };
+            parent.Controls.Add(lbl);
+            MakeClickable(lbl, onClick);
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
@@ -262,9 +480,11 @@ namespace PersonalFinanceApp
         private void RefreshBalances()
         {
             var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            decimal invest = _accountService.GetInvestBalance(_user.Id);
 
             AnimateCardValue(lblWalletAmount, wallet);
             AnimateCardValue(lblSafeAmount, safe);
+            AnimateCardValue(lblInvestAmount, invest);
         }
 
         // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
@@ -306,27 +526,48 @@ namespace PersonalFinanceApp
         {
             using (var dialog = new TransferDialog())
             {
-                if (dialog.ShowDialog() == DialogResult.OK)
+                if (dialog.ShowDialog() != DialogResult.OK) return;
+
+                bool success;
+                string errorMessage;
+
+                switch ((dialog.From, dialog.To))
                 {
-                    bool success;
-                    string errorMessage;
-
-                    if (dialog.Direction == TransferDirection.WalletToSafe)
+                    case (TransferAccount.Wallet, TransferAccount.Safe):
                         success = _accountService.TransferToSafe(_user.Id, dialog.Amount, out errorMessage);
-                    else
+                        break;
+                    case (TransferAccount.Safe, TransferAccount.Wallet):
                         success = _accountService.TransferToWallet(_user.Id, dialog.Amount, out errorMessage);
+                        break;
+                    case (TransferAccount.Wallet, TransferAccount.Invest):
+                        success = _accountService.TransferWalletToInvest(_user.Id, dialog.Amount, out errorMessage);
+                        break;
+                    case (TransferAccount.Safe, TransferAccount.Invest):
+                        success = _accountService.TransferSafeToInvest(_user.Id, dialog.Amount, out errorMessage);
+                        break;
+                    case (TransferAccount.Invest, TransferAccount.Wallet):
+                        success = _accountService.TransferInvestToWallet(_user.Id, dialog.Amount, out errorMessage);
+                        break;
+                    case (TransferAccount.Invest, TransferAccount.Safe):
+                        success = _accountService.TransferInvestToSafe(_user.Id, dialog.Amount, out errorMessage);
+                        break;
+                    default:
+                        success = false;
+                        errorMessage = "Geçersiz transfer yönü.";
+                        break;
+                }
 
-                    if (success)
-                    {
-                        lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
-                        lblStatus.Text = "Transfer başarılı.";
-                        RefreshBalances();
-                    }
-                    else
-                    {
-                        lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
-                        lblStatus.Text = errorMessage;
-                    }
+                if (success)
+                {
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                    lblStatus.Text = "Transfer başarılı.";
+                    RefreshBalances();
+                    _ = LoadNotificationsAsync();
+                }
+                else
+                {
+                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                    lblStatus.Text = errorMessage;
                 }
             }
         }

@@ -76,7 +76,7 @@ namespace PersonalFinanceApp
 
             // --- ÜST PANEL ---
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 235;
+            pnlTop.Height = 190;
             pnlTop.BackColor = AppBackColor;
 
             Label lblTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
@@ -85,13 +85,11 @@ namespace PersonalFinanceApp
             lblInvestBalance.ForeColor = Color.FromArgb(120, 220, 150);
             lblInvestBalance.Left = 20; lblInvestBalance.Top = 55; lblInvestBalance.AutoSize = true;
             lblInvestBalance.Text = "Yatırım Bakiyesi: ...";
-
-            Button btnTransfer = new Button { Text = "🔁 Bakiye Transferi", Left = 20, Top = 90, Width = 190, Height = 34, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F) };
-            SetupRoundedButton(btnTransfer, Color.FromArgb(80, 85, 105), Color.White);
-            btnTransfer.Click += BtnTransfer_Click;
+            // Bakiye Transferi butonu kaldırıldı — Ana Sayfa'daki "Transfer Et" artık Cüzdan/Kasa/Varlıklarım
+            // arasında her yönde transfer yapabiliyor (bkz. HomeControl.BtnTransfer_Click, TransferDialog).
 
             // İkinci satır: arama/alım araç çubuğu (üstteki bakiye satırıyla çakışmasın diye ayrı bir satırda)
-            const int row2Top = 150;
+            const int row2Top = 95;
 
             Label lblSearch = new Label { Text = "Varlık Ara:", Left = 20, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
             cmbSearch.Left = 20; cmbSearch.Top = row2Top + 24; cmbSearch.Width = 220; cmbSearch.Font = new Font("Segoe UI", 10F);
@@ -121,7 +119,6 @@ namespace PersonalFinanceApp
 
             pnlTop.Controls.Add(lblTitle);
             pnlTop.Controls.Add(lblInvestBalance);
-            pnlTop.Controls.Add(btnTransfer);
             pnlTop.Controls.Add(lblSearch);
             pnlTop.Controls.Add(cmbSearch);
             pnlTop.Controls.Add(lblSelectedPrice);
@@ -202,17 +199,6 @@ namespace PersonalFinanceApp
             decimal? price = await priceService.GetPriceTryAsync(item.Symbol, item.AssetType);
             var tr = new System.Globalization.CultureInfo("tr-TR");
             lblSelectedPrice.Text = price.HasValue ? $"Güncel Fiyat: {price.Value.ToString("#,##0.00", tr)} ₺" : "Fiyat alınamadı";
-        }
-
-        private void BtnTransfer_Click(object? sender, EventArgs e)
-        {
-            using (var dialog = new AssetTransferDialog(_user.Id))
-            {
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    RefreshInvestBalance();
-                }
-            }
         }
 
         private async void BtnBuy_Click(object? sender, EventArgs e)

@@ -218,7 +218,7 @@ namespace PersonalFinanceApp
         }
 
         private string GetSelectedType() => cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
-        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
+        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", "invest" => "Yatırım", _ => "Gider" };
 
         private void LoadCategorySuggestions()
         {

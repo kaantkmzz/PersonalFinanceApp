@@ -16,9 +16,11 @@ namespace PersonalFinanceApp.Services
                 TotalIncome = _repository.GetTotalByTypeAndDateRange(userId, "income", start, end),
                 TotalExpense = _repository.GetTotalByTypeAndDateRange(userId, "expense", start, end),
                 TotalGoal = _repository.GetTotalByTypeAndDateRange(userId, "goal", start, end),
+                TotalInvest = _repository.GetTotalByTypeAndDateRange(userId, "invest", start, end),
                 ExpenseBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "expense", start, end),
                 IncomeBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "income", start, end),
-                GoalBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "goal", start, end)
+                GoalBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "goal", start, end),
+                InvestBreakdown = _repository.GetCategoryBreakdownByDateRange(userId, "invest", start, end)
             };
         }
 

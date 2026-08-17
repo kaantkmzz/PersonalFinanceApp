@@ -25,6 +25,7 @@ namespace PersonalFinanceApp
         private static Color SafeColor => AppTheme.SafeColor;
         private static Color IdleColor => AppTheme.IdleColor;
         private static Color GoalColor => AppTheme.GoalColor;
+        private static Color InvestColor => AppTheme.InvestColor;
         private static Color SliceBorderColor => AppTheme.SliceBorderColor;
         // Dilim/lejant üzerine gelindiğinde vurgu çerçevesi. SliceBorderColor artık her iki temada
         // da sabit koyu bir renk olduğu için (bkz. AppTheme.SliceBorderColor), TextLight kullanmak
@@ -272,14 +273,14 @@ namespace PersonalFinanceApp
             SetupOutlinedButton(btnExportReport, TextMuted, TextLight);
 
             // --- Sağ alt: Genel / Varlıklarım grafik modu seçimi ---
-            btnModeGenel.Text = "📊 Genel";
+            btnModeGenel.Text = "Genel";
             btnModeGenel.Width = 110; btnModeGenel.Height = 32; btnModeGenel.Left = 0; btnModeGenel.Top = 0;
             btnModeGenel.Cursor = Cursors.Hand; btnModeGenel.Font = new Font("Segoe UI", 9F);
             btnModeGenel.FlatAppearance.BorderSize = 0;
             btnModeGenel.Click += (s, e) => SetMode(ReportMode.Genel);
             SetupModeToggleButton(btnModeGenel, () => _reportMode == ReportMode.Genel);
 
-            btnModeVarliklarim.Text = "💰 Varlıklarım";
+            btnModeVarliklarim.Text = "Varlıklarım";
             btnModeVarliklarim.Width = 140; btnModeVarliklarim.Height = 32; btnModeVarliklarim.Left = btnModeGenel.Right + 8; btnModeVarliklarim.Top = 0;
             btnModeVarliklarim.Cursor = Cursors.Hand; btnModeVarliklarim.Font = new Font("Segoe UI", 9F);
             btnModeVarliklarim.FlatAppearance.BorderSize = 0;
@@ -555,18 +556,20 @@ namespace PersonalFinanceApp
             decimal idle = _currentWallet - categorySum;
             if (idle < 0) idle = 0;
             decimal goalTotal = current.GoalBreakdown.Sum(x => x.TotalAmount);
-            decimal pieTotal = categorySum + idle + goalTotal;
+            decimal investTotal = current.InvestBreakdown.Sum(x => x.TotalAmount);
+            decimal pieTotal = categorySum + idle + goalTotal + investTotal;
 
             lblTitle.Text = _drillDownType switch
             {
                 "income" => "Rapor — Gelir",
                 "expense" => "Rapor — Gider",
                 "goal" => "Rapor — Hedef",
+                "invest" => "Rapor — Yatırım",
                 _ => "Rapor"
             };
 
             BuildChart(current, idle, pieTotal);
-            BuildLegend(current, idle, goalTotal, pieTotal, tr);
+            BuildLegend(current, idle, goalTotal, investTotal, pieTotal, tr);
 
             // Animasyonu hemen değil, boyut oturana kadar erteleyerek başlatıyoruz (bkz. RequestChartReveal).
             RequestChartReveal();
@@ -628,24 +631,27 @@ namespace PersonalFinanceApp
                 AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor, "income");
                 AddGroupedPoints(current.ExpenseBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), ExpenseColor, "expense");
                 AddGroupedPoints(current.GoalBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), GoalColor, "goal");
+                AddGroupedPoints(current.InvestBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), InvestColor, "invest");
 
                 if (idle > 0 || series.Points.Count == 0)
                     _idlePointIndex = AddPoint("Boşta", idle, IdleColor);
             }
             else
             {
-                // Kırılım görünümü: seçilen türün (gelir/gider/hedef) HER kategorisi kendi dilimi olarak,
+                // Kırılım görünümü: seçilen türün (gelir/gider/hedef/yatırım) HER kategorisi kendi dilimi olarak,
                 // tümü aynı temel rengin farklı bir tonuyla — kaç kategori olursa olsun (10, 100 fark etmez).
                 var items = _drillDownType switch
                 {
                     "income" => current.IncomeBreakdown,
                     "expense" => current.ExpenseBreakdown,
+                    "invest" => current.InvestBreakdown,
                     _ => current.GoalBreakdown
                 };
                 Color baseColor = _drillDownType switch
                 {
                     "income" => IncomeColor,
                     "expense" => ExpenseColor,
+                    "invest" => InvestColor,
                     _ => GoalColor
                 };
 
@@ -733,7 +739,7 @@ namespace PersonalFinanceApp
         // Dilimlerin altında kategori kategori değil; her renk için TEK bir kutucukta o rengin toplam
         // yüzdesini gösteren, grafiğin altında ortalanmış özel bir şerit. Gelir/Gider/Hedef tıklanabilir:
         // tıklanınca o türün kendi kategori kırılımına geçilir (bkz. BuildChart, BuildDrillDownLegend).
-        private void BuildLegend(MonthlyReport current, decimal idle, decimal goalTotal, decimal pieTotal, System.Globalization.CultureInfo tr)
+        private void BuildLegend(MonthlyReport current, decimal idle, decimal goalTotal, decimal investTotal, decimal pieTotal, System.Globalization.CultureInfo tr)
         {
             pnlLegendFlow.Controls.Clear();
 
@@ -758,6 +764,7 @@ namespace PersonalFinanceApp
                 if (incomeTotal > 0) AddLegendEntry(IncomeColor, "Gelir", incomeTotal, pieTotal, () => DrillInto("income"), _typeToPointIndices.GetValueOrDefault("income"));
                 if (expenseTotal > 0) AddLegendEntry(ExpenseColor, "Gider", expenseTotal, pieTotal, () => DrillInto("expense"), _typeToPointIndices.GetValueOrDefault("expense"));
                 if (goalTotal > 0) AddLegendEntry(GoalColor, "Hedef", goalTotal, pieTotal, () => DrillInto("goal"), _typeToPointIndices.GetValueOrDefault("goal"));
+                if (investTotal > 0) AddLegendEntry(InvestColor, "Yatırım", investTotal, pieTotal, () => DrillInto("invest"), _typeToPointIndices.GetValueOrDefault("invest"));
                 if (idle > 0) AddLegendEntry(IdleColor, "Boşta", idle, pieTotal, null, _idlePointIndex >= 0 ? new List<int> { _idlePointIndex } : null);
             }
 
@@ -770,12 +777,14 @@ namespace PersonalFinanceApp
             {
                 "income" => current.IncomeBreakdown,
                 "expense" => current.ExpenseBreakdown,
+                "invest" => current.InvestBreakdown,
                 _ => current.GoalBreakdown
             };
             Color baseColor = _drillDownType switch
             {
                 "income" => IncomeColor,
                 "expense" => ExpenseColor,
+                "invest" => InvestColor,
                 _ => GoalColor
             };
 
