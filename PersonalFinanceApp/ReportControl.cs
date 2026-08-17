@@ -22,6 +22,9 @@ namespace PersonalFinanceApp
         private static Color IdleColor => AppTheme.IdleColor;
         private static Color GoalColor => AppTheme.GoalColor;
         private static Color SliceBorderColor => AppTheme.SliceBorderColor;
+        // Dilim/lejant üzerine gelindiğinde vurgu çerçevesi: dark modda beyaz, light modda (beyaz
+        // arka planla karışmaması için) koyu renk.
+        private static Color HoverHighlightColor => AppTheme.TextLight;
 
         private ComboBox cmbMonth = new ComboBox();
         private NumericUpDown nudYear = new NumericUpDown();
@@ -45,6 +48,10 @@ namespace PersonalFinanceApp
         private int _hoveredPointIndex = -1;
         private Panel pnlLegendWrapper = new Panel();
         private FlowLayoutPanel pnlLegendFlow = new FlowLayoutPanel();
+        // Geri dönüş oku artık pnlLegendFlow'un İÇİNDE (sarma akışının bir parçası) değil; ayrı, sabit
+        // konumlu bir kontrol. Böylece kategori öğeleri birden fazla satıra taştığında (ör. tek başına
+        // kalan küçük bir yüzdelik), her satır okun genişliğinden etkilenmeden aynı X'te başlar.
+        private Panel? _backButton;
 
         // Lejant öğesinin (Gelir/Gider/Hedef/Boşta ya da kırılımdaki tek bir kategori) üzerine gelindiğinde
         // grafikte hangi dilim(ler)in beyaz çizgiyle vurgulanacağını tutar (bkz. BuildChart, AddLegendEntry).
@@ -90,9 +97,21 @@ namespace PersonalFinanceApp
             _revealSettleTimer.Start();
         }
 
+        // Dışarıdan tetiklenen bir tazeleme (ör. tutarları gizle aç/kapa) verileri yeniden çeksin
+        // ama kullanıcının o an incelediği kırılım (drill-down) görünümünü sıfırlamasın.
         public void RefreshData()
         {
-            LoadReport();
+            LoadReport(resetDrillDown: false);
+        }
+
+        // Tema değişikliğinde ekran tamamen yeniden kurulduğu için kırılım durumu MainForm
+        // tarafından yakalanıp yeni örneğe geri uygulanır (bkz. MainForm.RebuildForThemeChange).
+        public string? DrillDownType => _drillDownType;
+
+        public void RestoreDrillDownType(string? type)
+        {
+            _drillDownType = type;
+            RenderReport();
         }
         private void SetupUI()
         {
@@ -175,8 +194,8 @@ namespace PersonalFinanceApp
             };
 
             Label lblMonth = new Label { Text = "Ay:", Left = 0, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlMonth = new Panel { Left = 0, Top = 24, Width = 195, Height = 36 };
-            cmbMonth.Left = 5; cmbMonth.Top = 7; cmbMonth.Width = 190;
+            Panel pnlMonth = new Panel { Left = 0, Top = 24, Width = 195, Height = 40 };
+            cmbMonth.Left = 5; cmbMonth.Top = 5; cmbMonth.Width = 190;
             cmbMonth.Font = new Font("Segoe UI", 9.5F); cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
             var trMonths = new System.Globalization.CultureInfo("tr-TR");
             for (int m = 1; m <= 12; m++) cmbMonth.Items.Add(trMonths.DateTimeFormat.GetMonthName(m));
@@ -185,9 +204,9 @@ namespace PersonalFinanceApp
             SetupCustomComboBox(pnlMonth, cmbMonth);
 
             Label lblYear = new Label { Text = "Yıl:", Left = 210, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlYear = new Panel { Left = 210, Top = 24, Width = 195, Height = 36 };
+            Panel pnlYear = new Panel { Left = 210, Top = 24, Width = 195, Height = 40 };
             SetupSmoothContainer(pnlYear, 8, CardBackColor);
-            nudYear.Left = 10; nudYear.Top = 6; nudYear.Width = 175;
+            nudYear.Left = 10; nudYear.Top = 8; nudYear.Width = 175;
             nudYear.Font = new Font("Segoe UI", 9.5F); nudYear.BorderStyle = BorderStyle.None;
             nudYear.BackColor = CardBackColor; nudYear.ForeColor = TextLight;
             nudYear.Minimum = 2000; nudYear.Maximum = 2100; nudYear.Value = DateTime.Today.Year;
@@ -195,19 +214,19 @@ namespace PersonalFinanceApp
             pnlYear.Controls.Add(nudYear);
 
             btnView.Text = "Görüntüle";
-            btnView.Left = 0; btnView.Top = 64; btnView.Width = 405; btnView.Height = 34;
+            btnView.Left = 0; btnView.Top = 68; btnView.Width = 405; btnView.Height = 34;
             btnView.Cursor = Cursors.Hand;
             btnView.Click += (s, e) => { _drillDownType = null; LoadReport(); };
             SetupRoundedButton(btnView, AccentColor, Color.White);
 
-            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 116, IncomeColor, lblIncome);
-            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 116, ExpenseColor, lblExpense);
-            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 221, TextLight, lblNet);
-            Panel cardSafe = CreateSummaryCard("Kasa", 210, 221, SafeColor, lblSafeBalance);
+            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 120, IncomeColor, lblIncome);
+            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 120, ExpenseColor, lblExpense);
+            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 225, TextLight, lblNet);
+            Panel cardSafe = CreateSummaryCard("Kasa", 210, 225, SafeColor, lblSafeBalance);
 
             btnExportReport.Text = "Raporu CSV'ye Aktar";
             btnExportReport.Left = 0;
-            btnExportReport.Top = 331;
+            btnExportReport.Top = 335;
             btnExportReport.Width = 405;
             btnExportReport.Height = 34;
             btnExportReport.Cursor = Cursors.Hand;
@@ -238,7 +257,9 @@ namespace PersonalFinanceApp
             cmb.ForeColor = TextLight;
 
             cmb.DrawMode = DrawMode.OwnerDrawFixed;
-            cmb.ItemHeight = 22;
+            // ItemHeight, kapalı kutunun kendi çizim yüksekliğini de belirliyor; 22px "Ağustos" gibi
+            // alt-uzantılı harf (ğ) içeren ay adlarının kesilmesine yol açıyordu, bu yüzden büyütüldü.
+            cmb.ItemHeight = 26;
             cmb.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;
@@ -366,8 +387,9 @@ namespace PersonalFinanceApp
             timer.Start();
         }
 
-        // Seçili ay/yıla ait veriyi veritabanından çeker.
-        private void LoadReport()
+        // Seçili ay/yıla ait veriyi veritabanından çeker. resetDrillDown=false olduğunda (ör. dışarıdan
+        // gelen tutar gizleme tazelemesinde) kullanıcının o an incelediği kırılım görünümü korunur.
+        private void LoadReport(bool resetDrillDown = true)
         {
             int year = (int)nudYear.Value;
             int month = cmbMonth.SelectedIndex + 1;
@@ -384,7 +406,7 @@ namespace PersonalFinanceApp
             AnimateCardValue(lblNet, _currentReport.NetBalance);
             AnimateCardValue(lblSafeBalance, safe);
 
-            _drillDownType = null;
+            if (resetDrillDown) _drillDownType = null;
             RenderReport();
         }
 
@@ -584,6 +606,13 @@ namespace PersonalFinanceApp
         {
             pnlLegendFlow.Controls.Clear();
 
+            if (_backButton != null)
+            {
+                pnlLegendWrapper.Controls.Remove(_backButton);
+                _backButton.Dispose();
+                _backButton = null;
+            }
+
             if (_drillDownType != null)
             {
                 BuildDrillDownLegend(current);
@@ -638,10 +667,9 @@ namespace PersonalFinanceApp
         {
             Panel btnBack = new Panel
             {
-                Width = 30,
-                Height = 30,
+                Width = 34,
+                Height = 34,
                 Cursor = Cursors.Hand,
-                Margin = new Padding(4, 2, 24, 2),
                 BackColor = AppBackColor
             };
 
@@ -657,7 +685,7 @@ namespace PersonalFinanceApp
                 using (var brush = new SolidBrush(isHovered ? ControlPaint.Light(AccentColor) : AccentColor))
                     e.Graphics.FillEllipse(brush, 0, 0, btnBack.Width - 1, btnBack.Height - 1);
 
-                using var pen = new Pen(Color.White, 2.4f)
+                using var pen = new Pen(Color.White, 2.6f)
                 {
                     StartCap = System.Drawing.Drawing2D.LineCap.Round,
                     EndCap = System.Drawing.Drawing2D.LineCap.Round,
@@ -666,14 +694,15 @@ namespace PersonalFinanceApp
                 int cx = btnBack.Width / 2, cy = btnBack.Height / 2;
                 e.Graphics.DrawLines(pen, new PointF[]
                 {
-                    new PointF(cx + 5, cy - 7),
-                    new PointF(cx - 6, cy),
-                    new PointF(cx + 5, cy + 7)
+                    new PointF(cx + 6, cy - 8),
+                    new PointF(cx - 7, cy),
+                    new PointF(cx + 6, cy + 8)
                 });
             };
 
             btnBack.Click += (s, e) => { _drillDownType = null; RenderReport(); };
-            pnlLegendFlow.Controls.Add(btnBack);
+            pnlLegendWrapper.Controls.Add(btnBack);
+            _backButton = btnBack;
         }
 
         private void DrillInto(string type)
@@ -824,11 +853,26 @@ namespace PersonalFinanceApp
 
         private void CenterLegend()
         {
+            // Geri oku artık akışın (wrap) dışında, sabit bir referans noktası: bu sayede kategori
+            // öğeleri birden fazla satıra taştığında (ör. tek başına kalan küçük bir yüzdelik), her
+            // satır okun genişliğinden etkilenmeksizin aynı X'te başlar ve üst satırla hizalı kalır.
+            int reserved = _backButton != null ? _backButton.Width + 10 : 0;
+
             // Lejant tek satıra sığmadığında (ör. çok sayıda kategori) sağ kenardan taşıp kırpılmak
             // yerine alt satıra kaysın diye genişliği sarmalayıcı panelin genişliğiyle sınırlıyoruz.
-            pnlLegendFlow.MaximumSize = new Size(Math.Max(100, pnlLegendWrapper.Width - 20), 0);
-            pnlLegendFlow.Left = Math.Max(0, (pnlLegendWrapper.Width - pnlLegendFlow.PreferredSize.Width) / 2);
+            pnlLegendFlow.MaximumSize = new Size(Math.Max(100, pnlLegendWrapper.Width - 20 - reserved), 0);
+
+            int contentWidth = pnlLegendFlow.PreferredSize.Width + reserved;
+            int startLeft = Math.Max(0, (pnlLegendWrapper.Width - contentWidth) / 2);
+
+            pnlLegendFlow.Left = startLeft + reserved;
             pnlLegendFlow.Top = Math.Max(4, (pnlLegendWrapper.Height - pnlLegendFlow.PreferredSize.Height) / 2);
+
+            if (_backButton != null)
+            {
+                _backButton.Left = startLeft;
+                _backButton.Top = Math.Max(4, pnlLegendFlow.Top - (_backButton.Height - 24) / 2);
+            }
         }
 
         private void Chart_MouseMove(object? sender, MouseEventArgs e)
@@ -849,7 +893,7 @@ namespace PersonalFinanceApp
 
             if (newIndex >= 0 && newIndex < series.Points.Count)
             {
-                series.Points[newIndex].BorderColor = Color.White;
+                series.Points[newIndex].BorderColor = HoverHighlightColor;
                 series.Points[newIndex].BorderWidth = 4;
             }
 
@@ -880,7 +924,7 @@ namespace PersonalFinanceApp
             foreach (var idx in indices)
             {
                 if (idx < 0 || idx >= series.Points.Count) continue;
-                series.Points[idx].BorderColor = Color.White;
+                series.Points[idx].BorderColor = HoverHighlightColor;
                 series.Points[idx].BorderWidth = 4;
                 _legendHoverIndices.Add(idx);
             }
