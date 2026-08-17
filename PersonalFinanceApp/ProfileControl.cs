@@ -72,7 +72,7 @@ namespace PersonalFinanceApp
             BuildAccountSummaryCard(rightColX, 75, colWidth);
             BuildCleanupCard(rightColX, 290, colWidth);
 
-            lblStatus.Left = leftColX; lblStatus.Top = 855; lblStatus.Width = colWidth * 2 + 20; lblStatus.Height = 25;
+            lblStatus.Left = leftColX; lblStatus.Top = 905; lblStatus.Width = colWidth * 2 + 20; lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F); lblStatus.BackColor = Color.Transparent;
             this.Controls.Add(lblStatus);
 
@@ -196,13 +196,13 @@ namespace PersonalFinanceApp
         // --- Hesap Bilgileri kartı (salt okunur) ---
         private void BuildAccountInfoCard(int left, int top, int width)
         {
-            Panel card = CreateCard(left, top, width, 220);
+            Panel card = CreateCard(left, top, width, 270);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
             Label lblCardTitle = new Label { Text = "Hesap Bilgileri", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
 
-            // Etiket üstte, değer altında tam satır genişliğinde: uzun e-postaların kırpılmadan
-            // okunabilmesi ve alt harflerin (q p y g) kesilmemesi için.
+            // Etiket üstte, değer altında tam satır genişliğinde ve bol boşluklu: uzun e-postaların
+            // kırpılmadan okunabilmesi ve alt harflerin (q p y g) kesilmemesi için.
             Label MakeRow(string label, string value, int rowTop)
             {
                 Label l = new Label { Text = label, Left = 20, Top = rowTop, Height = 16, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
@@ -211,9 +211,9 @@ namespace PersonalFinanceApp
                 {
                     Text = value,
                     Left = 20,
-                    Top = rowTop + 18,
+                    Top = rowTop + 20,
                     Width = width - 40,
-                    Height = 26,
+                    Height = 30,
                     ForeColor = TextLight,
                     BackColor = Color.Transparent,
                     AutoSize = false,
@@ -223,9 +223,9 @@ namespace PersonalFinanceApp
                 return v;
             }
 
-            var vUsername = MakeRow("Kullanıcı Adı:", _user.Username, 54);
-            var vEmail = MakeRow("E-posta:", _user.Email, 106);
-            var vSince = MakeRow("Üyelik Tarihi:", _user.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy", tr), 158);
+            var vUsername = MakeRow("Kullanıcı Adı:", _user.Username, 56);
+            var vEmail = MakeRow("E-posta:", _user.Email, 126);
+            var vSince = MakeRow("Üyelik Tarihi:", _user.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy", tr), 196);
 
             card.Controls.Add(lblCardTitle);
             card.Controls.Add(vUsername);
