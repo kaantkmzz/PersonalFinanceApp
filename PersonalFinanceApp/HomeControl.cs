@@ -13,7 +13,6 @@ namespace PersonalFinanceApp
         private static Color TextLight => AppTheme.TextLight;
         private static Color AccentColor => AppTheme.AccentColor;
 
-        private Label lblWelcome = new Label();
         private Label lblWalletAmount = new Label();
         private Label lblSafeAmount = new Label();
         private Label lblStatus = new Label();
@@ -33,14 +32,7 @@ namespace PersonalFinanceApp
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
-            lblWelcome.Text = $"Hoş geldin, {DisplayName}";
-            lblWelcome.Font = new Font("Segoe UI", 22F, FontStyle.Bold);
-            lblWelcome.ForeColor = TextLight;
-            lblWelcome.AutoSize = true;
-            lblWelcome.Left = 20;
-            lblWelcome.Top = 20;
-
-            Panel pnlWallet = new Panel { Left = 20, Top = 100, Width = 320, Height = 240 };
+            Panel pnlWallet = new Panel { Left = 20, Top = 30, Width = 320, Height = 240 };
             SetupSmoothContainer(pnlWallet, 16, CardBackColor);
             Label lblWalletIcon = new Label { Text = "💳", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
             Label lblWalletTitle = new Label { Text = "Cüzdan", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
@@ -55,7 +47,7 @@ namespace PersonalFinanceApp
             pnlWallet.Controls.Add(lblWalletTitle);
             pnlWallet.Controls.Add(lblWalletAmount);
 
-            Panel pnlSafe = new Panel { Left = 360, Top = 100, Width = 320, Height = 240 };
+            Panel pnlSafe = new Panel { Left = 360, Top = 30, Width = 320, Height = 240 };
             SetupSmoothContainer(pnlSafe, 16, CardBackColor);
             Label lblSafeIcon = new Label { Text = "🏦", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
             Label lblSafeTitle = new Label { Text = "Kasa", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
@@ -72,7 +64,7 @@ namespace PersonalFinanceApp
 
             // Butonlar, Kasa kutucuğunun sağ kenarıyla hizalı, kutucukların hemen altında (sağ alt)
             const int cardsRight = 360 + 320; // pnlSafe.Left + pnlSafe.Width
-            const int buttonsTop = 100 + 240 + 16; // kutucukların altı + küçük boşluk
+            const int buttonsTop = 30 + 240 + 16; // kutucukların altı + küçük boşluk
             const int btnWidth = 190;
             const int btnGap = 14;
 
@@ -114,7 +106,6 @@ namespace PersonalFinanceApp
             lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
 
-            this.Controls.Add(lblWelcome);
             this.Controls.Add(pnlWallet);
             this.Controls.Add(pnlSafe);
             this.Controls.Add(btnTransfer);
@@ -170,11 +161,8 @@ namespace PersonalFinanceApp
             return path;
         }
 
-        private string DisplayName => string.IsNullOrWhiteSpace(_user.FullName) ? _user.Username : _user.FullName;
-
         public void RefreshData()
         {
-            lblWelcome.Text = $"Hoş geldin, {DisplayName}";
             RefreshBalances();
         }
 

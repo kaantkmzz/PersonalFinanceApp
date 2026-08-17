@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using PersonalFinanceApp.Helpers;
@@ -21,21 +22,30 @@ namespace PersonalFinanceApp
         private static Color AccentColor => AppTheme.AccentColor;
         private static Color FieldBackColor => AppTheme.HoverBackColor;
 
+        private Panel pnlScroll = new Panel();
+        private readonly List<AccordionSection> _sections = new List<AccordionSection>();
+        private const int SectionWidth = 760;
+
         private TextBox txtFullName = new TextBox();
+        private Label lblNameStatus = new Label();
+
         private Button btnWeekly = new Button();
         private Button btnMonthly = new Button();
         private Button btnNever = new Button();
         private Label lblExplanation = new Label();
         private Panel pnlToggle = new Panel();
-        private Label lblStatus = new Label();
 
         private Panel pnlAvatarPreview = new Panel();
         private Label lblAvatarStatus = new Label();
         private Color _selectedAvatarColor;
         private readonly Action? _onAvatarSaved;
 
-        // onAvatarSaved: avatar rengi kaydedildiğinde MainForm'un sidebar'daki avatarı da anında
-        // güncellemesi için verdiği geri çağırım (bkz. MainForm.HandleMenuClick / BuildAvatarWidget).
+        private Label _lblTxCount = new Label();
+        private Label _lblCatCount = new Label();
+        private Label _lblMemberDays = new Label();
+
+        // onAvatarSaved: avatar rengi ya da isim kaydedildiğinde MainForm'un sidebar'daki avatarı da
+        // anında güncellemesi için verdiği geri çağırım (bkz. MainForm.BuildAvatarWidget).
         public ProfileControl(User user, Action? onAvatarSaved = null)
         {
             _user = user;
@@ -47,7 +57,7 @@ namespace PersonalFinanceApp
 
         public void RefreshData()
         {
-            // Diğer ekranlardan işlem/kategori eklenmiş olabilir; Hesap Özeti kartı güncel kalsın.
+            // Diğer ekranlardan işlem/kategori eklenmiş olabilir; Hesap Özeti bölümü güncel kalsın.
             UpdateAccountSummary();
         }
 
@@ -61,33 +71,35 @@ namespace PersonalFinanceApp
             Label lblTitle = new Label { Text = "Profilim", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 30, Top = 20, AutoSize = true };
             this.Controls.Add(lblTitle);
 
-            const int colWidth = 420;
-            const int leftColX = 30;
-            const int rightColX = leftColX + colWidth + 20;
+            pnlScroll.Left = 30;
+            pnlScroll.Top = 70;
+            pnlScroll.AutoScroll = true;
+            pnlScroll.BackColor = AppBackColor;
+            this.Controls.Add(pnlScroll);
+            this.Resize += (s, e) => ResizeScrollArea();
+            ResizeScrollArea();
 
-            BuildAvatarCard(leftColX, 75, colWidth);
-            BuildFullNameCard(leftColX, 465, colWidth);
-            BuildAccountInfoCard(leftColX, 615, colWidth);
+            AddAccordionSection("Avatar", 340, body => BuildAvatarBody(body, SectionWidth));
+            AddAccordionSection("Ad Soyad", 100, body => BuildFullNameBody(body, SectionWidth));
+            AddAccordionSection("Hesap Bilgileri", 220, body => BuildAccountInfoBody(body, SectionWidth));
+            AddAccordionSection("Hesap Özeti", 150, body => BuildAccountSummaryBody(body, SectionWidth));
+            AddAccordionSection("Temizleme Sıklığı", 360, body => BuildCleanupBody(body, SectionWidth));
 
-            BuildAccountSummaryCard(rightColX, 75, colWidth);
-            BuildCleanupCard(rightColX, 290, colWidth);
-
-            lblStatus.Left = leftColX; lblStatus.Top = 905; lblStatus.Width = colWidth * 2 + 20; lblStatus.Height = 25;
-            lblStatus.Font = new Font("Segoe UI", 9F); lblStatus.BackColor = Color.Transparent;
-            this.Controls.Add(lblStatus);
-
+            RelayoutSections();
             UpdateExplanationText();
         }
 
-        // --- Avatar kartı: önizleme + renk paleti + kaydet ---
-        private void BuildAvatarCard(int left, int top, int width)
+        private void ResizeScrollArea()
         {
-            Panel card = CreateCard(left, top, width, 370);
+            pnlScroll.Width = Math.Max(200, this.ClientSize.Width - 60);
+            pnlScroll.Height = Math.Max(200, this.ClientSize.Height - 90);
+        }
 
-            Label lblCardTitle = new Label { Text = "Avatar", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-
+        // --- Avatar bölümü: önizleme + renk paleti + kaydet ---
+        private void BuildAvatarBody(Panel body, int width)
+        {
             pnlAvatarPreview.Width = 96; pnlAvatarPreview.Height = 96;
-            pnlAvatarPreview.Left = (width - 96) / 2; pnlAvatarPreview.Top = 46;
+            pnlAvatarPreview.Left = (width - 96) / 2; pnlAvatarPreview.Top = 10;
             pnlAvatarPreview.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
@@ -100,7 +112,7 @@ namespace PersonalFinanceApp
                 TextRenderer.DrawText(e.Graphics, initials, font, pnlAvatarPreview.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
 
-            Label lblPaletteHint = new Label { Text = "Bir renk seç:", Left = 20, Top = 156, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Label lblPaletteHint = new Label { Text = "Bir renk seç:", Left = 24, Top = 120, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
 
             const int swatchSize = 30, swatchGap = 10, perRow = 5;
             int paletteRowWidth = perRow * swatchSize + (perRow - 1) * swatchGap;
@@ -115,7 +127,7 @@ namespace PersonalFinanceApp
                     Width = swatchSize,
                     Height = swatchSize,
                     Left = paletteLeft + col * (swatchSize + swatchGap),
-                    Top = 186 + row * (swatchSize + swatchGap),
+                    Top = 150 + row * (swatchSize + swatchGap),
                     Cursor = Cursors.Hand,
                     Tag = swatchColor
                 };
@@ -137,14 +149,14 @@ namespace PersonalFinanceApp
                 {
                     _selectedAvatarColor = swatchColor;
                     pnlAvatarPreview.Invalidate();
-                    foreach (Control c in card.Controls)
+                    foreach (Control c in body.Controls)
                         if (c is Panel p && p.Tag is Color) p.Invalidate();
                 };
-                card.Controls.Add(swatch);
+                body.Controls.Add(swatch);
             }
 
             int paletteRows = (AvatarHelper.Palette.Length + perRow - 1) / perRow;
-            int afterPaletteTop = 186 + paletteRows * (swatchSize + swatchGap) + 14;
+            int afterPaletteTop = 150 + paletteRows * (swatchSize + swatchGap) + 14;
 
             Button btnSaveAvatar = new Button { Text = "Kaydet", Left = (width - 160) / 2, Top = afterPaletteTop, Width = 160, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnSaveAvatar, AccentColor, Color.White);
@@ -157,26 +169,21 @@ namespace PersonalFinanceApp
                 _onAvatarSaved?.Invoke();
             };
 
-            lblAvatarStatus.Left = 20; lblAvatarStatus.Top = afterPaletteTop + 46; lblAvatarStatus.Width = width - 40; lblAvatarStatus.Height = 22;
+            lblAvatarStatus.Left = 24; lblAvatarStatus.Top = afterPaletteTop + 46; lblAvatarStatus.Width = width - 48; lblAvatarStatus.Height = 22;
             lblAvatarStatus.Font = new Font("Segoe UI", 8.5F); lblAvatarStatus.BackColor = Color.Transparent; lblAvatarStatus.TextAlign = ContentAlignment.MiddleCenter;
 
-            card.Controls.Add(lblCardTitle);
-            card.Controls.Add(pnlAvatarPreview);
-            card.Controls.Add(lblPaletteHint);
-            card.Controls.Add(btnSaveAvatar);
-            card.Controls.Add(lblAvatarStatus);
+            body.Controls.Add(pnlAvatarPreview);
+            body.Controls.Add(lblPaletteHint);
+            body.Controls.Add(btnSaveAvatar);
+            body.Controls.Add(lblAvatarStatus);
         }
 
         private static bool ColorsEqual(Color a, Color b) => a.R == b.R && a.G == b.G && a.B == b.B;
 
-        // --- Ad Soyad kartı (mevcut davranış korunuyor) ---
-        private void BuildFullNameCard(int left, int top, int width)
+        // --- Ad Soyad bölümü ---
+        private void BuildFullNameBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 130);
-
-            Label lblCardTitle = new Label { Text = "Ad Soyad", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-
-            Panel pnlFullName = new Panel { Left = 20, Top = 56, Width = width - 130, Height = 42 };
+            Panel pnlFullName = new Panel { Left = 24, Top = 10, Width = width - 24 - 100 - 20 - 24, Height = 42 };
             SetupSmoothContainer(pnlFullName, 8, FieldBackColor, CardBackColor);
             txtFullName.Left = 10; txtFullName.Top = 11; txtFullName.Width = pnlFullName.Width - 20;
             txtFullName.Font = new Font("Segoe UI", 10.5F); txtFullName.BorderStyle = BorderStyle.None;
@@ -184,35 +191,35 @@ namespace PersonalFinanceApp
             txtFullName.Text = _user.FullName;
             pnlFullName.Controls.Add(txtFullName);
 
-            Button btnSaveName = new Button { Text = "Kaydet", Left = width - 100, Top = 56, Width = 80, Height = 42, Cursor = Cursors.Hand };
+            Button btnSaveName = new Button { Text = "Kaydet", Left = width - 24 - 100, Top = 10, Width = 100, Height = 42, Cursor = Cursors.Hand };
             SetupRoundedButton(btnSaveName, AccentColor, Color.White);
             btnSaveName.Click += BtnSaveName_Click;
 
-            card.Controls.Add(lblCardTitle);
-            card.Controls.Add(pnlFullName);
-            card.Controls.Add(btnSaveName);
+            lblNameStatus.Left = 24; lblNameStatus.Top = 60; lblNameStatus.Width = width - 48; lblNameStatus.Height = 22;
+            lblNameStatus.Font = new Font("Segoe UI", 9F); lblNameStatus.BackColor = Color.Transparent;
+
+            body.Controls.Add(pnlFullName);
+            body.Controls.Add(btnSaveName);
+            body.Controls.Add(lblNameStatus);
         }
 
-        // --- Hesap Bilgileri kartı (salt okunur) ---
-        private void BuildAccountInfoCard(int left, int top, int width)
+        // --- Hesap Bilgileri bölümü (salt okunur) ---
+        private void BuildAccountInfoBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 270);
             var tr = new System.Globalization.CultureInfo("tr-TR");
-
-            Label lblCardTitle = new Label { Text = "Hesap Bilgileri", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
 
             // Etiket üstte, değer altında tam satır genişliğinde ve bol boşluklu: uzun e-postaların
             // kırpılmadan okunabilmesi ve alt harflerin (q p y g) kesilmemesi için.
             Label MakeRow(string label, string value, int rowTop)
             {
-                Label l = new Label { Text = label, Left = 20, Top = rowTop, Height = 16, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
-                card.Controls.Add(l);
+                Label l = new Label { Text = label, Left = 24, Top = rowTop, Height = 16, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
+                body.Controls.Add(l);
                 Label v = new Label
                 {
                     Text = value,
-                    Left = 20,
+                    Left = 24,
                     Top = rowTop + 20,
-                    Width = width - 40,
+                    Width = width - 48,
                     Height = 30,
                     ForeColor = TextLight,
                     BackColor = Color.Transparent,
@@ -223,30 +230,21 @@ namespace PersonalFinanceApp
                 return v;
             }
 
-            var vUsername = MakeRow("Kullanıcı Adı:", _user.Username, 56);
-            var vEmail = MakeRow("E-posta:", _user.Email, 126);
-            var vSince = MakeRow("Üyelik Tarihi:", _user.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy", tr), 196);
+            var vUsername = MakeRow("Kullanıcı Adı:", _user.Username, 10);
+            var vEmail = MakeRow("E-posta:", _user.Email, 80);
+            var vSince = MakeRow("Üyelik Tarihi:", _user.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy", tr), 150);
 
-            card.Controls.Add(lblCardTitle);
-            card.Controls.Add(vUsername);
-            card.Controls.Add(vEmail);
-            card.Controls.Add(vSince);
+            body.Controls.Add(vUsername);
+            body.Controls.Add(vEmail);
+            body.Controls.Add(vSince);
         }
 
-        // --- Hesap Özeti kartı: toplam işlem/kategori sayısı ve üyelik süresi ---
-        private Label _lblTxCount = new Label();
-        private Label _lblCatCount = new Label();
-        private Label _lblMemberDays = new Label();
-
-        private void BuildAccountSummaryCard(int left, int top, int width)
+        // --- Hesap Özeti bölümü: toplam işlem/kategori sayısı ve üyelik süresi ---
+        private void BuildAccountSummaryBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 200);
-
-            Label lblCardTitle = new Label { Text = "Hesap Özeti", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-
-            Panel MakeStat(string title, Label valueLabel, int statLeft)
+            Panel MakeStat(string title, Label valueLabel, int statLeft, int colW)
             {
-                Panel p = new Panel { Left = statLeft, Top = 56, Width = (width - 40) / 3, Height = 120, BackColor = Color.Transparent };
+                Panel p = new Panel { Left = statLeft, Top = 10, Width = colW, Height = 120, BackColor = Color.Transparent };
                 Label lblT = new Label { Text = title, Left = 0, Top = 0, Width = p.Width, Height = 32, ForeColor = TextMuted, BackColor = Color.Transparent, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.TopCenter };
                 valueLabel.Left = 0; valueLabel.Top = 34; valueLabel.Width = p.Width; valueLabel.Height = 44;
                 valueLabel.ForeColor = AccentColor; valueLabel.BackColor = Color.Transparent;
@@ -257,11 +255,10 @@ namespace PersonalFinanceApp
                 return p;
             }
 
-            int colW = (width - 40) / 3;
-            card.Controls.Add(MakeStat("İşlem", _lblTxCount, 20));
-            card.Controls.Add(MakeStat("Kategori", _lblCatCount, 20 + colW));
-            card.Controls.Add(MakeStat("Üyelik (gün)", _lblMemberDays, 20 + colW * 2));
-            card.Controls.Add(lblCardTitle);
+            int colW = (width - 48) / 3;
+            body.Controls.Add(MakeStat("İşlem", _lblTxCount, 24, colW));
+            body.Controls.Add(MakeStat("Kategori", _lblCatCount, 24 + colW, colW));
+            body.Controls.Add(MakeStat("Üyelik (gün)", _lblMemberDays, 24 + colW * 2, colW));
 
             UpdateAccountSummary();
         }
@@ -277,54 +274,47 @@ namespace PersonalFinanceApp
             _lblMemberDays.Text = memberDays.ToString();
         }
 
-        // --- Temizleme Sıklığı kartı (mevcut davranış korunuyor) ---
-        private void BuildCleanupCard(int left, int top, int width)
+        // --- Temizleme Sıklığı bölümü ---
+        private void BuildCleanupBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 430);
-
-            Label lblCleanupTitle = new Label { Text = "Temizleme Sıklığı", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-
-            int btnW = (width - 40 - 20) / 3;
+            int btnW = (width - 48 - 20) / 3;
             SetupFrequencyButton(btnWeekly, DataCleanupService.Weekly, "Haftalık");
-            btnWeekly.Left = 20; btnWeekly.Top = 56; btnWeekly.Width = btnW; btnWeekly.Height = 36;
+            btnWeekly.Left = 24; btnWeekly.Top = 10; btnWeekly.Width = btnW; btnWeekly.Height = 36;
 
             SetupFrequencyButton(btnMonthly, DataCleanupService.Monthly, "Aylık");
-            btnMonthly.Left = 20 + btnW + 10; btnMonthly.Top = 56; btnMonthly.Width = btnW; btnMonthly.Height = 36;
+            btnMonthly.Left = 24 + btnW + 10; btnMonthly.Top = 10; btnMonthly.Width = btnW; btnMonthly.Height = 36;
 
             SetupFrequencyButton(btnNever, DataCleanupService.Never, "Hiçbir zaman");
-            btnNever.Left = 20 + (btnW + 10) * 2; btnNever.Top = 56; btnNever.Width = btnW; btnNever.Height = 36;
+            btnNever.Left = 24 + (btnW + 10) * 2; btnNever.Top = 10; btnNever.Width = btnW; btnNever.Height = 36;
 
-            lblExplanation.Left = 20; lblExplanation.Top = 102; lblExplanation.Width = width - 40; lblExplanation.Height = 70;
+            lblExplanation.Left = 24; lblExplanation.Top = 56; lblExplanation.Width = width - 48; lblExplanation.Height = 70;
             lblExplanation.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic); lblExplanation.ForeColor = TextMuted; lblExplanation.BackColor = Color.Transparent;
 
-            // İki ayrı tek-satırlık AutoSize Label: sabit Height'li çok satırlı ("\n") Label'lar,
-            // alt-uzantılı harflerin (g y ç ş ğ) kırpılıp bozuk görünmesine yol açıyordu (ör. "CSV'ye" -> "CSV've").
-            Label lblExportToggle1 = new Label { Text = "Temizlenmeden önce", Left = 20, Top = 184, AutoSize = true, ForeColor = TextMuted, BackColor = Color.Transparent };
-            Label lblExportToggle2 = new Label { Text = "her zaman CSV'ye aktarsın mı?", Left = 20, Top = 202, AutoSize = true, ForeColor = TextMuted, BackColor = Color.Transparent };
+            Label lblExportToggle1 = new Label { Text = "Temizlenmeden önce", Left = 24, Top = 136, AutoSize = true, ForeColor = TextMuted, BackColor = Color.Transparent };
+            Label lblExportToggle2 = new Label { Text = "her zaman CSV'ye aktarsın mı?", Left = 24, Top = 154, AutoSize = true, ForeColor = TextMuted, BackColor = Color.Transparent };
 
             SetupToggle();
-            pnlToggle.Left = 20; pnlToggle.Top = 236; pnlToggle.Width = 52; pnlToggle.Height = 28;
+            pnlToggle.Left = 24; pnlToggle.Top = 184; pnlToggle.Width = 52; pnlToggle.Height = 28;
 
-            Panel divider = new Panel { Left = 20, Top = 284, Width = width - 40, Height = 1, BackColor = AppTheme.SidebarDividerColor };
+            Panel divider = new Panel { Left = 24, Top = 232, Width = width - 48, Height = 1, BackColor = AppTheme.SidebarDividerColor };
 
             Label lblNote = new Label
             {
                 Text = "Bu ayar yalnızca İşlemler ve Kategoriler verilerinizi etkiler. Tekrarlanan işlem tanımlarınız, hedefleriniz, notlarınız ve hatırlatıcılarınız asla otomatik olarak silinmez.",
-                Left = 20,
-                Top = 300,
-                Width = width - 40,
+                Left = 24,
+                Top = 248,
+                Width = width - 48,
                 Height = 90,
                 ForeColor = TextMuted,
                 BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5F)
             };
 
-            card.Controls.Add(lblCleanupTitle);
-            card.Controls.Add(btnWeekly); card.Controls.Add(btnMonthly); card.Controls.Add(btnNever);
-            card.Controls.Add(lblExplanation);
-            card.Controls.Add(lblExportToggle1); card.Controls.Add(lblExportToggle2); card.Controls.Add(pnlToggle);
-            card.Controls.Add(divider);
-            card.Controls.Add(lblNote);
+            body.Controls.Add(btnWeekly); body.Controls.Add(btnMonthly); body.Controls.Add(btnNever);
+            body.Controls.Add(lblExplanation);
+            body.Controls.Add(lblExportToggle1); body.Controls.Add(lblExportToggle2); body.Controls.Add(pnlToggle);
+            body.Controls.Add(divider);
+            body.Controls.Add(lblNote);
         }
 
         private void BtnSaveName_Click(object? sender, EventArgs e)
@@ -334,8 +324,8 @@ namespace PersonalFinanceApp
             _accountService.SetFullName(_user.Id, name);
             pnlAvatarPreview.Invalidate();
             _onAvatarSaved?.Invoke();
-            lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
-            lblStatus.Text = "Ad Soyad güncellendi.";
+            lblNameStatus.ForeColor = Color.FromArgb(120, 220, 150);
+            lblNameStatus.Text = "Ad Soyad güncellendi.";
         }
 
         // --- Temizleme sıklığı butonları (Rapor ekranındaki periyot butonlarıyla aynı stil) ---
@@ -441,15 +431,120 @@ namespace PersonalFinanceApp
 
         protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
-        // --- GÖRSEL YARDIMCI METOTLAR ---
-        private Panel CreateCard(int left, int top, int width, int height)
+        // --- AKORDİYON (AÇ/KAPA BÖLÜM) ALTYAPISI ---
+        // Profilim ve Ayarlar ekranlarında, karmaşık 2 kolonlu kart düzeni yerine tek kolonda alt alta,
+        // her biri başlık + ok simgesiyle açılıp kapanan bölümler kullanılıyor. Sayfa sığmazsa dikey
+        // olarak kayar (pnlScroll.AutoScroll).
+        private class AccordionSection
         {
-            Panel card = new Panel { Left = left, Top = top, Width = width, Height = height };
-            SetupSmoothContainer(card, 14, CardBackColor);
-            this.Controls.Add(card);
-            return card;
+            public Panel Card = new Panel();
+            public Panel Body = new Panel();
+            public Panel Chevron = new Panel();
+            public bool Expanded;
+            public int BodyHeight;
+            public const int HeaderHeight = 56;
+            public const int GapAfterHeader = 24;
+            public const int BottomPadding = 16;
         }
 
+        private void AddAccordionSection(string title, int bodyHeight, Action<Panel> buildBody)
+        {
+            var section = new AccordionSection { BodyHeight = bodyHeight, Expanded = false };
+            int width = SectionWidth;
+
+            section.Card.Width = width;
+            section.Card.Height = AccordionSection.HeaderHeight;
+            SetupSmoothContainer(section.Card, 14, CardBackColor);
+            section.Card.Cursor = Cursors.Hand;
+
+            Label lblSectionTitle = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = TextLight,
+                BackColor = Color.Transparent,
+                Left = 24,
+                Top = 0,
+                Width = width - 80,
+                Height = AccordionSection.HeaderHeight,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand
+            };
+
+            section.Chevron.Width = 22;
+            section.Chevron.Height = 22;
+            section.Chevron.Left = width - 46;
+            section.Chevron.Top = (AccordionSection.HeaderHeight - 22) / 2;
+            section.Chevron.BackColor = Color.Transparent;
+            section.Chevron.Cursor = Cursors.Hand;
+            section.Chevron.Paint += (s, e) => DrawChevron(e.Graphics, section.Chevron.ClientRectangle, section.Expanded);
+
+            Panel divider = new Panel { Left = 24, Top = AccordionSection.HeaderHeight, Width = width - 48, Height = 1, BackColor = AppTheme.SidebarDividerColor, Visible = false };
+
+            section.Body.Left = 0;
+            section.Body.Top = AccordionSection.HeaderHeight + AccordionSection.GapAfterHeader;
+            section.Body.Width = width;
+            section.Body.Height = bodyHeight;
+            section.Body.BackColor = CardBackColor;
+            section.Body.Visible = false;
+            buildBody(section.Body);
+
+            void Toggle()
+            {
+                section.Expanded = !section.Expanded;
+                section.Body.Visible = section.Expanded;
+                divider.Visible = section.Expanded;
+                section.Card.Height = section.Expanded
+                    ? AccordionSection.HeaderHeight + AccordionSection.GapAfterHeader + bodyHeight + AccordionSection.BottomPadding
+                    : AccordionSection.HeaderHeight;
+                section.Chevron.Invalidate();
+                RelayoutSections();
+            }
+
+            section.Card.Click += (s, e) => Toggle();
+            lblSectionTitle.Click += (s, e) => Toggle();
+            section.Chevron.Click += (s, e) => Toggle();
+
+            section.Card.Controls.Add(lblSectionTitle);
+            section.Card.Controls.Add(section.Chevron);
+            section.Card.Controls.Add(divider);
+            section.Card.Controls.Add(section.Body);
+
+            pnlScroll.Controls.Add(section.Card);
+            _sections.Add(section);
+        }
+
+        private static void DrawChevron(Graphics g, Rectangle r, bool expanded)
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var pen = new Pen(TextMuted, 2.2f)
+            {
+                StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                EndCap = System.Drawing.Drawing2D.LineCap.Round,
+                LineJoin = System.Drawing.Drawing2D.LineJoin.Round
+            };
+            int cx = r.Left + r.Width / 2, cy = r.Top + r.Height / 2;
+            if (expanded)
+            {
+                g.DrawLines(pen, new PointF[] { new PointF(cx - 6, cy - 2), new PointF(cx, cy + 5), new PointF(cx + 6, cy - 2) });
+            }
+            else
+            {
+                g.DrawLines(pen, new PointF[] { new PointF(cx - 3, cy - 7), new PointF(cx + 4, cy), new PointF(cx - 3, cy + 7) });
+            }
+        }
+
+        private void RelayoutSections()
+        {
+            int y = 8;
+            foreach (var section in _sections)
+            {
+                section.Card.Top = y;
+                y += section.Card.Height + 16;
+            }
+        }
+
+        // --- GÖRSEL YARDIMCI METOTLAR ---
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) => SetupSmoothContainer(pnl, radius, bgColor, AppBackColor);
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor, Color clearColor)
         {

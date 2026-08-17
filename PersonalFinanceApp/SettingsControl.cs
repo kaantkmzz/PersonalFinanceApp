@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using PersonalFinanceApp.Helpers;
@@ -14,17 +15,29 @@ namespace PersonalFinanceApp
         private readonly Action _onHideAmountsToggle;
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly CategoryService _categoryService = new CategoryService();
+        private readonly AuthService _authService = new AuthService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
         private static Color TextLight => AppTheme.TextLight;
         private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
+        private static Color FieldBackColor => AppTheme.HoverBackColor;
+
+        private Panel pnlScroll = new Panel();
+        private readonly List<AccordionSection> _sections = new List<AccordionSection>();
+        private const int SectionWidth = 760;
 
         private Panel pnlThemeToggle = new Panel();
         private Panel pnlHideToggle = new Panel();
         private Label lblDataStatus = new Label();
         private Label lblSessionStatus = new Label();
+
+        private TextBox txtCurrentPassword = new TextBox();
+        private TextBox txtNewPassword = new TextBox();
+        private TextBox txtConfirmPassword = new TextBox();
+        private CheckBox chkShowPasswords = new CheckBox();
+        private Label lblPasswordStatus = new Label();
 
         public SettingsControl(User user, Action onThemeToggle, Action onHideAmountsToggle)
         {
@@ -45,12 +58,44 @@ namespace PersonalFinanceApp
             Label lblTitle = new Label { Text = "Ayarlar", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 30, Top = 20, AutoSize = true };
             this.Controls.Add(lblTitle);
 
-            const int colWidth = 420;
-            const int leftColX = 30;
-            const int rightColX = leftColX + colWidth + 20;
+            pnlScroll.Left = 30;
+            pnlScroll.Top = 70;
+            pnlScroll.AutoScroll = true;
+            pnlScroll.BackColor = AppBackColor;
+            this.Controls.Add(pnlScroll);
+            this.Resize += (s, e) => ResizeScrollArea();
+            ResizeScrollArea();
 
-            BuildPreferencesCard(leftColX, 75, colWidth);
-            BuildDataSessionCard(rightColX, 75, colWidth);
+            AddAccordionSection("Görünüm", 100, body => BuildAppearanceBody(body, SectionWidth));
+            AddAccordionSection("Gizlilik", 100, body => BuildPrivacyBody(body, SectionWidth));
+            AddAccordionSection("Hakkında", 150, body => BuildAboutBody(body, SectionWidth));
+            AddAccordionSection("Veri Yönetimi", 200, body => BuildDataBody(body, SectionWidth));
+            AddAccordionSection("Oturum", 140, body => BuildSessionBody(body, SectionWidth));
+            AddAccordionSection("Şifre Değiştir", 340, body => BuildPasswordBody(body, SectionWidth));
+
+            RelayoutSections();
+        }
+
+        private void ResizeScrollArea()
+        {
+            pnlScroll.Width = Math.Max(200, this.ClientSize.Width - 60);
+            pnlScroll.Height = Math.Max(200, this.ClientSize.Height - 90);
+        }
+
+        // --- Görünüm: tema aç/kapa ---
+        private void BuildAppearanceBody(Panel body, int width)
+        {
+            Label lblRow = new Label { Text = "Koyu Tema", Left = 24, Top = 12, Width = width - 120, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
+            Label lblHint1 = MakeHintLine("Kenar çubuğundaki güneş simgesiyle", 24, 46, width - 48);
+            Label lblHint2 = MakeHintLine("aynı ayardır.", 24, 64, width - 48);
+
+            SetupToggle(pnlThemeToggle, () => AppTheme.IsDark, () => _onThemeToggle());
+            pnlThemeToggle.Left = width - 76; pnlThemeToggle.Top = 10; pnlThemeToggle.Width = 52; pnlThemeToggle.Height = 28;
+
+            body.Controls.Add(lblRow);
+            body.Controls.Add(lblHint1);
+            body.Controls.Add(lblHint2);
+            body.Controls.Add(pnlThemeToggle);
         }
 
         // Çok satırlı Label'ların satır aralığı/kırpılma sorunlarından kaçınmak için, her satırı
@@ -71,125 +116,62 @@ namespace PersonalFinanceApp
             };
         }
 
-        // Kart içinde bölüm başlıklarını ayıran ince çizgi.
-        private Panel MakeSectionDivider(int left, int top, int width)
-            => new Panel { Left = left, Top = top, Width = width, Height = 1, BackColor = AppTheme.SidebarDividerColor };
-
-        // --- Tek uzun kart: Görünüm + Gizlilik + Hakkında (küçük ayrı kutucuklar yerine,
-        // içeriğin taşmadan bol boşlukla sığdığı tek dikdörtgen kart) ---
-        private void BuildPreferencesCard(int left, int top, int width)
+        // --- Gizlilik: tutarları gizle ---
+        private void BuildPrivacyBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 500);
+            Label lblRow = new Label { Text = "Tutarları Gizle", Left = 24, Top = 12, Width = width - 120, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
+            Label lblHint1 = MakeHintLine("Açıkken tüm ekranlardaki tutarlar", 24, 46, width - 48);
+            Label lblHint2 = MakeHintLine("•••••• olarak gösterilir.", 24, 64, width - 48);
 
-            Label lblSection1 = new Label { Text = "Görünüm", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-            Label lblRow1 = new Label { Text = "Koyu Tema", Left = 20, Top = 54, Width = width - 100, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
-            Label lblHint1a = MakeHintLine("Kenar çubuğundaki güneş simgesiyle", 20, 90, width - 40);
-            Label lblHint1b = MakeHintLine("aynı ayardır.", 20, 108, width - 40);
-            SetupToggle(pnlThemeToggle, () => AppTheme.IsDark, () => _onThemeToggle());
-            pnlThemeToggle.Left = width - 72; pnlThemeToggle.Top = 52; pnlThemeToggle.Width = 52; pnlThemeToggle.Height = 28;
-
-            Panel divider1 = MakeSectionDivider(20, 142, width - 40);
-
-            Label lblSection2 = new Label { Text = "Gizlilik", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 164, AutoSize = true };
-            Label lblRow2 = new Label { Text = "Tutarları Gizle", Left = 20, Top = 202, Width = width - 100, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
-            Label lblHint2a = MakeHintLine("Açıkken tüm ekranlardaki tutarlar", 20, 238, width - 40);
-            Label lblHint2b = MakeHintLine("•••••• olarak gösterilir.", 20, 256, width - 40);
             SetupToggle(pnlHideToggle, () => _user.HideAmountsEnabled, () => _onHideAmountsToggle());
-            pnlHideToggle.Left = width - 72; pnlHideToggle.Top = 200; pnlHideToggle.Width = 52; pnlHideToggle.Height = 28;
+            pnlHideToggle.Left = width - 76; pnlHideToggle.Top = 10; pnlHideToggle.Width = 52; pnlHideToggle.Height = 28;
 
-            Panel divider2 = MakeSectionDivider(20, 290, width - 40);
-
-            Label lblSection3 = new Label { Text = "Hakkında", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 312, AutoSize = true };
-            Label lblAppName = new Label { Text = "Kişisel Finans Takip Sistemi", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 350, AutoSize = true };
-            Label lblVersion = new Label { Text = "Sürüm 1.0", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, Left = 20, Top = 378, AutoSize = true };
-            Label lblDesc1 = MakeHintLine("Gelir, gider ve hedeflerinizi tek", 20, 406, width - 40);
-            Label lblDesc2 = MakeHintLine("yerden takip edin; kasa/cüzdan", 20, 424, width - 40);
-            Label lblDesc3 = MakeHintLine("bakiyenizi yönetin, raporlarınızı", 20, 442, width - 40);
-            Label lblDesc4 = MakeHintLine("görüntüleyin.", 20, 460, width - 40);
-
-            card.Controls.Add(lblSection1);
-            card.Controls.Add(lblRow1);
-            card.Controls.Add(pnlThemeToggle);
-            card.Controls.Add(lblHint1a);
-            card.Controls.Add(lblHint1b);
-            card.Controls.Add(divider1);
-            card.Controls.Add(lblSection2);
-            card.Controls.Add(lblRow2);
-            card.Controls.Add(pnlHideToggle);
-            card.Controls.Add(lblHint2a);
-            card.Controls.Add(lblHint2b);
-            card.Controls.Add(divider2);
-            card.Controls.Add(lblSection3);
-            card.Controls.Add(lblAppName);
-            card.Controls.Add(lblVersion);
-            card.Controls.Add(lblDesc1);
-            card.Controls.Add(lblDesc2);
-            card.Controls.Add(lblDesc3);
-            card.Controls.Add(lblDesc4);
+            body.Controls.Add(lblRow);
+            body.Controls.Add(lblHint1);
+            body.Controls.Add(lblHint2);
+            body.Controls.Add(pnlHideToggle);
         }
 
-        // --- Tek uzun kart: Veri Yönetimi + Oturum ---
-        private void BuildDataSessionCard(int left, int top, int width)
+        // --- Hakkında ---
+        private void BuildAboutBody(Panel body, int width)
         {
-            Panel card = CreateCard(left, top, width, 440);
+            Label lblAppName = new Label { Text = "Kişisel Finans Takip Sistemi", Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 24, Top = 10, AutoSize = true };
+            Label lblVersion = new Label { Text = "Sürüm 1.0", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, Left = 24, Top = 34, AutoSize = true };
+            Label lblDesc1 = MakeHintLine("Gelir, gider ve hedeflerinizi tek", 24, 62, width - 48);
+            Label lblDesc2 = MakeHintLine("yerden takip edin; kasa/cüzdan", 24, 80, width - 48);
+            Label lblDesc3 = MakeHintLine("bakiyenizi yönetin, raporlarınızı", 24, 98, width - 48);
+            Label lblDesc4 = MakeHintLine("görüntüleyin.", 24, 116, width - 48);
 
-            Label lblSection1 = new Label { Text = "Veri Yönetimi", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 16, AutoSize = true };
-            Label lblHint1 = MakeHintLine("İşlemler ve Kategoriler ekranlarındaki", 20, 54, width - 40);
-            Label lblHint2 = MakeHintLine("dışa aktarma kısayolları.", 20, 72, width - 40);
+            body.Controls.Add(lblAppName);
+            body.Controls.Add(lblVersion);
+            body.Controls.Add(lblDesc1);
+            body.Controls.Add(lblDesc2);
+            body.Controls.Add(lblDesc3);
+            body.Controls.Add(lblDesc4);
+        }
 
-            Button btnExportTx = new Button { Text = "📄 Tüm İşlemleri CSV'ye Aktar", Left = 20, Top = 100, Width = width - 40, Height = 44, Cursor = Cursors.Hand };
+        // --- Veri yönetimi: hızlı CSV dışa aktarma ---
+        private void BuildDataBody(Panel body, int width)
+        {
+            Label lblHint1 = MakeHintLine("İşlemler ve Kategoriler ekranlarındaki", 24, 10, width - 48);
+            Label lblHint2 = MakeHintLine("dışa aktarma kısayolları.", 24, 28, width - 48);
+
+            Button btnExportTx = new Button { Text = "📄 Tüm İşlemleri CSV'ye Aktar", Left = 24, Top = 56, Width = width - 48, Height = 44, Cursor = Cursors.Hand };
             SetupOutlinedButton(btnExportTx, TextMuted, TextLight);
             btnExportTx.Click += (s, e) => ExportTransactions();
 
-            Button btnExportCat = new Button { Text = "📄 Tüm Kategorileri CSV'ye Aktar", Left = 20, Top = 154, Width = width - 40, Height = 44, Cursor = Cursors.Hand };
+            Button btnExportCat = new Button { Text = "📄 Tüm Kategorileri CSV'ye Aktar", Left = 24, Top = 110, Width = width - 48, Height = 44, Cursor = Cursors.Hand };
             SetupOutlinedButton(btnExportCat, TextMuted, TextLight);
             btnExportCat.Click += (s, e) => ExportCategories();
 
-            lblDataStatus.Left = 20; lblDataStatus.Top = 206; lblDataStatus.Width = width - 40; lblDataStatus.Height = 24;
+            lblDataStatus.Left = 24; lblDataStatus.Top = 162; lblDataStatus.Width = width - 48; lblDataStatus.Height = 24;
             lblDataStatus.Font = new Font("Segoe UI", 9F); lblDataStatus.BackColor = Color.Transparent;
 
-            Panel divider = MakeSectionDivider(20, 246, width - 40);
-
-            bool remembered = RememberMeHelper.Load() != null;
-
-            Label lblSection2 = new Label { Text = "Oturum", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, Left = 20, Top = 268, AutoSize = true };
-            Label lblRow = new Label
-            {
-                Text = remembered ? "\"Beni hatırla\" bu cihazda etkin." : "\"Beni hatırla\" bu cihazda kayıtlı değil.",
-                Left = 20,
-                Top = 306,
-                Width = width - 40,
-                Height = 24,
-                ForeColor = TextLight,
-                BackColor = Color.Transparent
-            };
-
-            Button btnClear = new Button { Text = "Kayıtlı Oturum Bilgisini Temizle", Left = 20, Top = 338, Width = width - 40, Height = 44, Cursor = Cursors.Hand, Enabled = remembered };
-            SetupOutlinedButton(btnClear, remembered ? AppTheme.DangerColor : TextMuted, remembered ? AppTheme.DangerColor : TextMuted);
-            btnClear.Click += (s, e) =>
-            {
-                RememberMeHelper.Clear();
-                btnClear.Enabled = false;
-                btnClear.Invalidate();
-                lblRow.Text = "\"Beni hatırla\" bu cihazda kayıtlı değil.";
-                lblSessionStatus.ForeColor = Color.FromArgb(120, 220, 150);
-                lblSessionStatus.Text = "Kayıtlı oturum bilgisi temizlendi.";
-            };
-
-            lblSessionStatus.Left = 20; lblSessionStatus.Top = 390; lblSessionStatus.Width = width - 40; lblSessionStatus.Height = 24;
-            lblSessionStatus.Font = new Font("Segoe UI", 9F); lblSessionStatus.BackColor = Color.Transparent;
-
-            card.Controls.Add(lblSection1);
-            card.Controls.Add(lblHint1);
-            card.Controls.Add(lblHint2);
-            card.Controls.Add(btnExportTx);
-            card.Controls.Add(btnExportCat);
-            card.Controls.Add(lblDataStatus);
-            card.Controls.Add(divider);
-            card.Controls.Add(lblSection2);
-            card.Controls.Add(lblRow);
-            card.Controls.Add(btnClear);
-            card.Controls.Add(lblSessionStatus);
+            body.Controls.Add(lblHint1);
+            body.Controls.Add(lblHint2);
+            body.Controls.Add(btnExportTx);
+            body.Controls.Add(btnExportCat);
+            body.Controls.Add(lblDataStatus);
         }
 
         private void ExportTransactions()
@@ -251,7 +233,124 @@ namespace PersonalFinanceApp
 
         private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
 
-        // --- Açma/kapama anahtarı (toggle switch) — ProfileControl'deki desenin genel hâli ---
+        // --- Oturum: Beni Hatırla durumu ---
+        private void BuildSessionBody(Panel body, int width)
+        {
+            bool remembered = RememberMeHelper.Load() != null;
+
+            Label lblRow = new Label
+            {
+                Text = remembered ? "\"Beni hatırla\" bu cihazda etkin." : "\"Beni hatırla\" bu cihazda kayıtlı değil.",
+                Left = 24,
+                Top = 10,
+                Width = width - 48,
+                Height = 24,
+                ForeColor = TextLight,
+                BackColor = Color.Transparent
+            };
+
+            Button btnClear = new Button { Text = "Kayıtlı Oturum Bilgisini Temizle", Left = 24, Top = 42, Width = width - 48, Height = 44, Cursor = Cursors.Hand, Enabled = remembered };
+            SetupOutlinedButton(btnClear, remembered ? AppTheme.DangerColor : TextMuted, remembered ? AppTheme.DangerColor : TextMuted);
+            btnClear.Click += (s, e) =>
+            {
+                RememberMeHelper.Clear();
+                btnClear.Enabled = false;
+                btnClear.Invalidate();
+                lblRow.Text = "\"Beni hatırla\" bu cihazda kayıtlı değil.";
+                lblSessionStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                lblSessionStatus.Text = "Kayıtlı oturum bilgisi temizlendi.";
+            };
+
+            lblSessionStatus.Left = 24; lblSessionStatus.Top = 94; lblSessionStatus.Width = width - 48; lblSessionStatus.Height = 24;
+            lblSessionStatus.Font = new Font("Segoe UI", 9F); lblSessionStatus.BackColor = Color.Transparent;
+
+            body.Controls.Add(lblRow);
+            body.Controls.Add(btnClear);
+            body.Controls.Add(lblSessionStatus);
+        }
+
+        // --- Şifre Değiştir (eskiden sidebar'daki ayrı ekrandı; artık Ayarlar'da bir bölüm) ---
+        private void BuildPasswordBody(Panel body, int width)
+        {
+            int fieldWidth = width - 48;
+
+            Label lblCurrent = new Label { Text = "Mevcut Şifre:", Left = 24, Top = 10, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlCurrent = new Panel { Left = 24, Top = 30, Width = fieldWidth, Height = 40 };
+            SetupSmoothContainer(pnlCurrent, 8, FieldBackColor, CardBackColor);
+            txtCurrentPassword.Left = 10; txtCurrentPassword.Top = 10; txtCurrentPassword.Width = fieldWidth - 20;
+            txtCurrentPassword.Font = new Font("Segoe UI", 10.5F); txtCurrentPassword.BorderStyle = BorderStyle.None;
+            txtCurrentPassword.BackColor = FieldBackColor; txtCurrentPassword.ForeColor = TextLight; txtCurrentPassword.UseSystemPasswordChar = true;
+            pnlCurrent.Controls.Add(txtCurrentPassword);
+
+            Label lblNew = new Label { Text = "Yeni Şifre (en az 6 karakter):", Left = 24, Top = 82, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlNew = new Panel { Left = 24, Top = 102, Width = fieldWidth, Height = 40 };
+            SetupSmoothContainer(pnlNew, 8, FieldBackColor, CardBackColor);
+            txtNewPassword.Left = 10; txtNewPassword.Top = 10; txtNewPassword.Width = fieldWidth - 20;
+            txtNewPassword.Font = new Font("Segoe UI", 10.5F); txtNewPassword.BorderStyle = BorderStyle.None;
+            txtNewPassword.BackColor = FieldBackColor; txtNewPassword.ForeColor = TextLight; txtNewPassword.UseSystemPasswordChar = true;
+            pnlNew.Controls.Add(txtNewPassword);
+
+            Label lblConfirm = new Label { Text = "Yeni Şifre (tekrar):", Left = 24, Top = 154, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlConfirm = new Panel { Left = 24, Top = 174, Width = fieldWidth, Height = 40 };
+            SetupSmoothContainer(pnlConfirm, 8, FieldBackColor, CardBackColor);
+            txtConfirmPassword.Left = 10; txtConfirmPassword.Top = 10; txtConfirmPassword.Width = fieldWidth - 20;
+            txtConfirmPassword.Font = new Font("Segoe UI", 10.5F); txtConfirmPassword.BorderStyle = BorderStyle.None;
+            txtConfirmPassword.BackColor = FieldBackColor; txtConfirmPassword.ForeColor = TextLight; txtConfirmPassword.UseSystemPasswordChar = true;
+            pnlConfirm.Controls.Add(txtConfirmPassword);
+
+            chkShowPasswords.Text = "Şifreleri göster";
+            chkShowPasswords.Left = 24; chkShowPasswords.Top = 226; chkShowPasswords.AutoSize = true;
+            chkShowPasswords.ForeColor = TextMuted; chkShowPasswords.BackColor = Color.Transparent;
+            chkShowPasswords.CheckedChanged += (s, e) =>
+            {
+                bool show = chkShowPasswords.Checked;
+                txtCurrentPassword.UseSystemPasswordChar = !show;
+                txtNewPassword.UseSystemPasswordChar = !show;
+                txtConfirmPassword.UseSystemPasswordChar = !show;
+            };
+
+            Button btnSavePassword = new Button { Text = "💾 Şifreyi Güncelle", Left = 24, Top = 258, Width = 240, Height = 38, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnSavePassword, AccentColor, Color.White);
+            btnSavePassword.Click += BtnSavePassword_Click;
+
+            lblPasswordStatus.Left = 24; lblPasswordStatus.Top = 304; lblPasswordStatus.Width = fieldWidth; lblPasswordStatus.Height = 24;
+            lblPasswordStatus.Font = new Font("Segoe UI", 9F); lblPasswordStatus.BackColor = Color.Transparent;
+
+            body.Controls.Add(lblCurrent); body.Controls.Add(pnlCurrent);
+            body.Controls.Add(lblNew); body.Controls.Add(pnlNew);
+            body.Controls.Add(lblConfirm); body.Controls.Add(pnlConfirm);
+            body.Controls.Add(chkShowPasswords);
+            body.Controls.Add(btnSavePassword);
+            body.Controls.Add(lblPasswordStatus);
+        }
+
+        private void BtnSavePassword_Click(object? sender, EventArgs e)
+        {
+            string current = txtCurrentPassword.Text;
+            string newPass = txtNewPassword.Text;
+            string confirm = txtConfirmPassword.Text;
+
+            if (newPass != confirm)
+            {
+                lblPasswordStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblPasswordStatus.Text = "Yeni şifreler birbiriyle eşleşmiyor.";
+                return;
+            }
+
+            if (_authService.ChangePassword(_user.Id, current, newPass, out string errorMessage))
+            {
+                lblPasswordStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                lblPasswordStatus.Text = "Şifreniz başarıyla güncellendi.";
+                txtCurrentPassword.Clear(); txtNewPassword.Clear(); txtConfirmPassword.Clear();
+            }
+            else
+            {
+                lblPasswordStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblPasswordStatus.Text = errorMessage;
+            }
+        }
+
+        // --- Açma/kapama anahtarı (toggle switch) ---
         private void SetupToggle(Panel toggle, Func<bool> getOn, Action onClick)
         {
             toggle.Paint += (s, e) =>
@@ -282,27 +381,147 @@ namespace PersonalFinanceApp
 
         protected override CreateParams CreateParams { get { CreateParams cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
-        // --- GÖRSEL YARDIMCI METOTLAR ---
-        private Panel CreateCard(int left, int top, int width, int height)
+        // --- AKORDİYON (AÇ/KAPA BÖLÜM) ALTYAPISI ---
+        // Profilim ekranındaki desenin aynısı: bkz. ProfileControl.cs için ayrıntılı açıklama.
+        private class AccordionSection
         {
-            Panel card = new Panel { Left = left, Top = top, Width = width, Height = height };
-            SetupSmoothContainer(card, 14, CardBackColor);
-            this.Controls.Add(card);
-            return card;
+            public Panel Card = new Panel();
+            public Panel Body = new Panel();
+            public Panel Chevron = new Panel();
+            public bool Expanded;
+            public int BodyHeight;
+            public const int HeaderHeight = 56;
+            public const int GapAfterHeader = 24;
+            public const int BottomPadding = 16;
         }
 
-        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        private void AddAccordionSection(string title, int bodyHeight, Action<Panel> buildBody)
         {
-            pnl.BackColor = AppBackColor;
+            var section = new AccordionSection { BodyHeight = bodyHeight, Expanded = false };
+            int width = SectionWidth;
+
+            section.Card.Width = width;
+            section.Card.Height = AccordionSection.HeaderHeight;
+            SetupSmoothContainer(section.Card, 14, CardBackColor);
+            section.Card.Cursor = Cursors.Hand;
+
+            Label lblSectionTitle = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = TextLight,
+                BackColor = Color.Transparent,
+                Left = 24,
+                Top = 0,
+                Width = width - 80,
+                Height = AccordionSection.HeaderHeight,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand
+            };
+
+            section.Chevron.Width = 22;
+            section.Chevron.Height = 22;
+            section.Chevron.Left = width - 46;
+            section.Chevron.Top = (AccordionSection.HeaderHeight - 22) / 2;
+            section.Chevron.BackColor = Color.Transparent;
+            section.Chevron.Cursor = Cursors.Hand;
+            section.Chevron.Paint += (s, e) => DrawChevron(e.Graphics, section.Chevron.ClientRectangle, section.Expanded);
+
+            Panel divider = new Panel { Left = 24, Top = AccordionSection.HeaderHeight, Width = width - 48, Height = 1, BackColor = AppTheme.SidebarDividerColor, Visible = false };
+
+            section.Body.Left = 0;
+            section.Body.Top = AccordionSection.HeaderHeight + AccordionSection.GapAfterHeader;
+            section.Body.Width = width;
+            section.Body.Height = bodyHeight;
+            section.Body.BackColor = CardBackColor;
+            section.Body.Visible = false;
+            buildBody(section.Body);
+
+            void Toggle()
+            {
+                section.Expanded = !section.Expanded;
+                section.Body.Visible = section.Expanded;
+                divider.Visible = section.Expanded;
+                section.Card.Height = section.Expanded
+                    ? AccordionSection.HeaderHeight + AccordionSection.GapAfterHeader + bodyHeight + AccordionSection.BottomPadding
+                    : AccordionSection.HeaderHeight;
+                section.Chevron.Invalidate();
+                RelayoutSections();
+            }
+
+            section.Card.Click += (s, e) => Toggle();
+            lblSectionTitle.Click += (s, e) => Toggle();
+            section.Chevron.Click += (s, e) => Toggle();
+
+            section.Card.Controls.Add(lblSectionTitle);
+            section.Card.Controls.Add(section.Chevron);
+            section.Card.Controls.Add(divider);
+            section.Card.Controls.Add(section.Body);
+
+            pnlScroll.Controls.Add(section.Card);
+            _sections.Add(section);
+        }
+
+        private static void DrawChevron(Graphics g, Rectangle r, bool expanded)
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var pen = new Pen(TextMuted, 2.2f)
+            {
+                StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                EndCap = System.Drawing.Drawing2D.LineCap.Round,
+                LineJoin = System.Drawing.Drawing2D.LineJoin.Round
+            };
+            int cx = r.Left + r.Width / 2, cy = r.Top + r.Height / 2;
+            if (expanded)
+            {
+                g.DrawLines(pen, new PointF[] { new PointF(cx - 6, cy - 2), new PointF(cx, cy + 5), new PointF(cx + 6, cy - 2) });
+            }
+            else
+            {
+                g.DrawLines(pen, new PointF[] { new PointF(cx - 3, cy - 7), new PointF(cx + 4, cy), new PointF(cx - 3, cy + 7) });
+            }
+        }
+
+        private void RelayoutSections()
+        {
+            int y = 8;
+            foreach (var section in _sections)
+            {
+                section.Card.Top = y;
+                y += section.Card.Height + 16;
+            }
+        }
+
+        // --- GÖRSEL YARDIMCI METOTLAR ---
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) => SetupSmoothContainer(pnl, radius, bgColor, AppBackColor);
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor, Color clearColor)
+        {
+            pnl.BackColor = clearColor;
             pnl.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
+                e.Graphics.Clear(clearColor);
                 using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
                 using var brush = new SolidBrush(bgColor);
                 e.Graphics.FillPath(brush, path);
             };
             pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
         }
 
         private void SetupOutlinedButton(Button btn, Color borderColor, Color textColor)
