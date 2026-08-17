@@ -27,7 +27,7 @@ namespace PersonalFinanceApp.Services
                 return false;
             }
 
-            if (type != "income" && type != "expense" && type != "goal")
+            if (type != "income" && type != "expense" && type != "goal" && type != "invest")
             {
                 errorMessage = "Geçersiz kategori tipi.";
                 return false;
