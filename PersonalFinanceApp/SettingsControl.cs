@@ -61,8 +61,12 @@ namespace PersonalFinanceApp
             pnlScroll.Left = 30;
             pnlScroll.Top = 70;
             pnlScroll.AutoScroll = true;
+            pnlScroll.HorizontalScroll.Enabled = false;
+            pnlScroll.HorizontalScroll.Visible = false;
             pnlScroll.BackColor = AppBackColor;
+            EnableDoubleBuffering(pnlScroll);
             this.Controls.Add(pnlScroll);
+            DarkTitleBarHelper.SetScrollBarDarkMode(pnlScroll, AppTheme.IsDark);
             this.Resize += (s, e) => ResizeScrollArea();
             ResizeScrollArea();
 
@@ -71,7 +75,7 @@ namespace PersonalFinanceApp
             AddAccordionSection("Hakkında", 150, body => BuildAboutBody(body, SectionWidth));
             AddAccordionSection("Veri Yönetimi", 200, body => BuildDataBody(body, SectionWidth));
             AddAccordionSection("Oturum", 140, body => BuildSessionBody(body, SectionWidth));
-            AddAccordionSection("Şifre Değiştir", 340, body => BuildPasswordBody(body, SectionWidth));
+            AddAccordionSection("Şifre Değiştir", 380, body => BuildPasswordBody(body, SectionWidth));
 
             RelayoutSections();
         }
@@ -274,24 +278,24 @@ namespace PersonalFinanceApp
         {
             int fieldWidth = width - 48;
 
-            Label lblCurrent = new Label { Text = "Mevcut Şifre:", Left = 24, Top = 10, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlCurrent = new Panel { Left = 24, Top = 30, Width = fieldWidth, Height = 40 };
+            Label lblCurrent = new Label { Text = "Mevcut Şifre:", Left = 24, Top = 10, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
+            Panel pnlCurrent = new Panel { Left = 24, Top = 36, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlCurrent, 8, FieldBackColor, CardBackColor);
             txtCurrentPassword.Left = 10; txtCurrentPassword.Top = 10; txtCurrentPassword.Width = fieldWidth - 20;
             txtCurrentPassword.Font = new Font("Segoe UI", 10.5F); txtCurrentPassword.BorderStyle = BorderStyle.None;
             txtCurrentPassword.BackColor = FieldBackColor; txtCurrentPassword.ForeColor = TextLight; txtCurrentPassword.UseSystemPasswordChar = true;
             pnlCurrent.Controls.Add(txtCurrentPassword);
 
-            Label lblNew = new Label { Text = "Yeni Şifre (en az 6 karakter):", Left = 24, Top = 82, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlNew = new Panel { Left = 24, Top = 102, Width = fieldWidth, Height = 40 };
+            Label lblNew = new Label { Text = "Yeni Şifre (en az 6 karakter):", Left = 24, Top = 92, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
+            Panel pnlNew = new Panel { Left = 24, Top = 118, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlNew, 8, FieldBackColor, CardBackColor);
             txtNewPassword.Left = 10; txtNewPassword.Top = 10; txtNewPassword.Width = fieldWidth - 20;
             txtNewPassword.Font = new Font("Segoe UI", 10.5F); txtNewPassword.BorderStyle = BorderStyle.None;
             txtNewPassword.BackColor = FieldBackColor; txtNewPassword.ForeColor = TextLight; txtNewPassword.UseSystemPasswordChar = true;
             pnlNew.Controls.Add(txtNewPassword);
 
-            Label lblConfirm = new Label { Text = "Yeni Şifre (tekrar):", Left = 24, Top = 154, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlConfirm = new Panel { Left = 24, Top = 174, Width = fieldWidth, Height = 40 };
+            Label lblConfirm = new Label { Text = "Yeni Şifre (tekrar):", Left = 24, Top = 174, ForeColor = TextMuted, BackColor = CardBackColor, AutoSize = true };
+            Panel pnlConfirm = new Panel { Left = 24, Top = 200, Width = fieldWidth, Height = 40 };
             SetupSmoothContainer(pnlConfirm, 8, FieldBackColor, CardBackColor);
             txtConfirmPassword.Left = 10; txtConfirmPassword.Top = 10; txtConfirmPassword.Width = fieldWidth - 20;
             txtConfirmPassword.Font = new Font("Segoe UI", 10.5F); txtConfirmPassword.BorderStyle = BorderStyle.None;
@@ -299,8 +303,8 @@ namespace PersonalFinanceApp
             pnlConfirm.Controls.Add(txtConfirmPassword);
 
             chkShowPasswords.Text = "Şifreleri göster";
-            chkShowPasswords.Left = 24; chkShowPasswords.Top = 226; chkShowPasswords.AutoSize = true;
-            chkShowPasswords.ForeColor = TextMuted; chkShowPasswords.BackColor = Color.Transparent;
+            chkShowPasswords.Left = 24; chkShowPasswords.Top = 252; chkShowPasswords.AutoSize = true;
+            chkShowPasswords.ForeColor = TextMuted; chkShowPasswords.BackColor = CardBackColor;
             chkShowPasswords.CheckedChanged += (s, e) =>
             {
                 bool show = chkShowPasswords.Checked;
@@ -309,11 +313,11 @@ namespace PersonalFinanceApp
                 txtConfirmPassword.UseSystemPasswordChar = !show;
             };
 
-            Button btnSavePassword = new Button { Text = "💾 Şifreyi Güncelle", Left = 24, Top = 258, Width = 240, Height = 38, Cursor = Cursors.Hand };
+            Button btnSavePassword = new Button { Text = "💾 Şifreyi Güncelle", Left = 24, Top = 284, Width = 240, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnSavePassword, AccentColor, Color.White);
             btnSavePassword.Click += BtnSavePassword_Click;
 
-            lblPasswordStatus.Left = 24; lblPasswordStatus.Top = 304; lblPasswordStatus.Width = fieldWidth; lblPasswordStatus.Height = 24;
+            lblPasswordStatus.Left = 24; lblPasswordStatus.Top = 330; lblPasswordStatus.Width = fieldWidth; lblPasswordStatus.Height = 24;
             lblPasswordStatus.Font = new Font("Segoe UI", 9F); lblPasswordStatus.BackColor = Color.Transparent;
 
             body.Controls.Add(lblCurrent); body.Controls.Add(pnlCurrent);
@@ -404,6 +408,8 @@ namespace PersonalFinanceApp
             section.Card.Height = AccordionSection.HeaderHeight;
             SetupSmoothContainer(section.Card, 14, CardBackColor);
             section.Card.Cursor = Cursors.Hand;
+            EnableDoubleBuffering(section.Card);
+            EnableDoubleBuffering(section.Body);
 
             Label lblSectionTitle = new Label
             {
@@ -490,6 +496,24 @@ namespace PersonalFinanceApp
                 section.Card.Top = y;
                 y += section.Card.Height + 16;
             }
+
+            // Genişliği hep 0 olarak sabitliyoruz ki içerik hiçbir zaman yatay kaydırma
+            // gerektirmesin (sığdığı halde ara sıra yatay kaydırma çubuğu çıkıyordu); dikey
+            // kaydırma için gereken yüksekliği ise burada kendimiz belirliyoruz.
+            pnlScroll.AutoScrollMinSize = new Size(0, y);
+        }
+
+        // MainForm'daki EnableDoubleBuffering ile aynı: kaydırılabilir alan çift arabellekli
+        // olmayınca (özellikle özel çizimli kartlarla) kaydırma sırasında eski karelerden kalma
+        // izler ("hayalet" koyu kutular) görülebiliyordu.
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
         }
 
         // --- GÖRSEL YARDIMCI METOTLAR ---

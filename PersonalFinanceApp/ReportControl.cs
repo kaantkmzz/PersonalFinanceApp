@@ -463,7 +463,7 @@ namespace PersonalFinanceApp
                 int index = series.Points.AddXY(name, amount);
                 series.Points[index].Color = color;
                 series.Points[index].BorderColor = SliceBorderColor;
-                series.Points[index].BorderWidth = 2;
+                series.Points[index].BorderWidth = 3;
                 if (details != null) series.Points[index].Tag = details;
                 return index;
             }
@@ -888,7 +888,7 @@ namespace PersonalFinanceApp
             if (_hoveredPointIndex >= 0 && _hoveredPointIndex < series.Points.Count)
             {
                 series.Points[_hoveredPointIndex].BorderColor = SliceBorderColor;
-                series.Points[_hoveredPointIndex].BorderWidth = 2;
+                series.Points[_hoveredPointIndex].BorderWidth = 3;
             }
 
             if (newIndex >= 0 && newIndex < series.Points.Count)
@@ -906,7 +906,7 @@ namespace PersonalFinanceApp
             if (series != null && _hoveredPointIndex >= 0 && _hoveredPointIndex < series.Points.Count)
             {
                 series.Points[_hoveredPointIndex].BorderColor = SliceBorderColor;
-                series.Points[_hoveredPointIndex].BorderWidth = 2;
+                series.Points[_hoveredPointIndex].BorderWidth = 3;
             }
             _hoveredPointIndex = -1;
         }
@@ -939,7 +939,7 @@ namespace PersonalFinanceApp
                 {
                     if (idx < 0 || idx >= series.Points.Count) continue;
                     series.Points[idx].BorderColor = SliceBorderColor;
-                    series.Points[idx].BorderWidth = 2;
+                    series.Points[idx].BorderWidth = 3;
                 }
             }
             _legendHoverIndices.Clear();
