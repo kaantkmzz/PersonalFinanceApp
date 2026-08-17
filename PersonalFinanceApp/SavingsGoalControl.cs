@@ -87,12 +87,14 @@ namespace PersonalFinanceApp
             Label lblGoalName = new Label { Text = "Yeni Hedef Adı:", Left = 20, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlGoalName = new Panel { Left = 20, Top = 95, Width = 250, Height = 38 };
             SetupSmoothContainer(pnlGoalName, 8, CardBackColor);
+            txtGoalName.Name = "GoalName";
             txtGoalName.BorderStyle = BorderStyle.None; txtGoalName.Font = new Font("Segoe UI", 10.5F); txtGoalName.BackColor = CardBackColor; txtGoalName.ForeColor = TextLight; txtGoalName.Width = 230; txtGoalName.Location = new Point(10, 8);
             pnlGoalName.Controls.Add(txtGoalName);
 
             Label lblTargetAmount = new Label { Text = "Hedef Tutar:", Left = 290, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlTargetAmount = new Panel { Left = 290, Top = 95, Width = 150, Height = 38 };
             SetupSmoothContainer(pnlTargetAmount, 8, CardBackColor);
+            txtTargetAmount.Name = "GoalTargetAmount";
             txtTargetAmount.BorderStyle = BorderStyle.None; txtTargetAmount.Font = new Font("Segoe UI", 10.5F); txtTargetAmount.BackColor = CardBackColor; txtTargetAmount.ForeColor = TextLight; txtTargetAmount.Width = 130; txtTargetAmount.Location = new Point(10, 8);
             txtTargetAmount.TextChanged += TxtTargetAmount_TextChanged;
             pnlTargetAmount.Controls.Add(txtTargetAmount);

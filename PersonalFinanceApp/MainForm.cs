@@ -427,6 +427,11 @@ namespace PersonalFinanceApp
                 reportDrillDownType = activeReport.DrillDownType;
             }
 
+            // Aktif ekranda kullanıcının henüz kaydetmediği bir form girişi olabilir (ör. İşlemler'de
+            // yarım kalmış bir kayıt). Tema değişince ekran yeniden kurulacağı için bu veriyi
+            // kaybetmemek adına, Name'i atanmış denetimlerin değerlerini önce yakalıyoruz.
+            Dictionary<string, object>? activeFormState = _visibleControl != null ? CaptureFormState(_visibleControl) : null;
+
             foreach (var control in _screenCache.Values)
             {
                 pnlContent.Controls.Remove(control);
@@ -441,12 +446,72 @@ namespace PersonalFinanceApp
             BuildSidebar();
             ShowCachedContent(_activeContentKey, _activeContentFactory);
 
+            if (activeFormState != null && activeFormState.Count > 0 && _visibleControl != null)
+            {
+                RestoreFormState(_visibleControl, activeFormState);
+            }
+
             if (reportDrillDownType != null && _screenCache.TryGetValue("report", out var newReportControl) && newReportControl is ReportControl newReport)
             {
                 newReport.RestoreDrillDownType(reportDrillDownType);
             }
 
             this.ResumeLayout(true);
+        }
+
+        // Bir ekranın Name'i atanmış TextBox/ComboBox/NumericUpDown/CheckBox denetimlerinin o anki
+        // değerlerini isimleriyle eşleştirerek toplar (bkz. RebuildForThemeChange).
+        private static Dictionary<string, object> CaptureFormState(Control root)
+        {
+            var state = new Dictionary<string, object>();
+            CaptureFormStateRecursive(root, state);
+            return state;
+        }
+
+        private static void CaptureFormStateRecursive(Control root, Dictionary<string, object> state)
+        {
+            foreach (Control c in root.Controls)
+            {
+                if (!string.IsNullOrEmpty(c.Name))
+                {
+                    switch (c)
+                    {
+                        case TextBox tb: state[c.Name] = tb.Text; break;
+                        case ComboBox cb: state[c.Name] = cb.Text; break;
+                        case NumericUpDown nud: state[c.Name] = nud.Value; break;
+                        case CheckBox chk: state[c.Name] = chk.Checked; break;
+                    }
+                }
+                CaptureFormStateRecursive(c, state);
+            }
+        }
+
+        // CaptureFormState ile toplanan değerleri, yeniden kurulan ekrandaki aynı isimli
+        // denetimlere geri yazar. Denetim ağacı henüz farklı bir düzende olabileceğinden
+        // (ör. bir ComboBox'ın seçenekleri başka bir alana bağlıysa) başarısız tekil atamalar
+        // sessizce yok sayılır; kritik olan metin alanlarının (tutar, açıklama, başlık vb.) kaybolmamasıdır.
+        private static void RestoreFormState(Control root, Dictionary<string, object> state)
+        {
+            foreach (Control c in root.Controls)
+            {
+                if (!string.IsNullOrEmpty(c.Name) && state.TryGetValue(c.Name, out var value))
+                {
+                    try
+                    {
+                        switch (c)
+                        {
+                            case TextBox tb: tb.Text = (string)value; break;
+                            case ComboBox cb: cb.Text = (string)value; break;
+                            case NumericUpDown nud: nud.Value = (decimal)value; break;
+                            case CheckBox chk: chk.Checked = (bool)value; break;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                RestoreFormState(c, state);
+            }
         }
 
         private void EnableDoubleBuffering(Control control)

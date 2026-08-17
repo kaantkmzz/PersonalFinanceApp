@@ -172,6 +172,7 @@ namespace PersonalFinanceApp
             };
             SetupSmoothContainer(pnlTitleWrapper, 8, CardBackColor);
 
+            txtTitle.Name = "NoteTitle";
             txtTitle.BorderStyle = BorderStyle.None;
             txtTitle.Font = new Font("Segoe UI", 11F);
             txtTitle.BackColor = CardBackColor;
@@ -223,6 +224,7 @@ namespace PersonalFinanceApp
             pnlRightBottom.Controls.Add(btnDelete);
             pnlRightBottom.Controls.Add(lblStatus);
 
+            txtContent.Name = "NoteContent";
             txtContent.Dock = DockStyle.Fill;
             txtContent.BorderStyle = BorderStyle.None;
             txtContent.Multiline = true;
