@@ -121,7 +121,7 @@ namespace PersonalFinanceApp
             };
 
             cmb.Left = 10; cmb.Top = 9; cmb.Width = 280;
-            cmb.Font = new Font("Segoe UI", 10F);
+            cmb.Font = new Font("Segoe UI", 9F);
             cmb.DropDownStyle = ComboBoxStyle.DropDownList;
             cmb.FlatStyle = FlatStyle.Flat;
             cmb.BackColor = CardBackColor;
