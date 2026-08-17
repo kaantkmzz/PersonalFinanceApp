@@ -13,6 +13,7 @@ namespace PersonalFinanceApp
         private readonly ReminderService _reminderService = new ReminderService();
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly ReportService _reportService = new ReportService();
+        private readonly SavingsGoalService _savingsGoalService = new SavingsGoalService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -25,6 +26,7 @@ namespace PersonalFinanceApp
         private const int CardLeft1 = 20;
         private const int CardLeft2 = 360;
         private const int CardLeft3 = 700;
+        private const int CardLeft4 = 1040;
         private const int CardWidth = 320;
         private const int AllCardsRight = CardLeft3 + CardWidth; // 1020
 
@@ -48,6 +50,7 @@ namespace PersonalFinanceApp
             LoadReminderWidget();
             LoadMiniReportWidget();
             LoadRecentTransactionsWidget();
+            LoadGoalsWidget();
         }
 
         private void SetupUI()
@@ -169,16 +172,19 @@ namespace PersonalFinanceApp
         private Panel pnlReminderWidget = new Panel();
         private Panel pnlMiniReportWidget = new Panel();
         private Panel pnlRecentTxWidget = new Panel();
+        private Panel pnlGoalsWidget = new Panel();
 
         private void SetupMiniWidgets()
         {
             pnlReminderWidget = CreateWidgetCard(CardLeft1, "⏰ Yaklaşan Hatırlatıcılar", "Hatırlatıcılar");
             pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "📊 Bu Ayın Özeti", "Rapor");
             pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "🧾 Son İşlemler", "İşlemler");
+            pnlGoalsWidget = CreateWidgetCard(CardLeft4, "🎯 Hedeflerim", "Hedefler");
 
             this.Controls.Add(pnlReminderWidget);
             this.Controls.Add(pnlMiniReportWidget);
             this.Controls.Add(pnlRecentTxWidget);
+            this.Controls.Add(pnlGoalsWidget);
         }
 
         private Panel CreateWidgetCard(int left, string titleText, string navigateTarget)
@@ -292,7 +298,7 @@ namespace PersonalFinanceApp
             var report = _reportService.GenerateReport(_user.Id, start, end);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            Chart miniChart = new Chart { Left = 18, Top = 44, Width = 100, Height = 100, BackColor = CardBackColor };
+            Chart miniChart = new Chart { Left = 14, Top = 44, Width = 150, Height = 150, BackColor = CardBackColor };
             ChartArea area = new ChartArea("mini") { BackColor = CardBackColor };
             area.Position = new ElementPosition(0, 0, 100, 100);
             area.InnerPlotPosition = new ElementPosition(0, 0, 100, 100);
@@ -321,10 +327,93 @@ namespace PersonalFinanceApp
             string expenseText = _user.HideAmountsEnabled ? "••••••" : report.TotalExpense.ToString("#,##0", tr) + " ₺";
 
             Action goToReport = () => _onNavigate?.Invoke("Rapor");
-            AddWidgetLine(pnlMiniReportWidget, $"Gelir: {incomeText}", 44, IncomeColor, 130, goToReport);
-            AddWidgetLine(pnlMiniReportWidget, $"Gider: {expenseText}", 74, ExpenseColor, 130, goToReport);
+            AddWidgetLine(pnlMiniReportWidget, $"Gelir: {incomeText}", 92, IncomeColor, 178, goToReport);
+            AddWidgetLine(pnlMiniReportWidget, $"Gider: {expenseText}", 122, ExpenseColor, 178, goToReport);
 
             MakeClickable(miniChart, goToReport);
+        }
+
+        // Tamamlanmamış hedeflerden rastgele 3 tanesini, Hedefler ekranındaki ile aynı stilde
+        // (dolan yuvarlak çubuk) küçük bir önizleme olarak gösterir.
+        private void LoadGoalsWidget()
+        {
+            var rng = new Random();
+            var pending = _savingsGoalService.GetUserGoals(_user.Id)
+                .Where(g => !g.IsAchieved)
+                .OrderBy(_ => rng.Next())
+                .Take(3)
+                .ToList();
+
+            Action goToGoals = () => _onNavigate?.Invoke("Hedefler");
+
+            if (pending.Count == 0)
+            {
+                AddWidgetLine(pnlGoalsWidget, "Tamamlanmamış hedef yok.", 48, TextMuted, 18, goToGoals);
+                return;
+            }
+
+            int top = 48;
+            foreach (var g in pending)
+            {
+                double percent = g.TargetAmount > 0 ? Math.Min(100, Math.Max(0, (double)(g.CurrentAmount / g.TargetAmount * 100))) : 0;
+
+                Label lblName = new Label
+                {
+                    Text = g.GoalName,
+                    ForeColor = TextLight,
+                    Left = 18,
+                    Top = top,
+                    AutoSize = true,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F),
+                    MaximumSize = new Size(CardWidth - 90, 0)
+                };
+                Label lblPercent = new Label
+                {
+                    Text = $"%{percent:0}",
+                    ForeColor = TextMuted,
+                    Left = CardWidth - 78,
+                    Top = top,
+                    Width = 60,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                pnlGoalsWidget.Controls.Add(lblName);
+                pnlGoalsWidget.Controls.Add(lblPercent);
+                MakeClickable(lblName, goToGoals);
+                MakeClickable(lblPercent, goToGoals);
+
+                Panel bar = CreateMiniProgressBar(18, top + 22, CardWidth - 36, percent);
+                pnlGoalsWidget.Controls.Add(bar);
+                MakeClickable(bar, goToGoals);
+
+                top += 48;
+            }
+        }
+
+        // Hedefler ekranındaki dolan çubukla aynı görsel dil: gri iz + dolu kısım (yaklaşık tamamsa yeşil).
+        private Panel CreateMiniProgressBar(int left, int top, int width, double percent)
+        {
+            const int barHeight = 8;
+            Panel bar = new Panel { Left = left, Top = top, Width = width, Height = barHeight, BackColor = Color.Transparent };
+            bar.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var trackPath = GetRoundedRectPath(new Rectangle(0, 0, bar.Width, bar.Height), barHeight / 2))
+                using (var trackBrush = new SolidBrush(AppTheme.GridLineColor))
+                    e.Graphics.FillPath(trackBrush, trackPath);
+
+                int fillWidth = (int)(bar.Width * (percent / 100.0));
+                if (fillWidth > barHeight)
+                {
+                    Color fillColor = percent >= 99.9 ? AppTheme.SuccessColor : AccentColor;
+                    using var fillPath = GetRoundedRectPath(new Rectangle(0, 0, fillWidth, bar.Height), barHeight / 2);
+                    using var fillBrush = new SolidBrush(fillColor);
+                    e.Graphics.FillPath(fillBrush, fillPath);
+                }
+            };
+            return bar;
         }
 
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
