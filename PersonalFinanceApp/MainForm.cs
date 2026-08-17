@@ -125,6 +125,7 @@ namespace PersonalFinanceApp
                 "Kategoriler",
                 "Rapor",
                 "Hedefler",
+                "Varlıklarım",
                 "Notlar",
                 "Hatırlatıcılar",
                 "Profilim",
@@ -422,9 +423,11 @@ namespace PersonalFinanceApp
             // Rapor ekranı o an açıksa ve bir kırılım (drill-down) görünümü inceleniyorsa, ekran
             // sıfırdan kurulacağı için bu durumu yakalayıp yeni örneğe geri uyguluyoruz.
             string? reportDrillDownType = null;
+            bool reportAssetMode = false;
             if (_activeContentKey == "report" && _screenCache.TryGetValue("report", out var activeReportControl) && activeReportControl is ReportControl activeReport)
             {
                 reportDrillDownType = activeReport.DrillDownType;
+                reportAssetMode = activeReport.IsAssetReportMode;
             }
 
             // Aktif ekranda kullanıcının henüz kaydetmediği bir form girişi olabilir (ör. İşlemler'de
@@ -451,9 +454,12 @@ namespace PersonalFinanceApp
                 RestoreFormState(_visibleControl, activeFormState);
             }
 
-            if (reportDrillDownType != null && _screenCache.TryGetValue("report", out var newReportControl) && newReportControl is ReportControl newReport)
+            if (_screenCache.TryGetValue("report", out var newReportControl) && newReportControl is ReportControl newReport)
             {
-                newReport.RestoreDrillDownType(reportDrillDownType);
+                if (reportAssetMode)
+                    newReport.RestoreAssetReportMode(true);
+                else if (reportDrillDownType != null)
+                    newReport.RestoreDrillDownType(reportDrillDownType);
             }
 
             this.ResumeLayout(true);
@@ -712,6 +718,9 @@ namespace PersonalFinanceApp
                     break;
                 case "Hedefler":
                     ShowCachedContent("goals", () => new SavingsGoalControl(_user));
+                    break;
+                case "Varlıklarım":
+                    ShowCachedContent("assets", () => new AssetControl(_user));
                     break;
                 case "Notlar":
                     ShowCachedContent("notes", () => new NoteControl(_user));

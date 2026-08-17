@@ -10,6 +10,10 @@ namespace PersonalFinanceApp
         private readonly User _user;
         private readonly ReportService _reportService = new ReportService();
         private readonly AccountService _accountService = new AccountService();
+        private readonly AssetService _assetService = new AssetService();
+
+        private enum ReportMode { Genel, Varliklarim }
+        private ReportMode _reportMode = ReportMode.Genel;
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -29,6 +33,10 @@ namespace PersonalFinanceApp
         // sağlıyor.
         private static Color HoverHighlightColor => AppTheme.AccentColor;
 
+        private Label lblMonth = new Label();
+        private Panel pnlMonth = new Panel();
+        private Label lblYear = new Label();
+        private Panel pnlYear = new Panel();
         private ComboBox cmbMonth = new ComboBox();
         private NumericUpDown nudYear = new NumericUpDown();
         private Button btnView = new Button();
@@ -36,6 +44,24 @@ namespace PersonalFinanceApp
         private MonthlyReport? _currentReport;
         private decimal _currentWallet;
         private decimal _currentSafe;
+
+        // --- Varlıklarım grafik modu ---
+        private Panel pnlAssetCharts = new Panel();
+        private Panel pnlLineChartArea = new Panel();
+        private Panel pnlColumnChartArea = new Panel();
+        private Label lblLineChartTitle = new Label();
+        private Label lblColumnChartTitle = new Label();
+        private Label lblLineEmptyState = new Label();
+        private Label lblColumnEmptyState = new Label();
+        private Chart lineChart = new Chart();
+        private Chart columnChart = new Chart();
+        private Panel pnlModeToggle = new Panel();
+        private Button btnModeGenel = new Button();
+        private Button btnModeVarliklarim = new Button();
+        private Label lblCard1Title = new Label();
+        private Label lblCard2Title = new Label();
+        private Label lblCard3Title = new Label();
+        private Label lblCard4Title = new Label();
 
         // null = birleşik (gelir+gider+hedef+boşta) görünüm; "income"/"expense"/"goal" = o türün kendi kırılımı
         private string? _drillDownType;
@@ -115,6 +141,15 @@ namespace PersonalFinanceApp
         {
             _drillDownType = type;
             RenderReport();
+        }
+
+        // Tema değişikliğinde ekran yeniden kurulduğunda Genel/Varlıklarım grafik modunun da
+        // korunması için (bkz. MainForm.RebuildForThemeChange, DrillDownType ile aynı desen).
+        public bool IsAssetReportMode => _reportMode == ReportMode.Varliklarim;
+
+        public void RestoreAssetReportMode(bool isAssetMode)
+        {
+            if (isAssetMode) SetMode(ReportMode.Varliklarim);
         }
         private void SetupUI()
         {
@@ -196,8 +231,8 @@ namespace PersonalFinanceApp
                 Padding = new Padding(20, 15, 20, 20)
             };
 
-            Label lblMonth = new Label { Text = "Ay:", Left = 0, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlMonth = new Panel { Left = 0, Top = 24, Width = 195, Height = 40 };
+            lblMonth.Text = "Ay:"; lblMonth.Left = 0; lblMonth.Top = 0; lblMonth.ForeColor = TextMuted; lblMonth.BackColor = Color.Transparent; lblMonth.AutoSize = true;
+            pnlMonth.Left = 0; pnlMonth.Top = 24; pnlMonth.Width = 195; pnlMonth.Height = 40;
             cmbMonth.Left = 5; cmbMonth.Top = 5; cmbMonth.Width = 190;
             cmbMonth.Font = new Font("Segoe UI", 9.5F); cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList;
             var trMonths = new System.Globalization.CultureInfo("tr-TR");
@@ -206,8 +241,8 @@ namespace PersonalFinanceApp
             pnlMonth.Controls.Add(cmbMonth);
             SetupCustomComboBox(pnlMonth, cmbMonth);
 
-            Label lblYear = new Label { Text = "Yıl:", Left = 210, Top = 0, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
-            Panel pnlYear = new Panel { Left = 210, Top = 24, Width = 195, Height = 40 };
+            lblYear.Text = "Yıl:"; lblYear.Left = 210; lblYear.Top = 0; lblYear.ForeColor = TextMuted; lblYear.BackColor = Color.Transparent; lblYear.AutoSize = true;
+            pnlYear.Left = 210; pnlYear.Top = 24; pnlYear.Width = 195; pnlYear.Height = 40;
             SetupSmoothContainer(pnlYear, 8, CardBackColor);
             nudYear.Left = 10; nudYear.Top = 8; nudYear.Width = 175;
             nudYear.Font = new Font("Segoe UI", 9.5F); nudYear.BorderStyle = BorderStyle.None;
@@ -222,10 +257,10 @@ namespace PersonalFinanceApp
             btnView.Click += (s, e) => { _drillDownType = null; LoadReport(); };
             SetupRoundedButton(btnView, AccentColor, Color.White);
 
-            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 120, IncomeColor, lblIncome);
-            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 120, ExpenseColor, lblExpense);
-            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 225, TextLight, lblNet);
-            Panel cardSafe = CreateSummaryCard("Kasa", 210, 225, SafeColor, lblSafeBalance);
+            Panel cardIncome = CreateSummaryCard("Toplam Gelir", 0, 120, IncomeColor, lblIncome, lblCard1Title);
+            Panel cardExpense = CreateSummaryCard("Toplam Gider", 210, 120, ExpenseColor, lblExpense, lblCard2Title);
+            Panel cardNet = CreateSummaryCard("Net Bakiye", 0, 225, TextLight, lblNet, lblCard3Title);
+            Panel cardSafe = CreateSummaryCard("Kasa", 210, 225, SafeColor, lblSafeBalance, lblCard4Title);
 
             btnExportReport.Text = "Raporu CSV'ye Aktar";
             btnExportReport.Left = 0;
@@ -235,6 +270,27 @@ namespace PersonalFinanceApp
             btnExportReport.Cursor = Cursors.Hand;
             btnExportReport.Click += BtnExportReport_Click;
             SetupOutlinedButton(btnExportReport, TextMuted, TextLight);
+
+            // --- Sağ alt: Genel / Varlıklarım grafik modu seçimi ---
+            btnModeGenel.Text = "📊 Genel";
+            btnModeGenel.Width = 110; btnModeGenel.Height = 32; btnModeGenel.Left = 0; btnModeGenel.Top = 0;
+            btnModeGenel.Cursor = Cursors.Hand; btnModeGenel.Font = new Font("Segoe UI", 9F);
+            btnModeGenel.FlatAppearance.BorderSize = 0;
+            btnModeGenel.Click += (s, e) => SetMode(ReportMode.Genel);
+            SetupModeToggleButton(btnModeGenel, () => _reportMode == ReportMode.Genel);
+
+            btnModeVarliklarim.Text = "💰 Varlıklarım";
+            btnModeVarliklarim.Width = 140; btnModeVarliklarim.Height = 32; btnModeVarliklarim.Left = btnModeGenel.Right + 8; btnModeVarliklarim.Top = 0;
+            btnModeVarliklarim.Cursor = Cursors.Hand; btnModeVarliklarim.Font = new Font("Segoe UI", 9F);
+            btnModeVarliklarim.FlatAppearance.BorderSize = 0;
+            btnModeVarliklarim.Click += (s, e) => SetMode(ReportMode.Varliklarim);
+            SetupModeToggleButton(btnModeVarliklarim, () => _reportMode == ReportMode.Varliklarim);
+
+            pnlModeToggle.Width = btnModeVarliklarim.Right;
+            pnlModeToggle.Height = 32;
+            pnlModeToggle.BackColor = AppBackColor;
+            pnlModeToggle.Controls.Add(btnModeGenel);
+            pnlModeToggle.Controls.Add(btnModeVarliklarim);
 
             pnlRight.Controls.Add(lblMonth);
             pnlRight.Controls.Add(pnlMonth);
@@ -246,10 +302,76 @@ namespace PersonalFinanceApp
             pnlRight.Controls.Add(cardNet);
             pnlRight.Controls.Add(cardSafe);
             pnlRight.Controls.Add(btnExportReport);
+            pnlRight.Controls.Add(pnlModeToggle);
+            pnlRight.Resize += (s, e) => PositionModeToggle(pnlRight);
+
+            // --- Sol taraf: Varlıklarım grafik modu (Genel modda görünmez) ---
+            SetupAssetCharts(pnlLeft);
 
             // Sıra önemli: önce Fill (sol), sonra Right (sağ) — böylece sağ blok sabit genişliğini korur, sol kalanı doldurur
             this.Controls.Add(pnlLeft);
             this.Controls.Add(pnlRight);
+
+            PositionModeToggle(pnlRight);
+        }
+
+        private void PositionModeToggle(Panel pnlRight)
+        {
+            var dr = pnlRight.DisplayRectangle;
+            pnlModeToggle.Left = Math.Max(0, dr.Width - pnlModeToggle.Width);
+            pnlModeToggle.Top = Math.Max(0, dr.Height - pnlModeToggle.Height);
+        }
+
+        private void SetupModeToggleButton(Button btn, Func<bool> isActive)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.BackColor = Color.Transparent;
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                bool active = isActive();
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                if (active)
+                {
+                    using var brush = new SolidBrush(AccentColor);
+                    e.Graphics.FillPath(brush, path);
+                }
+                else
+                {
+                    using var pen = new Pen(TextMuted, 1.2f);
+                    e.Graphics.DrawPath(pen, path);
+                }
+                Color textColor = active ? Color.White : TextMuted;
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+        }
+
+        // Genel <-> Varlıklarım grafik modu geçişi: ilgili panelleri gösterir/gizler ve veriyi yükler.
+        private void SetMode(ReportMode mode)
+        {
+            if (_reportMode == mode) return;
+            _reportMode = mode;
+            btnModeGenel.Invalidate();
+            btnModeVarliklarim.Invalidate();
+
+            bool isAsset = mode == ReportMode.Varliklarim;
+
+            chart.Visible = !isAsset;
+            pnlLegendWrapper.Visible = !isAsset;
+            pnlAssetCharts.Visible = isAsset;
+
+            lblMonth.Visible = !isAsset;
+            pnlMonth.Visible = !isAsset;
+            lblYear.Visible = !isAsset;
+            pnlYear.Visible = !isAsset;
+            btnView.Visible = !isAsset;
+            btnExportReport.Visible = !isAsset;
+
+            if (isAsset)
+                _ = LoadAssetReportAsync();
+            else
+                LoadReport(resetDrillDown: false);
         }
 
         private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
@@ -298,7 +420,7 @@ namespace PersonalFinanceApp
             pnlArrow.BringToFront();
         }
 
-        private Panel CreateSummaryCard(string title, int left, int top, Color valueColor, Label valueLabel)
+        private Panel CreateSummaryCard(string title, int left, int top, Color valueColor, Label valueLabel, Label titleLabel)
         {
             Panel card = new Panel { Left = left, Top = top, Width = 195, Height = 90, BackColor = AppBackColor };
             card.Paint += (s, e) =>
@@ -310,16 +432,14 @@ namespace PersonalFinanceApp
                 e.Graphics.FillPath(brush, path);
             };
 
-            Label lblCardTitle = new Label
-            {
-                Text = title,
-                Left = 15,
-                Top = 14,
-                AutoSize = true,
-                ForeColor = TextMuted,
-                Font = new Font("Segoe UI", 9F),
-                BackColor = Color.Transparent
-            };
+            Label lblCardTitle = titleLabel;
+            lblCardTitle.Text = title;
+            lblCardTitle.Left = 15;
+            lblCardTitle.Top = 14;
+            lblCardTitle.AutoSize = true;
+            lblCardTitle.ForeColor = TextMuted;
+            lblCardTitle.Font = new Font("Segoe UI", 9F);
+            lblCardTitle.BackColor = Color.Transparent;
 
             valueLabel.Left = 15;
             valueLabel.Top = 40;
@@ -336,8 +456,10 @@ namespace PersonalFinanceApp
         }
 
         // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
-        private void AnimateCardValue(Label label, decimal targetValue, string suffix = " ₺")
+        // color verilirse (ör. Varlıklarım modunda kartın rolü değiştiğinde) etiketin rengi de güncellenir.
+        private void AnimateCardValue(Label label, decimal targetValue, Color? color = null, string suffix = " ₺")
         {
+            if (color.HasValue) label.ForeColor = color.Value;
             // Aynı karta ait önceki animasyon hâlâ çalışıyorsa (ör. rapor art arda hızlıca yenilendiğinde
             // ya da animasyon sürerken "tutarları gizle" açıldığında), o zamanlayıcıyı iptal etmeden yeni
             // bir tane daha başlatmak ikisinin de aynı Label'a yazmasına ve gizleme durumunun görmezden
@@ -404,10 +526,16 @@ namespace PersonalFinanceApp
             _currentWallet = wallet;
             _currentSafe = safe;
 
-            AnimateCardValue(lblIncome, _currentReport.TotalIncome);
-            AnimateCardValue(lblExpense, _currentReport.TotalExpense);
-            AnimateCardValue(lblNet, _currentReport.NetBalance);
-            AnimateCardValue(lblSafeBalance, safe);
+            // Varlıklarım modundan dönüldüyse kart başlıkları/renkleri o modda değiştirilmiş olabilir; sıfırlıyoruz.
+            lblCard1Title.Text = "Toplam Gelir";
+            lblCard2Title.Text = "Toplam Gider";
+            lblCard3Title.Text = "Net Bakiye";
+            lblCard4Title.Text = "Kasa";
+
+            AnimateCardValue(lblIncome, _currentReport.TotalIncome, IncomeColor);
+            AnimateCardValue(lblExpense, _currentReport.TotalExpense, ExpenseColor);
+            AnimateCardValue(lblNet, _currentReport.NetBalance, TextLight);
+            AnimateCardValue(lblSafeBalance, safe, SafeColor);
 
             if (resetDrillDown) _drillDownType = null;
             RenderReport();
@@ -1021,6 +1149,195 @@ namespace PersonalFinanceApp
                     }
                 }
             }
+        }
+
+        // --- Varlıklarım grafik modu: kurulum, veri yükleme, çizgi/sütun grafik çizimi ---
+
+        private void SetupAssetCharts(Panel pnlLeft)
+        {
+            // pnlLeft'teki aynı nottaki gibi: Dock=Top/Fill çocukları (lineChart/columnChart) henüz
+            // gerçek boyutuna dock edilmeden önce, varsayılan küçük Panel boyutuyla (200x100) negatif/0
+            // kalan yükseklik hesaplanıp Chart'ın OnResize'ında sert bir ArgumentException atmaması için
+            // geçici olarak makul bir başlangıç boyutu veriyoruz.
+            pnlAssetCharts.Size = new Size(900, 700);
+            pnlAssetCharts.Dock = DockStyle.Fill;
+            pnlAssetCharts.BackColor = AppBackColor;
+            pnlAssetCharts.Visible = false;
+            pnlAssetCharts.Resize += (s, e) => PositionAssetChartAreas();
+
+            lblLineChartTitle.Text = "Portföy Değeri Gelişimi";
+            lblLineChartTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblLineChartTitle.ForeColor = TextLight;
+            lblLineChartTitle.Left = 0; lblLineChartTitle.Top = 0; lblLineChartTitle.AutoSize = true;
+
+            lineChart.Dock = DockStyle.Fill;
+            lineChart.BackColor = AppBackColor;
+            ChartArea lineArea = new ChartArea("lineArea") { BackColor = AppBackColor };
+            lineArea.AxisX.LabelStyle.ForeColor = TextMuted;
+            lineArea.AxisX.LineColor = AppTheme.GridLineColor;
+            lineArea.AxisX.MajorGrid.LineColor = AppTheme.GridLineColor;
+            lineArea.AxisY.LabelStyle.ForeColor = TextMuted;
+            lineArea.AxisY.LineColor = AppTheme.GridLineColor;
+            lineArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
+            lineChart.ChartAreas.Add(lineArea);
+
+            lblLineEmptyState.Dock = DockStyle.Fill;
+            lblLineEmptyState.ForeColor = TextMuted;
+            lblLineEmptyState.TextAlign = ContentAlignment.MiddleCenter;
+            lblLineEmptyState.Visible = false;
+
+            Panel pnlLineHeader = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = AppBackColor };
+            pnlLineHeader.Controls.Add(lblLineChartTitle);
+
+            pnlLineChartArea.Dock = DockStyle.Top;
+            pnlLineChartArea.Height = 250;
+            pnlLineChartArea.BackColor = AppBackColor;
+            pnlLineChartArea.Controls.Add(lineChart);
+            pnlLineChartArea.Controls.Add(lblLineEmptyState);
+            pnlLineChartArea.Controls.Add(pnlLineHeader);
+
+            lblColumnChartTitle.Text = "Varlık Dağılımı";
+            lblColumnChartTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblColumnChartTitle.ForeColor = TextLight;
+            lblColumnChartTitle.Left = 0; lblColumnChartTitle.Top = 0; lblColumnChartTitle.AutoSize = true;
+
+            columnChart.Dock = DockStyle.Fill;
+            columnChart.BackColor = AppBackColor;
+            ChartArea columnArea = new ChartArea("columnArea") { BackColor = AppBackColor };
+            columnArea.AxisX.LabelStyle.ForeColor = TextMuted;
+            columnArea.AxisX.LineColor = AppTheme.GridLineColor;
+            columnArea.AxisX.MajorGrid.LineColor = Color.Transparent;
+            columnArea.AxisY.LabelStyle.ForeColor = TextMuted;
+            columnArea.AxisY.LineColor = AppTheme.GridLineColor;
+            columnArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
+            columnChart.ChartAreas.Add(columnArea);
+
+            lblColumnEmptyState.Dock = DockStyle.Fill;
+            lblColumnEmptyState.ForeColor = TextMuted;
+            lblColumnEmptyState.TextAlign = ContentAlignment.MiddleCenter;
+            lblColumnEmptyState.Visible = false;
+
+            Panel pnlColumnHeader = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = AppBackColor };
+            pnlColumnHeader.Controls.Add(lblColumnChartTitle);
+
+            pnlColumnChartArea.Dock = DockStyle.Fill;
+            pnlColumnChartArea.BackColor = AppBackColor;
+            pnlColumnChartArea.Controls.Add(columnChart);
+            pnlColumnChartArea.Controls.Add(lblColumnEmptyState);
+            pnlColumnChartArea.Controls.Add(pnlColumnHeader);
+
+            pnlAssetCharts.Controls.Add(pnlColumnChartArea);
+            pnlAssetCharts.Controls.Add(pnlLineChartArea);
+
+            pnlLeft.Controls.Add(pnlAssetCharts);
+        }
+
+        // pnlLineChartArea Dock=Top ile pnlAssetCharts'ı dikey ikiye böler (üst: çizgi, alt: sütun grafiği).
+        private void PositionAssetChartAreas()
+        {
+            if (pnlAssetCharts.Height > 0)
+                pnlLineChartArea.Height = Math.Max(100, pnlAssetCharts.Height / 2 - 8);
+        }
+
+        private async Task LoadAssetReportAsync()
+        {
+            lblTitle.Text = "Rapor — Varlıklarım";
+
+            lblCard1Title.Text = "Yatırım Bakiyesi";
+            lblCard2Title.Text = "Toplam Maliyet";
+            lblCard3Title.Text = "Güncel Değer";
+            lblCard4Title.Text = "Kâr / Zarar";
+
+            var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+            var costBasis = _assetService.GetHoldingsCostBasisBySymbol(_user.Id);
+            var snapshots = _assetService.GetPortfolioSnapshots(_user.Id);
+
+            decimal investBalance = _accountService.GetInvestBalance(_user.Id);
+            decimal totalCost = holdings.Sum(h => h.AvgCostTry * h.Quantity);
+            decimal totalValue = holdings.Sum(h => h.CurrentValueTry ?? 0);
+            decimal totalPl = totalValue - totalCost;
+
+            AnimateCardValue(lblIncome, investBalance, IncomeColor);
+            AnimateCardValue(lblExpense, totalCost, TextLight);
+            AnimateCardValue(lblNet, totalValue, SafeColor);
+            AnimateCardValue(lblSafeBalance, totalPl, totalPl >= 0 ? IncomeColor : ExpenseColor);
+
+            BuildLineChart(snapshots);
+            BuildColumnChart(costBasis);
+
+            PositionAssetChartAreas();
+        }
+
+        private void BuildLineChart(List<Models.PortfolioSnapshot> snapshots)
+        {
+            lineChart.Series.Clear();
+
+            if (snapshots.Count == 0)
+            {
+                lineChart.Visible = false;
+                lblLineEmptyState.Text = "Henüz veri birikmedi — Varlıklarım'da fiyatlar her çekildiğinde\ngünlük bir kayıt eklenir, birkaç gün sonra burada gelişimi göreceksiniz.";
+                lblLineEmptyState.Visible = true;
+                return;
+            }
+
+            lblLineEmptyState.Visible = false;
+            lineChart.Visible = true;
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            Series series = new Series("Portföy Değeri")
+            {
+                ChartType = SeriesChartType.SplineArea,
+                ChartArea = "lineArea",
+                Color = Color.FromArgb(60, AccentColor),
+                BorderColor = AccentColor,
+                BorderWidth = 3,
+                ToolTip = "#VALX{dd.MM}: #VAL{N0} ₺"
+            };
+
+            foreach (var snap in snapshots)
+            {
+                int idx = series.Points.AddXY(snap.SnapshotDate.ToString("dd.MM"), snap.TotalValueTry);
+                series.Points[idx].MarkerStyle = MarkerStyle.Circle;
+                series.Points[idx].MarkerSize = 6;
+                series.Points[idx].MarkerColor = AccentColor;
+            }
+
+            lineChart.ChartAreas["lineArea"].AxisY.LabelStyle.Format = "#,##0 ₺";
+            lineChart.Series.Add(series);
+        }
+
+        private void BuildColumnChart(List<(string Symbol, string Name, decimal CostBasisTry)> costBasis)
+        {
+            columnChart.Series.Clear();
+
+            if (costBasis.Count == 0)
+            {
+                columnChart.Visible = false;
+                lblColumnEmptyState.Text = "Henüz bir varlığınız yok.";
+                lblColumnEmptyState.Visible = true;
+                return;
+            }
+
+            lblColumnEmptyState.Visible = false;
+            columnChart.Visible = true;
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            Series series = new Series("Varlık")
+            {
+                ChartType = SeriesChartType.Column,
+                ChartArea = "columnArea",
+                ToolTip = "#AXISLABEL: #VAL{N0} ₺"
+            };
+
+            var shades = GenerateShades(AccentColor, costBasis.Count);
+            for (int i = 0; i < costBasis.Count; i++)
+            {
+                int idx = series.Points.AddXY(costBasis[i].Symbol, costBasis[i].CostBasisTry);
+                series.Points[idx].Color = shades[i];
+            }
+
+            columnChart.ChartAreas["columnArea"].AxisY.LabelStyle.Format = "#,##0 ₺";
+            columnChart.Series.Add(series);
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)

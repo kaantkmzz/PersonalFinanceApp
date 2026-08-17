@@ -7,15 +7,20 @@ namespace PersonalFinanceApp
     {
         private readonly User _user;
         private readonly AccountService _accountService = new AccountService();
+        private readonly AssetService _assetService = new AssetService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
         private static Color TextLight => AppTheme.TextLight;
+        private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
+        private static Color IncomeColor => AppTheme.IncomeColor;
+        private static Color ExpenseColor => AppTheme.ExpenseColor;
 
         private Label lblWalletAmount = new Label();
         private Label lblSafeAmount = new Label();
         private Label lblStatus = new Label();
+        private Panel pnlNotifications = new Panel();
 
         public HomeControl(User user)
         {
@@ -23,6 +28,7 @@ namespace PersonalFinanceApp
             InitializeComponent();
             SetupUI();
             RefreshBalances();
+            _ = LoadNotificationsAsync();
         }
 
         private void SetupUI()
@@ -106,11 +112,20 @@ namespace PersonalFinanceApp
             lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
 
+            // Varlıklarım'da pozisyonu olan kullanıcılar için kâr/zarar bildirim kartı; pozisyon yoksa
+            // (bkz. LoadNotificationsAsync) tamamen gizlenir, boş kart gösterilmez.
+            pnlNotifications.Left = 20;
+            pnlNotifications.Top = lblStatus.Top + 40;
+            pnlNotifications.Width = cardsRight;
+            pnlNotifications.Visible = false;
+            SetupSmoothContainer(pnlNotifications, 16, CardBackColor);
+
             this.Controls.Add(pnlWallet);
             this.Controls.Add(pnlSafe);
             this.Controls.Add(btnTransfer);
             this.Controls.Add(btnHistory);
             this.Controls.Add(lblStatus);
+            this.Controls.Add(pnlNotifications);
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
@@ -164,6 +179,84 @@ namespace PersonalFinanceApp
         public void RefreshData()
         {
             RefreshBalances();
+            _ = LoadNotificationsAsync();
+        }
+
+        // Varlıklarım'daki pozisyonların anlık kâr/zararını "bildirim" tarzında listeler; en çok
+        // hareket edenler (yüzde olarak) üstte. Pozisyon yoksa kart tamamen gizlenir.
+        private async Task LoadNotificationsAsync()
+        {
+            var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+            if (this.IsDisposed) return;
+
+            var withChange = holdings.Where(h => h.ProfitLossPercent.HasValue).ToList();
+
+            pnlNotifications.Controls.Clear();
+
+            if (withChange.Count == 0)
+            {
+                pnlNotifications.Visible = false;
+                return;
+            }
+
+            pnlNotifications.Visible = true;
+
+            Label lblHeader = new Label
+            {
+                Text = "🔔 Varlık Bildirimleri",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 20,
+                Top = 16,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlNotifications.Controls.Add(lblHeader);
+
+            var ordered = withChange.OrderByDescending(h => Math.Abs(h.ProfitLossPercent!.Value)).Take(5).ToList();
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            int rowTop = 56;
+            foreach (var h in ordered)
+            {
+                bool isUp = h.ProfitLossPercent!.Value >= 0;
+                Color changeColor = isUp ? IncomeColor : ExpenseColor;
+                string arrow = isUp ? "▲" : "▼";
+
+                Label lblSymbol = new Label
+                {
+                    Text = $"{h.Symbol} — {h.Name}",
+                    Font = new Font("Segoe UI", 10F),
+                    ForeColor = TextLight,
+                    Left = 20,
+                    Top = rowTop,
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                };
+
+                string changeText = _user.HideAmountsEnabled
+                    ? "••••••"
+                    : $"{arrow} %{Math.Abs(h.ProfitLossPercent!.Value).ToString("0.0", tr)}   {h.ProfitLossTry!.Value.ToString("+#,##0;-#,##0", tr)} ₺";
+
+                Label lblChange = new Label
+                {
+                    Text = changeText,
+                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                    ForeColor = changeColor,
+                    Left = pnlNotifications.Width - 220,
+                    Top = rowTop,
+                    Width = 200,
+                    AutoSize = false,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent
+                };
+
+                pnlNotifications.Controls.Add(lblSymbol);
+                pnlNotifications.Controls.Add(lblChange);
+                rowTop += 32;
+            }
+
+            pnlNotifications.Height = rowTop + 16;
         }
 
         private void RefreshBalances()
