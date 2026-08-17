@@ -117,8 +117,6 @@ namespace PersonalFinanceApp
             };
             pnlSidebar.Controls.Add(lblLogo);
 
-            BuildAvatarWidget();
-
             string[] menuItems =
             {
                 "Ana Sayfa",
@@ -133,7 +131,7 @@ namespace PersonalFinanceApp
                 "Şifre Değiştir"
             };
 
-            int menuTop = 148;
+            int menuTop = 80;
             foreach (var item in menuItems)
             {
                 Button btn = CreateSidebarButton(item, menuTop);
@@ -164,14 +162,14 @@ namespace PersonalFinanceApp
             this.Controls.Add(pnlSidebar);
         }
 
-        // "Finans Takip" başlığının altında, kullanıcının baş harflerini gösteren tıklanabilir
-        // dairesel avatar; tıklanınca doğrudan Profilim ekranına gider.
-        private void BuildAvatarWidget()
+        // Kullanıcının baş harflerini gösteren tıklanabilir dairesel avatar; tıklanınca doğrudan
+        // Profilim ekranına gider. Alt çubuktaki diğer ikon butonlarla aynı sırada yer alır.
+        private Panel BuildAvatarWidget(int left, int top, int size)
         {
             Color avatarColor = AvatarHelper.ParseColor(_user.AvatarColor, AppTheme.AccentColor);
             string initials = AvatarHelper.GetInitials(_user);
 
-            Panel avatar = new Panel { Left = 20, Top = 68, Width = 64, Height = 64, Cursor = Cursors.Hand };
+            Panel avatar = new Panel { Left = left, Top = top, Width = size, Height = size, Cursor = Cursors.Hand };
 
             bool isHovered = false;
             avatar.MouseEnter += (s, e) => { isHovered = true; avatar.Invalidate(); };
@@ -184,7 +182,7 @@ namespace PersonalFinanceApp
                 Color fill = isHovered ? ControlPaint.Light(avatarColor, 0.15f) : avatarColor;
                 using (var brush = new SolidBrush(fill))
                     e.Graphics.FillEllipse(brush, 0, 0, avatar.Width - 1, avatar.Height - 1);
-                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 19F);
+                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 12F);
                 using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold))
                     TextRenderer.DrawText(e.Graphics, initials, font, avatar.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
@@ -196,14 +194,17 @@ namespace PersonalFinanceApp
                 ShowCachedContent("profile", () => new ProfileControl(_user, onAvatarSaved: BuildSidebar));
             };
 
-            pnlSidebar.Controls.Add(avatar);
+            return avatar;
         }
 
-        // Kenar çubuğunun en altındaki üç ikon buton: Kapat, Tutarları Göster/Gizle, Tema
+        // Kenar çubuğunun en altındaki satır: solda kullanıcı avatarı, yanında üç küçük ikon
+        // buton (Kapat, Tutarları Göster/Gizle, Tema) — hepsi aynı hizada.
         private void BuildBottomBar()
         {
-            const int rowHeight = 92;
-            const int buttonSize = 60;
+            const int rowHeight = 76;
+            const int itemSize = 40;
+            const int margin = 15;
+            const int gap = 13;
 
             Panel pnlBottomBar = new Panel
             {
@@ -212,10 +213,17 @@ namespace PersonalFinanceApp
                 BackColor = SidebarColor
             };
 
-            Button btnPower = CreateIconButton(20, (rowHeight - buttonSize) / 2, buttonSize, DrawPowerIcon);
-            btnPower.Click += (s, e) => ShowPowerMenu(btnPower);
+            int itemTop = (rowHeight - itemSize) / 2;
+            int left = margin;
 
-            Button btnEye = CreateIconButton(90, (rowHeight - buttonSize) / 2, buttonSize, (g, r) => DrawEyeIcon(g, r, _user.HideAmountsEnabled));
+            Panel avatar = BuildAvatarWidget(left, itemTop, itemSize);
+            left += itemSize + gap;
+
+            Button btnPower = CreateIconButton(left, itemTop, itemSize, DrawPowerIcon);
+            btnPower.Click += (s, e) => ShowPowerMenu(btnPower);
+            left += itemSize + gap;
+
+            Button btnEye = CreateIconButton(left, itemTop, itemSize, (g, r) => DrawEyeIcon(g, r, _user.HideAmountsEnabled));
             btnEye.Click += (s, e) =>
             {
                 _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
@@ -223,14 +231,16 @@ namespace PersonalFinanceApp
                 RefreshAllCachedScreens();
                 btnEye.Invalidate();
             };
+            left += itemSize + gap;
 
-            Button btnTheme = CreateIconButton(160, (rowHeight - buttonSize) / 2, buttonSize, DrawThemeIcon);
+            Button btnTheme = CreateIconButton(left, itemTop, itemSize, DrawThemeIcon);
             btnTheme.Click += (s, e) =>
             {
                 AppTheme.Toggle();
                 RebuildForThemeChange();
             };
 
+            pnlBottomBar.Controls.Add(avatar);
             pnlBottomBar.Controls.Add(btnPower);
             pnlBottomBar.Controls.Add(btnEye);
             pnlBottomBar.Controls.Add(btnTheme);
