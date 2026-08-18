@@ -95,15 +95,22 @@ namespace PersonalFinanceApp
         // Kenar çubuğunu kurar; tema değiştirildiğinde de (verileri koruyarak) yeniden çağrılır.
         private void BuildSidebar()
         {
-            pnlSidebar.Controls.Clear();
-            this.Controls.Remove(pnlSidebar);
-            pnlSidebar.Dispose();
-            pnlSidebar = new Panel();
+            // Panel'i (ve dolayısıyla alttaki pencere tanıtıcısını) kaldırıp yeniden oluşturmak,
+            // Dock=Left alanının anlık olarak boşalıp yeniden dolmasına ve içeriğin bir kare için
+            // tam genişliğe yayılmasına yol açıyordu (tema/gizle butonlarına basınca sol altta
+            // görülen "resetlenme" hissi). Aynı Panel örneğini koruyup sadece içeriğini
+            // yeniliyoruz; böylece Dock düzeni ve pencere tanıtıcısı hiç bozulmuyor.
+            bool alreadyOnForm = this.Controls.Contains(pnlSidebar);
 
-            pnlSidebar.Dock = DockStyle.Left;
-            pnlSidebar.Width = 240;
+            pnlSidebar.Controls.Clear();
             pnlSidebar.BackColor = SidebarColor;
-            EnableDoubleBuffering(pnlSidebar);
+
+            if (!alreadyOnForm)
+            {
+                pnlSidebar.Dock = DockStyle.Left;
+                pnlSidebar.Width = 240;
+                EnableDoubleBuffering(pnlSidebar);
+            }
 
             _activeButton = null;
 
@@ -123,11 +130,11 @@ namespace PersonalFinanceApp
                 "Ana Sayfa",
                 "İşlemler",
                 "Kategoriler",
-                "Rapor",
-                "Hedefler",
                 "Varlıklarım",
-                "Notlar",
+                "Hedefler",
+                "Rapor",
                 "Hatırlatıcılar",
+                "Notlar",
                 "Profilim",
                 "Ayarlar"
             };
@@ -160,7 +167,10 @@ namespace PersonalFinanceApp
 
             BuildBottomBar();
 
-            this.Controls.Add(pnlSidebar);
+            if (!alreadyOnForm)
+            {
+                this.Controls.Add(pnlSidebar);
+            }
         }
 
         // Kullanıcının baş harflerini gösteren tıklanabilir dairesel avatar; tıklanınca doğrudan

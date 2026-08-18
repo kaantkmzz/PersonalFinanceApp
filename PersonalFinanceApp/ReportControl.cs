@@ -14,6 +14,9 @@ namespace PersonalFinanceApp
 
         private enum ReportMode { Genel, Varliklarim }
         private ReportMode _reportMode = ReportMode.Genel;
+        // Genel <-> Varlıklarım arasında hızlıca birkaç kez tıklanınca, önceki (yarım kalmış)
+        // LoadAssetReportAsync çağrısı gecikmeli dönüp güncel grafiği ezmesin diye kullanılan sayaç.
+        private int _assetReportRequestId = 0;
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -358,6 +361,17 @@ namespace PersonalFinanceApp
 
             bool isAsset = mode == ReportMode.Varliklarim;
 
+            if (isAsset)
+            {
+                // Genel moddan gecikmeli (zamanlayıcı tabanlı) "ortaya çıkarma" animasyonu hâlâ
+                // sürüyor olabilir; durdurmazsak birkaç yüz milisaniye sonra tetiklenip chart.Visible'ı
+                // tekrar TRUE yapıp Varlıklarım'ın üzerine Genel pastasını geri getiriyordu (hızlı
+                // Genel<->Varlıklarım geçişlerinde grafiğin "kaybolup" yanlış yerde görünmesi bug'ı).
+                _revealSettleTimer.Stop();
+                _revealTimer.Stop();
+                pnlChartReveal.Visible = false;
+            }
+
             chart.Visible = !isAsset;
             pnlLegendWrapper.Visible = !isAsset;
             pnlAssetCharts.Visible = isAsset;
@@ -683,6 +697,7 @@ namespace PersonalFinanceApp
         // Grafiği saat 12 konumundan başlayıp tam tur atarak kademeli ortaya çıkarır.
         private void StartChartRevealAnimation()
         {
+            if (_reportMode != ReportMode.Genel) return;
             if (chart.Width <= 0 || chart.Height <= 0) return;
 
             _revealTimer.Stop();
@@ -701,6 +716,11 @@ namespace PersonalFinanceApp
 
         private void RevealTimer_Tick(object? sender, EventArgs e)
         {
+            if (_reportMode != ReportMode.Genel)
+            {
+                _revealTimer.Stop();
+                return;
+            }
             double t = _revealStopwatch.Elapsed.TotalMilliseconds / RevealDurationMs;
             bool finished = t >= 1.0;
             if (finished) t = 1.0;
@@ -1250,6 +1270,8 @@ namespace PersonalFinanceApp
 
         private async Task LoadAssetReportAsync()
         {
+            int requestId = ++_assetReportRequestId;
+
             lblTitle.Text = "Rapor — Varlıklarım";
 
             lblCard1Title.Text = "Yatırım Bakiyesi";
@@ -1258,6 +1280,12 @@ namespace PersonalFinanceApp
             lblCard4Title.Text = "Kâr / Zarar";
 
             var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+
+            // Bu bekleme sürerken kullanıcı Genel'e geçmiş ya da moda tekrar tekrar tıklamış olabilir;
+            // böyle bir durumda artık geçersiz olan bu sonucu uygulamıyoruz.
+            if (requestId != _assetReportRequestId || _reportMode != ReportMode.Varliklarim || IsDisposed)
+                return;
+
             var costBasis = _assetService.GetHoldingsCostBasisBySymbol(_user.Id);
             var snapshots = _assetService.GetPortfolioSnapshots(_user.Id);
 

@@ -81,10 +81,13 @@ namespace PersonalFinanceApp
 
             Label lblTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
 
+            // Başlığın hemen sağında, aynı satırda; sabit yeşil yerine tema rengiyle (AccentColor) uyumlu.
             lblInvestBalance.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-            lblInvestBalance.ForeColor = Color.FromArgb(120, 220, 150);
-            lblInvestBalance.Left = 20; lblInvestBalance.Top = 55; lblInvestBalance.AutoSize = true;
+            lblInvestBalance.ForeColor = AccentColor;
+            lblInvestBalance.AutoSize = true;
+            lblInvestBalance.Top = 24;
             lblInvestBalance.Text = "Yatırım Bakiyesi: ...";
+            lblInvestBalance.Left = lblTitle.Left + lblTitle.PreferredWidth + 20;
             // Bakiye Transferi butonu kaldırıldı — Ana Sayfa'daki "Transfer Et" artık Cüzdan/Kasa/Varlıklarım
             // arasında her yönde transfer yapabiliyor (bkz. HomeControl.BtnTransfer_Click, TransferDialog).
 
