@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Linq;
 using System.Collections.Generic;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -167,6 +168,8 @@ namespace PersonalFinanceApp
             dgvCategories.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvCategories.EnableHeadersVisualStyles = false; dgvCategories.ColumnHeadersHeight = 40;
 
             dgvCategories.CellPainting += DgvCategories_CellPainting;
+
+            dgvCategories.HandleCreated += (s, e) => DarkTitleBarHelper.SetScrollBarDarkMode(dgvCategories, AppTheme.IsDark);
 
             pnlGridWrapper.Controls.Add(dgvCategories);
             pnlGrid.Controls.Add(pnlGridWrapper);

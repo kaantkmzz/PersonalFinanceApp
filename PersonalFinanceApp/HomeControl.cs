@@ -44,6 +44,25 @@ namespace PersonalFinanceApp
         private const int MiniRowTop = 630;
         private const int MiniRowHeight = 210;
 
+        // "Bu Ayın Özeti" kutusundaki iki sayfa arası geçiş: 0 = genel dağılım, 1 = varlık dağılımı.
+        private int _miniReportPage = 0;
+        private Panel pnlMiniPageGeneral = new Panel();
+        private Panel pnlMiniPageAssets = new Panel();
+        private Panel pnlMiniDot0 = new Panel();
+        private Panel pnlMiniDot1 = new Panel();
+
+        private static readonly Color[] AssetPalette =
+        {
+            Color.FromArgb(80, 200, 195),
+            Color.FromArgb(120, 180, 255),
+            Color.FromArgb(230, 200, 80),
+            Color.FromArgb(190, 130, 240),
+            Color.FromArgb(230, 100, 100),
+            Color.FromArgb(120, 220, 150),
+            Color.FromArgb(255, 170, 90),
+            Color.FromArgb(140, 140, 220),
+        };
+
         public HomeControl(User user, Action<string>? onNavigate = null)
         {
             _user = user;
@@ -323,12 +342,33 @@ namespace PersonalFinanceApp
         {
             ClearWidgetContent(pnlMiniReportWidget);
 
+            // ClearWidgetContent az önce bir önceki üretimin pnlMiniPage*/pnlMiniDot* örneklerini dispose
+            // etti; aynı alan adlarını (field) taze örneklerle değiştirmeden yeniden kullanmaya çalışmak
+            // "disposed nesne" hatasına yol açardı — bu yüzden her yenilemede sıfırdan kuruyoruz. Sayfa
+            // seçimi (_miniReportPage) ise ayrı bir int alanda tutulduğundan yenilemeler arasında korunur.
+            pnlMiniPageGeneral = new Panel();
+            pnlMiniPageAssets = new Panel();
+            pnlMiniDot0 = new Panel();
+            pnlMiniDot1 = new Panel();
+
             DateTime start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             DateTime end = start.AddMonths(1);
             var report = _reportService.GenerateReport(_user.Id, start, end);
+            var (wallet, _) = _accountService.GetBalances(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            Chart miniChart = new Chart { Left = 14, Top = 44, Width = 130, Height = 150, BackColor = CardBackColor };
+            // Rapor ekranındaki Genel pastayla aynı kırılım: gelir + gider + hedef + yatırım + boşta kalan.
+            // Önceden burada sadece gelir/gider vardı ve Rapor'daki güncel dağılımı yansıtmıyordu.
+            decimal categorySum = report.TotalIncome + report.TotalExpense;
+            decimal idle = wallet - categorySum;
+            if (idle < 0) idle = 0;
+            decimal goalTotal = report.TotalGoal;
+            decimal investTotal = report.TotalInvest;
+
+            pnlMiniPageGeneral.Left = 0; pnlMiniPageGeneral.Top = 44; pnlMiniPageGeneral.Width = CardWidth; pnlMiniPageGeneral.Height = MiniRowHeight - 44;
+            pnlMiniPageGeneral.BackColor = Color.Transparent;
+
+            Chart miniChart = new Chart { Left = 14, Top = 0, Width = 130, Height = 150, BackColor = CardBackColor };
             ChartArea area = new ChartArea("mini") { BackColor = CardBackColor };
             area.Position = new ElementPosition(0, 0, 100, 100);
             area.InnerPlotPosition = new ElementPosition(0, 0, 100, 100);
@@ -338,28 +378,162 @@ namespace PersonalFinanceApp
             series["DoughnutRadius"] = "55";
             series["PieLabelStyle"] = "Disabled";
 
-            if (report.TotalIncome > 0 || report.TotalExpense > 0)
+            void AddSlice(decimal amount, Color color)
             {
-                int i1 = series.Points.AddY((double)report.TotalIncome);
-                series.Points[i1].Color = IncomeColor;
-                int i2 = series.Points.AddY((double)report.TotalExpense);
-                series.Points[i2].Color = ExpenseColor;
+                if (amount <= 0) return;
+                int idx = series.Points.AddY((double)amount);
+                series.Points[idx].Color = color;
             }
-            else
+            AddSlice(report.TotalIncome, IncomeColor);
+            AddSlice(report.TotalExpense, ExpenseColor);
+            AddSlice(goalTotal, AppTheme.GoalColor);
+            AddSlice(investTotal, AppTheme.InvestColor);
+            AddSlice(idle, AppTheme.IdleColor);
+            if (series.Points.Count == 0)
             {
                 int i1 = series.Points.AddY(1);
                 series.Points[i1].Color = TextMuted;
             }
             miniChart.Series.Add(series);
-            pnlMiniReportWidget.Controls.Add(miniChart);
+            pnlMiniPageGeneral.Controls.Add(miniChart);
 
             Action goToReport = () => _onNavigate?.Invoke("Rapor");
-            Label lblGelir = AddWidgetLine(pnlMiniReportWidget, "Gelir: 0 ₺", 92, IncomeColor, 158, goToReport);
-            Label lblGider = AddWidgetLine(pnlMiniReportWidget, "Gider: 0 ₺", 122, ExpenseColor, 158, goToReport);
+            Label lblGelir = AddWidgetLine(pnlMiniPageGeneral, "Gelir: 0 ₺", 48, IncomeColor, 158, goToReport);
+            Label lblGider = AddWidgetLine(pnlMiniPageGeneral, "Gider: 0 ₺", 78, ExpenseColor, 158, goToReport);
             AnimateLabelValue(lblGelir, report.TotalIncome, v => $"Gelir: {v.ToString("#,##0", tr)} ₺", hiddenText: "Gelir: ••••••");
             AnimateLabelValue(lblGider, report.TotalExpense, v => $"Gider: {v.ToString("#,##0", tr)} ₺", hiddenText: "Gider: ••••••");
-
             MakeClickable(miniChart, goToReport);
+
+            // İkinci sayfa: Varlıklarım'daki varlık dağılımı (canlı fiyatlarla), aşağıda asenkron doldurulur.
+            pnlMiniPageAssets.Left = 0; pnlMiniPageAssets.Top = 44; pnlMiniPageAssets.Width = CardWidth; pnlMiniPageAssets.Height = MiniRowHeight - 44;
+            pnlMiniPageAssets.BackColor = Color.Transparent;
+            pnlMiniPageAssets.Visible = false;
+
+            Label lblAssetsLoading = new Label { Text = "Varlık verisi yükleniyor...", ForeColor = TextMuted, Left = 14, Top = 48, AutoSize = true, BackColor = Color.Transparent, Font = new Font("Segoe UI", 9.5F) };
+            pnlMiniPageAssets.Controls.Add(lblAssetsLoading);
+
+            pnlMiniReportWidget.Controls.Add(pnlMiniPageGeneral);
+            pnlMiniReportWidget.Controls.Add(pnlMiniPageAssets);
+
+            SetupMiniPageDots();
+            UpdateMiniReportPageVisibility();
+
+            _ = LoadMiniAssetPageAsync();
+        }
+
+        // Kartın sağ alt köşesindeki iki nokta: tıklanınca genel/varlık sayfaları arasında geçiş yapar.
+        private void SetupMiniPageDots()
+        {
+            const int dotSize = 7;
+            const int gap = 6;
+            const int rightPad = 14;
+            int dot1Left = CardWidth - rightPad - dotSize;
+            int dot0Left = dot1Left - gap - dotSize;
+            const int dotTop = MiniRowHeight - 16;
+
+            void SetupDot(Panel dot, int left, int page)
+            {
+                dot.Left = left; dot.Top = dotTop; dot.Width = dotSize; dot.Height = dotSize;
+                dot.BackColor = Color.Transparent;
+                dot.Cursor = Cursors.Hand;
+                dot.Paint += (s, e) =>
+                {
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    Color c = _miniReportPage == page ? AccentColor : AppTheme.GridLineColor;
+                    using var brush = new SolidBrush(c);
+                    e.Graphics.FillEllipse(brush, 0, 0, dotSize, dotSize);
+                };
+                dot.Click += (s, e) =>
+                {
+                    if (_miniReportPage == page) return;
+                    _miniReportPage = page;
+                    UpdateMiniReportPageVisibility();
+                };
+            }
+
+            SetupDot(pnlMiniDot0, dot0Left, 0);
+            SetupDot(pnlMiniDot1, dot1Left, 1);
+
+            pnlMiniReportWidget.Controls.Add(pnlMiniDot0);
+            pnlMiniReportWidget.Controls.Add(pnlMiniDot1);
+            // Sayfa panelleri (pnlMiniPageGeneral/Assets) aynı üst denetimin çocuğu ve noktalarla aynı
+            // köşede çakışıyor; WinForms'ta önce eklenen denetim üstte kaldığından noktalar görünmez
+            // oluyordu — en öne alıyoruz.
+            pnlMiniDot0.BringToFront();
+            pnlMiniDot1.BringToFront();
+        }
+
+        private void UpdateMiniReportPageVisibility()
+        {
+            pnlMiniPageGeneral.Visible = _miniReportPage == 0;
+            pnlMiniPageAssets.Visible = _miniReportPage == 1;
+            pnlMiniDot0.Invalidate();
+            pnlMiniDot1.Invalidate();
+        }
+
+        // Ard arda tema/gizle tazelemeleri LoadMiniReportWidget'ı (ve dolayısıyla bu metodu) hızlıca
+        // birden fazla kez tetikleyebilir; her çağrı pnlMiniPageAssets'i TAZE bir Panel'e bağlıyor
+        // (bkz. LoadMiniReportWidget) ama önceki bir çağrının "await" sonrası devamı, o sırada CURRENT
+        // olan (daha yeni bir çağrının) pnlMiniPageAssets alanına yazabilirdi. ReportControl'deki aynı
+        // desenli bir yarış durumuna (Genel/Varlıklarım hızlı geçişte grafiğin karışması) paralel olarak,
+        // burada da istek numarası ile eski sonuçları sessizce atlıyoruz.
+        private int _miniAssetRequestId = 0;
+
+        // Varlıklarım'daki pozisyonların canlı fiyatlarla güncel değerine göre dağılım pastası.
+        private async Task LoadMiniAssetPageAsync()
+        {
+            int requestId = ++_miniAssetRequestId;
+            Panel targetPanel = pnlMiniPageAssets;
+
+            var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+            if (this.IsDisposed || requestId != _miniAssetRequestId) return;
+
+            targetPanel.Controls.Clear();
+
+            Action goToAssets = () => _onNavigate?.Invoke("Varlıklarım");
+
+            var grouped = holdings
+                .Where(h => (h.CurrentValueTry ?? 0) > 0)
+                .OrderByDescending(h => h.CurrentValueTry ?? 0)
+                .ToList();
+
+            if (grouped.Count == 0)
+            {
+                Label lblEmpty = new Label { Text = "Henüz bir varlığınız yok.", ForeColor = TextMuted, Left = 14, Top = 48, AutoSize = true, BackColor = Color.Transparent, Font = new Font("Segoe UI", 9.5F) };
+                targetPanel.Controls.Add(lblEmpty);
+                MakeClickable(lblEmpty, goToAssets);
+                return;
+            }
+
+            Chart miniChart = new Chart { Left = 14, Top = 0, Width = 130, Height = 150, BackColor = CardBackColor };
+            ChartArea area = new ChartArea("miniAssets") { BackColor = CardBackColor };
+            area.Position = new ElementPosition(0, 0, 100, 100);
+            area.InnerPlotPosition = new ElementPosition(0, 0, 100, 100);
+            miniChart.ChartAreas.Add(area);
+
+            Series series = new Series { ChartType = SeriesChartType.Doughnut, ChartArea = "miniAssets" };
+            series["DoughnutRadius"] = "55";
+            series["PieLabelStyle"] = "Disabled";
+
+            for (int i = 0; i < grouped.Count; i++)
+            {
+                int idx = series.Points.AddY((double)(grouped[i].CurrentValueTry ?? 0));
+                series.Points[idx].Color = AssetPalette[i % AssetPalette.Length];
+            }
+            miniChart.Series.Add(series);
+            targetPanel.Controls.Add(miniChart);
+            MakeClickable(miniChart, goToAssets);
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            int top = 8;
+            foreach (var h in grouped.Take(3))
+            {
+                Color c = AssetPalette[grouped.IndexOf(h) % AssetPalette.Length];
+                Label lblAsset = AddWidgetLine(targetPanel, $"{h.Symbol}: 0 ₺", top, c, 158, goToAssets);
+                decimal value = h.CurrentValueTry ?? 0;
+                AnimateLabelValue(lblAsset, value, v => $"{h.Symbol}: {v.ToString("#,##0", tr)} ₺", hiddenText: $"{h.Symbol}: ••••••");
+                top += 30;
+            }
         }
 
         // Tamamlanmamış hedeflerden rastgele 3 tanesini, Hedefler ekranındaki ile aynı stilde

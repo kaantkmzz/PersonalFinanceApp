@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using System.Linq;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -190,6 +191,10 @@ namespace PersonalFinanceApp
             dgvTransactions.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvTransactions.EnableHeadersVisualStyles = false; dgvTransactions.ColumnHeadersHeight = 40;
 
             dgvTransactions.CellPainting += DgvTransactions_CellPainting;
+
+            // Kaydırma çubuğu Windows'un yerleşik denetimi olduğundan BackColor/ForeColor'a uymuyor;
+            // handle oluşunca koyu temaya göre boyatıyoruz.
+            dgvTransactions.HandleCreated += (s, e) => DarkTitleBarHelper.SetScrollBarDarkMode(dgvTransactions, AppTheme.IsDark);
 
             pnlGridWrapper.Controls.Add(dgvTransactions);
             pnlGrid.Controls.Add(pnlGridWrapper);
