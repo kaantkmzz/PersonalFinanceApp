@@ -36,6 +36,11 @@ namespace PersonalFinanceApp
         private Label lblStatus = new Label();
         private Panel pnlNotifications = new Panel();
 
+        // Etikete göre çalışan sayaç animasyonu zamanlayıcıları — bir widget yenilenirken (ör. tutarları
+        // gizle aç/kapa, ya da mini-widget'lar yeniden dolarken) eski bir animasyon hâlâ sürüyorsa önce
+        // onu durdurmak için (bkz. AnimateLabelValue, ClearWidgetContent).
+        private readonly Dictionary<Control, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Control, System.Windows.Forms.Timer>();
+
         private const int MiniRowTop = 630;
         private const int MiniRowHeight = 210;
 
@@ -176,10 +181,10 @@ namespace PersonalFinanceApp
 
         private void SetupMiniWidgets()
         {
-            pnlReminderWidget = CreateWidgetCard(CardLeft1, "⏰ Yaklaşan Hatırlatıcılar", "Hatırlatıcılar");
-            pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "📊 Bu Ayın Özeti", "Rapor");
-            pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "🧾 Son İşlemler", "İşlemler");
-            pnlGoalsWidget = CreateWidgetCard(CardLeft4, "🎯 Hedeflerim", "Hedefler");
+            pnlReminderWidget = CreateWidgetCard(CardLeft1, "Yaklaşan Hatırlatıcılar", "Hatırlatıcılar");
+            pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "Bu Ayın Özeti", "Rapor");
+            pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "Son İşlemler", "İşlemler");
+            pnlGoalsWidget = CreateWidgetCard(CardLeft4, "Hedeflerim", "Hedefler");
 
             this.Controls.Add(pnlReminderWidget);
             this.Controls.Add(pnlMiniReportWidget);
@@ -200,12 +205,31 @@ namespace PersonalFinanceApp
                 Left = 18,
                 Top = 14,
                 AutoSize = true,
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                Tag = "title"
             };
             card.Controls.Add(lblTitle);
 
             MakeClickable(card, () => _onNavigate?.Invoke(navigateTarget));
             return card;
+        }
+
+        // Tutarları gizle açılıp kapandığında ya da veriler değiştiğinde bir mini-widget'ı yeniden
+        // doldurmak için, başlık etiketi dışındaki tüm önceki içeriği (ve varsa zamanlayıcılarını) temizler.
+        private void ClearWidgetContent(Panel card)
+        {
+            var toRemove = card.Controls.Cast<Control>().Where(c => !(c.Tag is string s && s == "title")).ToList();
+            foreach (var c in toRemove)
+            {
+                card.Controls.Remove(c);
+                if (_cardAnimTimers.TryGetValue(c, out var timer))
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    _cardAnimTimers.Remove(c);
+                }
+                c.Dispose();
+            }
         }
 
         // Panel ve içindeki her denetim (WinForms'ta Click yukarı aktarılmaz) için tıklanabilir
@@ -222,10 +246,12 @@ namespace PersonalFinanceApp
 
         private void LoadReminderWidget()
         {
+            ClearWidgetContent(pnlReminderWidget);
+
             var upcoming = _reminderService.GetUserReminders(_user.Id)
                 .Where(r => !r.IsCompleted && r.ReminderDate >= DateTime.Now)
                 .OrderBy(r => r.ReminderDate)
-                .Take(3)
+                .Take(5)
                 .ToList();
 
             Action goToReminders = () => _onNavigate?.Invoke("Hatırlatıcılar");
@@ -247,7 +273,9 @@ namespace PersonalFinanceApp
 
         private void LoadRecentTransactionsWidget()
         {
-            var recent = _transactionService.GetUserTransactions(_user.Id).Take(3).ToList();
+            ClearWidgetContent(pnlRecentTxWidget);
+
+            var recent = _transactionService.GetUserTransactions(_user.Id).Take(5).ToList();
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
             int top = 48;
@@ -260,7 +288,6 @@ namespace PersonalFinanceApp
             foreach (var t in recent)
             {
                 Color amountColor = t.Type == "income" ? IncomeColor : ExpenseColor;
-                string amountText = _user.HideAmountsEnabled ? "••••••" : t.Amount.ToString("#,##0", tr) + " ₺";
 
                 Label lblCategory = new Label
                 {
@@ -274,7 +301,6 @@ namespace PersonalFinanceApp
                 };
                 Label lblAmount = new Label
                 {
-                    Text = amountText,
                     ForeColor = amountColor,
                     Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                     Left = CardWidth - 150,
@@ -287,18 +313,22 @@ namespace PersonalFinanceApp
                 pnlRecentTxWidget.Controls.Add(lblAmount);
                 MakeClickable(lblCategory, () => _onNavigate?.Invoke("İşlemler"));
                 MakeClickable(lblAmount, () => _onNavigate?.Invoke("İşlemler"));
+
+                AnimateLabelValue(lblAmount, t.Amount, v => v.ToString("#,##0", tr) + " ₺", hiddenText: "••••••");
                 top += 30;
             }
         }
 
         private void LoadMiniReportWidget()
         {
+            ClearWidgetContent(pnlMiniReportWidget);
+
             DateTime start = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             DateTime end = start.AddMonths(1);
             var report = _reportService.GenerateReport(_user.Id, start, end);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
-            Chart miniChart = new Chart { Left = 14, Top = 44, Width = 150, Height = 150, BackColor = CardBackColor };
+            Chart miniChart = new Chart { Left = 14, Top = 44, Width = 130, Height = 150, BackColor = CardBackColor };
             ChartArea area = new ChartArea("mini") { BackColor = CardBackColor };
             area.Position = new ElementPosition(0, 0, 100, 100);
             area.InnerPlotPosition = new ElementPosition(0, 0, 100, 100);
@@ -323,12 +353,11 @@ namespace PersonalFinanceApp
             miniChart.Series.Add(series);
             pnlMiniReportWidget.Controls.Add(miniChart);
 
-            string incomeText = _user.HideAmountsEnabled ? "••••••" : report.TotalIncome.ToString("#,##0", tr) + " ₺";
-            string expenseText = _user.HideAmountsEnabled ? "••••••" : report.TotalExpense.ToString("#,##0", tr) + " ₺";
-
             Action goToReport = () => _onNavigate?.Invoke("Rapor");
-            AddWidgetLine(pnlMiniReportWidget, $"Gelir: {incomeText}", 92, IncomeColor, 178, goToReport);
-            AddWidgetLine(pnlMiniReportWidget, $"Gider: {expenseText}", 122, ExpenseColor, 178, goToReport);
+            Label lblGelir = AddWidgetLine(pnlMiniReportWidget, "Gelir: 0 ₺", 92, IncomeColor, 158, goToReport);
+            Label lblGider = AddWidgetLine(pnlMiniReportWidget, "Gider: 0 ₺", 122, ExpenseColor, 158, goToReport);
+            AnimateLabelValue(lblGelir, report.TotalIncome, v => $"Gelir: {v.ToString("#,##0", tr)} ₺", hiddenText: "Gelir: ••••••");
+            AnimateLabelValue(lblGider, report.TotalExpense, v => $"Gider: {v.ToString("#,##0", tr)} ₺", hiddenText: "Gider: ••••••");
 
             MakeClickable(miniChart, goToReport);
         }
@@ -337,6 +366,8 @@ namespace PersonalFinanceApp
         // (dolan yuvarlak çubuk) küçük bir önizleme olarak gösterir.
         private void LoadGoalsWidget()
         {
+            ClearWidgetContent(pnlGoalsWidget);
+
             var rng = new Random();
             var pending = _savingsGoalService.GetUserGoals(_user.Id)
                 .Where(g => !g.IsAchieved)
@@ -357,24 +388,31 @@ namespace PersonalFinanceApp
             {
                 double percent = g.TargetAmount > 0 ? Math.Min(100, Math.Max(0, (double)(g.CurrentAmount / g.TargetAmount * 100))) : 0;
 
+                // Sabit tek satır + "..." ile kısaltma: uzun hedef adları (ör. "masaüstü bilgisayar")
+                // eskiden sarıp bir alttaki çubuğun üzerine biniyordu (bkz. AddWidgetLine'daki not).
                 Label lblName = new Label
                 {
                     Text = g.GoalName,
                     ForeColor = TextLight,
                     Left = 18,
                     Top = top,
-                    AutoSize = true,
+                    Width = CardWidth - 90,
+                    // 20px, "y"/"ğ" gibi alt uzantılı (descender) harflerin kuyruğunu kesiyordu.
+                    Height = 24,
+                    AutoSize = false,
+                    AutoEllipsis = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
                     BackColor = Color.Transparent,
-                    Font = new Font("Segoe UI", 9.5F),
-                    MaximumSize = new Size(CardWidth - 90, 0)
+                    Font = new Font("Segoe UI", 9.5F)
                 };
                 Label lblPercent = new Label
                 {
-                    Text = $"%{percent:0}",
+                    Text = "%0",
                     ForeColor = TextMuted,
                     Left = CardWidth - 78,
                     Top = top,
                     Width = 60,
+                    Height = 24,
                     TextAlign = ContentAlignment.MiddleRight,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9.5F)
@@ -384,21 +422,27 @@ namespace PersonalFinanceApp
                 MakeClickable(lblName, goToGoals);
                 MakeClickable(lblPercent, goToGoals);
 
-                Panel bar = CreateMiniProgressBar(18, top + 22, CardWidth - 36, percent);
+                double shownPercent = 0;
+                Panel bar = CreateMiniProgressBar(18, top + 26, CardWidth - 36, () => shownPercent);
                 pnlGoalsWidget.Controls.Add(bar);
                 MakeClickable(bar, goToGoals);
+
+                AnimateLabelValue(lblPercent, (decimal)percent, v => $"%{v:0}", onTick: v => { shownPercent = (double)v; bar.Invalidate(); });
 
                 top += 48;
             }
         }
 
         // Hedefler ekranındaki dolan çubukla aynı görsel dil: gri iz + dolu kısım (yaklaşık tamamsa yeşil).
-        private Panel CreateMiniProgressBar(int left, int top, int width, double percent)
+        // Yüzde, sabit bir değer değil bir getter olarak alınır ki yanındaki etiketle birlikte
+        // (bkz. AnimateLabelValue'nun onTick'i) 0'dan gerçek değerine doğru animasyonla dolabilsin.
+        private Panel CreateMiniProgressBar(int left, int top, int width, Func<double> getPercent)
         {
             const int barHeight = 8;
             Panel bar = new Panel { Left = left, Top = top, Width = width, Height = barHeight, BackColor = Color.Transparent };
             bar.Paint += (s, e) =>
             {
+                double percent = getPercent();
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 using (var trackPath = GetRoundedRectPath(new Rectangle(0, 0, bar.Width, bar.Height), barHeight / 2))
                 using (var trackBrush = new SolidBrush(AppTheme.GridLineColor))
@@ -418,21 +462,30 @@ namespace PersonalFinanceApp
 
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
         // SONRA eklendiği için o ilk MakeClickable taramasına dahil değil — burada ayrıca sarmalıyoruz.
-        private void AddWidgetLine(Panel parent, string text, int top, Color color, int left, Action onClick)
+        private Label AddWidgetLine(Panel parent, string text, int top, Color color, int left, Action onClick)
         {
+            // AutoSize + MaximumSize (yalnızca genişlik sınırlı) satırı sarmaya çalışıyordu; dar mini-widget
+            // genişliğinde bu, metnin iki satıra bölünüp bir alttaki satırın üzerine binmesine yol açıyordu
+            // (ör. "Gider: X ₺" satırının Gelir satırınca örtülmesi). Sabit tek satır + gerekirse "..." ile
+            // kısaltma daha güvenli.
             Label lbl = new Label
             {
                 Text = text,
                 ForeColor = color,
                 Left = left,
                 Top = top,
-                AutoSize = true,
+                Width = CardWidth - left - 16,
+                // "y"/"ğ" gibi alt uzantılı harflerin kuyruğu 20px'te kesiliyordu.
+                Height = 24,
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
                 BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 9.5F),
-                MaximumSize = new Size(CardWidth - left - 16, 0)
+                Font = new Font("Segoe UI", 9.5F)
             };
             parent.Controls.Add(lbl);
             MakeClickable(lbl, onClick);
+            return lbl;
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
@@ -487,6 +540,14 @@ namespace PersonalFinanceApp
         {
             RefreshBalances();
             _ = LoadNotificationsAsync();
+
+            // Eskiden yalnızca üstteki üç kart tazeleniyordu; mini-widget'lar (Hatırlatıcılar, Bu Ayın
+            // Özeti, Son İşlemler, Hedeflerim) yalnızca kurucuda dolduruluyordu — bu yüzden hem "tutarları
+            // gizle" aç/kapa hem de sayfa değiştirip geri dönme bu widget'ları hiç güncellemiyordu.
+            LoadReminderWidget();
+            LoadMiniReportWidget();
+            LoadRecentTransactionsWidget();
+            LoadGoalsWidget();
         }
 
         // Varlıklarım'daki pozisyonların anlık kâr/zararını "bildirim" tarzında listeler; en çok
@@ -579,20 +640,40 @@ namespace PersonalFinanceApp
         // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
         private void AnimateCardValue(Label label, decimal targetValue, string suffix = " ₺")
         {
-            if (_user.HideAmountsEnabled)
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            AnimateLabelValue(label, targetValue, v => v.ToString("#,##0", tr) + suffix, hiddenText: "••••••");
+        }
+
+        // Genel sayaç animasyonu: 0'dan hedef değere doğru (ease-out) sayarak yazdırır, özel bir
+        // biçimlendirici alır (ör. "%45" ya da "1.234 ₺") — Cüzdan/Kasa/Varlıklarım kartlarıyla aynı
+        // efekti Bu Ayın Özeti, Son İşlemler ve Hedeflerim mini-widget'larında da kullanmak için.
+        // Tutarlar gizliyse animasyonsuz "••••••" gösterir (showDotsWhenHidden=false ise, ör. yüzdeler
+        // için, gizleme durumundan etkilenmeden normal animasyonla devam eder).
+        private void AnimateLabelValue(Label label, decimal targetValue, Func<decimal, string> formatter, string? hiddenText = null, Action<decimal>? onTick = null)
+        {
+            // Aynı etikete ait önceki animasyon hâlâ çalışıyorsa (ör. widget hızlıca yeniden yüklendiğinde)
+            // önce onu durdurup atıyoruz — yoksa ikisi de aynı Label'a yazıp yarım kalmış/titreşen bir
+            // görüntüye yol açabiliyor.
+            if (_cardAnimTimers.TryGetValue(label, out var existingTimer))
             {
-                label.Text = "••••••";
+                existingTimer.Stop();
+                existingTimer.Dispose();
+                _cardAnimTimers.Remove(label);
+            }
+
+            if (hiddenText != null && _user.HideAmountsEnabled)
+            {
+                label.Text = hiddenText;
                 return;
             }
 
-            var tr = new System.Globalization.CultureInfo("tr-TR");
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var timer = new System.Windows.Forms.Timer { Interval = 16 };
             const int durationMs = 800;
 
             timer.Tick += (s, e) =>
             {
-                if (label.IsDisposed) { timer.Stop(); timer.Dispose(); return; }
+                if (label.IsDisposed) { timer.Stop(); timer.Dispose(); _cardAnimTimers.Remove(label); return; }
 
                 double t = sw.Elapsed.TotalMilliseconds / durationMs;
                 bool finished = t >= 1.0;
@@ -600,14 +681,17 @@ namespace PersonalFinanceApp
 
                 double eased = 1 - Math.Pow(1 - t, 3);
                 decimal shown = finished ? targetValue : Math.Round(targetValue * (decimal)eased);
-                label.Text = shown.ToString("#,##0", tr) + suffix;
+                label.Text = formatter(shown);
+                onTick?.Invoke(shown);
 
                 if (finished)
                 {
                     timer.Stop();
                     timer.Dispose();
+                    _cardAnimTimers.Remove(label);
                 }
             };
+            _cardAnimTimers[label] = timer;
             timer.Start();
         }
 

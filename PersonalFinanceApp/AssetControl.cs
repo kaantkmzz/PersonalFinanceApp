@@ -91,8 +91,11 @@ namespace PersonalFinanceApp
             // İkinci satır: arama/alım araç çubuğu (üstteki bakiye satırıyla çakışmasın diye ayrı bir satırda)
             const int row2Top = 95;
 
+            // Etiket ile kutunun arasında yeterli boşluk olsun diye (dar aralık bazı DPI ayarlarında
+            // "Varlık Ara:" yazısının kutunun üstüne/içine binmesine yol açıyordu) satır aralığı 24'ten 28'e çıkarıldı.
+            const int rowGap = 28;
             Label lblSearch = new Label { Text = "Varlık Ara:", Left = 20, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
-            cmbSearch.Left = 20; cmbSearch.Top = row2Top + 24; cmbSearch.Width = 220; cmbSearch.Font = new Font("Segoe UI", 10F);
+            cmbSearch.Left = 20; cmbSearch.Top = row2Top + rowGap; cmbSearch.Width = 220; cmbSearch.Font = new Font("Segoe UI", 10F);
             cmbSearch.DropDownStyle = ComboBoxStyle.DropDownList;
             foreach (var item in AssetCatalog.Items)
             {
@@ -100,21 +103,25 @@ namespace PersonalFinanceApp
             }
             cmbSearch.SelectedIndexChanged += CmbSearch_SelectedIndexChanged;
 
-            lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + 56; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 20;
+            lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + rowGap + 32; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 26;
             lblSelectedPrice.ForeColor = TextMuted;
+            lblSelectedPrice.TextAlign = ContentAlignment.MiddleLeft;
 
             Label lblQty = new Label { Text = "Miktar:", Left = 260, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlQty = new Panel { Left = 260, Top = row2Top + 24, Width = 130, Height = 34 };
+            Panel pnlQty = new Panel { Left = 260, Top = row2Top + rowGap, Width = 130, Height = 34 };
             SetupSmoothContainer(pnlQty, 8, CardBackColor);
             txtBuyQuantity.BorderStyle = BorderStyle.None; txtBuyQuantity.Font = new Font("Segoe UI", 10F); txtBuyQuantity.BackColor = CardBackColor; txtBuyQuantity.ForeColor = TextLight; txtBuyQuantity.Width = 110; txtBuyQuantity.Location = new Point(10, 6);
             pnlQty.Controls.Add(txtBuyQuantity);
 
             btnBuy.Text = "➕ Satın Al";
-            btnBuy.Left = 410; btnBuy.Top = row2Top + 24; btnBuy.Width = 150; btnBuy.Height = 34; btnBuy.Cursor = Cursors.Hand;
+            btnBuy.Left = 410; btnBuy.Top = row2Top + rowGap; btnBuy.Width = 150; btnBuy.Height = 34; btnBuy.Cursor = Cursors.Hand;
             SetupRoundedButton(btnBuy, AccentColor, Color.White);
             btnBuy.Click += BtnBuy_Click;
 
-            lblStatus.Left = 580; lblStatus.Top = row2Top; lblStatus.Width = 400; lblStatus.Height = 58;
+            // Satın al/sat sonucu artık butonun hemen yanında görünür (eskiden sağda uzakta, ayrı bir
+            // sütundaymış gibi duruyordu).
+            lblStatus.Left = btnBuy.Right + 16; lblStatus.Top = row2Top + rowGap; lblStatus.Width = 320; lblStatus.Height = 34;
+            lblStatus.TextAlign = ContentAlignment.MiddleLeft;
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
 
             pnlTop.Controls.Add(lblTitle);
@@ -189,14 +196,22 @@ namespace PersonalFinanceApp
                 : $"Yatırım Bakiyesi: {balance.ToString("#,##0.00", tr)} ₺";
         }
 
+        private int _priceRequestToken;
+
         private async void CmbSearch_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (cmbSearch.SelectedIndex < 0) return;
             var item = AssetCatalog.Items[cmbSearch.SelectedIndex];
             lblSelectedPrice.Text = "Fiyat alınıyor...";
 
+            int myToken = ++_priceRequestToken;
             var priceService = new AssetPriceService();
             decimal? price = await priceService.GetPriceTryAsync(item.Symbol, item.AssetType);
+
+            // Kullanıcı bekleme sırasında seçimi değiştirdiyse (ör. hızlıca başka bir varlığa tıkladıysa),
+            // bu artık bayatlamış cevabı ekrana yazıp güncel seçimin fiyatını ezmesin.
+            if (myToken != _priceRequestToken || this.IsDisposed) return;
+
             var tr = new System.Globalization.CultureInfo("tr-TR");
             lblSelectedPrice.Text = price.HasValue ? $"Güncel Fiyat: {price.Value.ToString("#,##0.00", tr)} ₺" : "Fiyat alınamadı";
         }

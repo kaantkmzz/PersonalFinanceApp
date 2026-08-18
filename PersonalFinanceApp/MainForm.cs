@@ -183,8 +183,8 @@ namespace PersonalFinanceApp
                 Color fill = isHovered ? ControlPaint.Light(avatarColor, 0.15f) : avatarColor;
                 using (var brush = new SolidBrush(fill))
                     e.Graphics.FillEllipse(brush, 0, 0, avatar.Width - 1, avatar.Height - 1);
-                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, size * 0.3F);
-                using (var font = new Font("Segoe UI", fontSize, FontStyle.Bold))
+                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, size * 0.26F);
+                using (var font = new Font(AvatarHelper.InitialsFontFamily, fontSize, FontStyle.Bold))
                     TextRenderer.DrawText(e.Graphics, initials, font, avatar.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
 

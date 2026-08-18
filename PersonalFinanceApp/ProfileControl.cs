@@ -111,8 +111,8 @@ namespace PersonalFinanceApp
                 using var brush = new SolidBrush(_selectedAvatarColor);
                 e.Graphics.FillEllipse(brush, 0, 0, pnlAvatarPreview.Width - 1, pnlAvatarPreview.Height - 1);
                 string initials = AvatarHelper.GetInitials(_user);
-                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 24F);
-                using var font = new Font("Segoe UI", fontSize, FontStyle.Bold);
+                float fontSize = AvatarHelper.GetInitialsFontSize(initials.Length, 21F);
+                using var font = new Font(AvatarHelper.InitialsFontFamily, fontSize, FontStyle.Bold);
                 TextRenderer.DrawText(e.Graphics, initials, font, pnlAvatarPreview.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
 

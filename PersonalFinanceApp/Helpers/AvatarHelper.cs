@@ -6,6 +6,11 @@ namespace PersonalFinanceApp.Helpers
     // Sidebar'daki ve Profilim ekranındaki baş harf avatarı için ortak yardımcılar.
     public static class AvatarHelper
     {
+        // Avatar dairesindeki baş harfler için Segoe UI Bold köşeli/sert duruyordu; Calibri daha
+        // yuvarlak/yumuşak hatlara sahip ve Windows'ta varsayılan olarak kurulu.
+        public const string InitialsFontFamily = "Calibri";
+
+
         // Kullanıcının seçebileceği hazır avatar renk paleti (koyu temayla uyumlu, birbirinden
         // ayırt edilebilir tonlar).
         public static readonly Color[] Palette =

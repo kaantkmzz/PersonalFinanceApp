@@ -27,7 +27,15 @@ namespace PersonalFinanceApp.Services
             var provider = _providers.Find(p => p.CanHandle(assetType));
             if (provider == null) return null;
 
+            // Truncgil/Binance geçici bir ağ hatasıyla tek seferde başarısız olabiliyor;
+            // kullanıcıya hemen "alınamadı" göstermeden önce kısa bir aradan sonra bir kez daha dene.
             decimal? price = await provider.GetPriceTryAsync(symbol);
+            if (!price.HasValue)
+            {
+                await Task.Delay(400);
+                price = await provider.GetPriceTryAsync(symbol);
+            }
+
             if (price.HasValue)
             {
                 _cache[symbol] = (price.Value, DateTime.UtcNow);

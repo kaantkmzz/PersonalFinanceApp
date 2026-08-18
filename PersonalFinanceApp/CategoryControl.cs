@@ -69,7 +69,7 @@ namespace PersonalFinanceApp
             Panel pnlFilter = new Panel { Left = 20, Top = 95, Width = 140, Height = 36 };
             cmbFilterType.Left = 5; cmbFilterType.Top = 7; cmbFilterType.Width = 135;
             cmbFilterType.Font = new Font("Segoe UI", 9.5F); cmbFilterType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.Items.Add("Hedef"); cmbFilterType.SelectedIndex = 0;
+            cmbFilterType.Items.Add("Tümü"); cmbFilterType.Items.Add("Gelir"); cmbFilterType.Items.Add("Gider"); cmbFilterType.Items.Add("Hedef"); cmbFilterType.Items.Add("Yatırım"); cmbFilterType.SelectedIndex = 0;
             cmbFilterType.SelectedIndexChanged += (s, e) => LoadCategories();
             pnlFilter.Controls.Add(cmbFilterType);
             SetupCustomComboBox(pnlFilter, cmbFilterType); // Beyazlık ve mavi renk düzeltildi
@@ -97,21 +97,6 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
             btnAdd.Click += BtnAdd_Click;
 
-            // Arama kutusu, Ekle butonunun hemen yanında
-            Label lblSearch = new Label { Text = "Ara:", Left = 680, Top = 70, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlSearch = new Panel { Left = 680, Top = 95, Width = 160, Height = 36 };
-            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
-            txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 140;
-            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
-            txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
-            txtSearch.TextChanged += (s, e) => LoadCategories();
-            pnlSearch.Controls.Add(txtSearch);
-
-            btnSearch.Text = "🔍";
-            btnSearch.Left = 848; btnSearch.Top = 95; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
-            SetupRoundedButton(btnSearch, AccentColor, Color.White);
-            btnSearch.Click += (s, e) => LoadCategories();
-
             lblStatus.Left = 20;
             lblStatus.Top = 145;
             lblStatus.AutoSize = true;
@@ -120,13 +105,41 @@ namespace PersonalFinanceApp
 
             pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblFilter); pnlTop.Controls.Add(pnlFilter);
             pnlTop.Controls.Add(lblNew); pnlTop.Controls.Add(pnlNewCat); pnlTop.Controls.Add(lblNewType); pnlTop.Controls.Add(pnlNewType);
-            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
+            pnlTop.Controls.Add(btnAdd);
             pnlTop.Controls.Add(lblStatus);
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
             pnlGrid.Padding = new Padding(20, 0, 40, 0);
             pnlGrid.BackColor = AppBackColor;
+
+            // Arama kutusu artık üstteki kalabalık filtre satırında değil; tablonun hemen üstünde,
+            // sağ üst köşesinde, metin kutusu ile buton aynı hizada.
+            Panel pnlSearchRow = new Panel { Dock = DockStyle.Top, Height = 46, BackColor = AppBackColor };
+            Panel pnlSearch = new Panel { Top = 6, Width = 160, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 140;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
+            txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.TextChanged += (s, e) => LoadCategories();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍";
+            btnSearch.Top = 6; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White);
+            btnSearch.Click += (s, e) => LoadCategories();
+
+            void PositionSearchRow()
+            {
+                btnSearch.Left = pnlSearchRow.ClientSize.Width - btnSearch.Width;
+                pnlSearch.Left = btnSearch.Left - 8 - pnlSearch.Width;
+            }
+            pnlSearchRow.Resize += (s, e) => PositionSearchRow();
+
+            pnlSearchRow.Controls.Add(pnlSearch);
+            pnlSearchRow.Controls.Add(btnSearch);
+            pnlGrid.Controls.Add(pnlSearchRow);
+            PositionSearchRow();
 
             Panel pnlGridWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2, 6, 2, 6) };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -254,7 +267,9 @@ namespace PersonalFinanceApp
                 ID = c.Id,
                 Ad = c.Name,
                 Tip = TypeToTr(c.Type),
-                ToplamTutar = (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
+                ToplamTutar = _user.HideAmountsEnabled
+                    ? "••••••"
+                    : (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
             }).ToList();
 
             dgvCategories.DataSource = displayList;
@@ -268,8 +283,8 @@ namespace PersonalFinanceApp
         }
 
         // Şeffaf kapsül çizimini yapan yardımcı metot (Bu sınıfta olmadığı için eklememiz gerekiyor)
-        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", _ => "Gider" };
-        private static string TrToType(string tr) => tr switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
+        private static string TypeToTr(string type) => type switch { "income" => "Gelir", "goal" => "Hedef", "invest" => "Yatırım", _ => "Gider" };
+        private static string TrToType(string tr) => tr switch { "Gelir" => "income", "Hedef" => "goal", "Yatırım" => "invest", _ => "expense" };
 
         private void BtnAdd_Click(object? sender, EventArgs e)
         {

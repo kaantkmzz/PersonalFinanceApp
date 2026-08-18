@@ -56,6 +56,8 @@ namespace PersonalFinanceApp
         private Label lblColumnEmptyState = new Label();
         private Chart lineChart = new Chart();
         private Chart columnChart = new Chart();
+        private ChartRevealAnimator? _lineChartReveal;
+        private ChartRevealAnimator? _columnChartReveal;
         private Panel pnlModeToggle = new Panel();
         private Button btnModeGenel = new Button();
         private Button btnModeVarliklarim = new Button();
@@ -116,6 +118,8 @@ namespace PersonalFinanceApp
                 _chartSnapshot?.Dispose();
                 _revealTimer.Dispose();
                 _revealSettleTimer.Dispose();
+                _lineChartReveal?.Dispose();
+                _columnChartReveal?.Dispose();
                 foreach (var t in _cardAnimTimers.Values) { t.Stop(); t.Dispose(); }
                 _cardAnimTimers.Clear();
             };
@@ -129,9 +133,16 @@ namespace PersonalFinanceApp
 
         // Dışarıdan tetiklenen bir tazeleme (ör. tutarları gizle aç/kapa) verileri yeniden çeksin
         // ama kullanıcının o an incelediği kırılım (drill-down) görünümünü sıfırlamasın.
+        // Varlıklarım modundayken bu her zaman Genel raporu (LoadReport) çağırıyordu — bu da chart/
+        // pnlAssetCharts görünürlüğünü Genel'e çeviriyor ama _reportMode alanını güncellemediği için
+        // ekran görsel olarak Genel'e dönüyor, ama "Varlıklarım" sekmesine tekrar tıklayınca SetMode
+        // "zaten bu moddayım" sanıp hiçbir şey yapmıyordu (bkz. SetMode'daki erken çıkış).
         public void RefreshData()
         {
-            LoadReport(resetDrillDown: false);
+            if (_reportMode == ReportMode.Varliklarim)
+                _ = LoadAssetReportAsync();
+            else
+                LoadReport(resetDrillDown: false);
         }
 
         // Tema değişikliğinde ekran tamamen yeniden kurulduğu için kırılım durumu MainForm
@@ -736,6 +747,105 @@ namespace PersonalFinanceApp
             e.Graphics.Clip = oldClip;
         }
 
+        // Varlıklarım modundaki çizgi/sütun grafikleri için, Genel rapordaki saat-12 efektinden farklı,
+        // her grafiğin doğasına uygun bir açılış efekti sağlayan yeniden kullanılabilir yardımcı:
+        // sütun grafiği alttan yukarı büyür, çizgi grafiği soldan sağa açılır.
+        private enum ChartRevealStyle { GrowFromBottom, WipeLeftToRight }
+
+        private class ChartRevealAnimator
+        {
+            private readonly Chart _chart;
+            private readonly Panel _overlay = new Panel();
+            private readonly System.Windows.Forms.Timer _timer = new System.Windows.Forms.Timer { Interval = 16 };
+            private readonly System.Diagnostics.Stopwatch _sw = new System.Diagnostics.Stopwatch();
+            private readonly Color _backColor;
+            private readonly ChartRevealStyle _style;
+            private Bitmap? _snapshot;
+            private float _progress;
+            private const int DurationMs = 700;
+
+            public ChartRevealAnimator(Chart chart, Control host, Color backColor, ChartRevealStyle style)
+            {
+                _chart = chart;
+                _backColor = backColor;
+                _style = style;
+                _overlay.Dock = DockStyle.Fill;
+                _overlay.BackColor = backColor;
+                _overlay.Visible = false;
+                _overlay.Paint += Overlay_Paint;
+                typeof(Control).InvokeMember("DoubleBuffered",
+                    System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    null, _overlay, new object[] { true });
+                _timer.Tick += Timer_Tick;
+                host.Controls.Add(_overlay);
+            }
+
+            public void Reveal()
+            {
+                if (_chart.Width <= 0 || _chart.Height <= 0 || !_chart.Visible) return;
+
+                _timer.Stop();
+                _chart.Invalidate();
+                _chart.Update(); // yeni seri verisiyle senkron bir kare yakalamak için anında (senkron) yeniden çizim
+                _snapshot?.Dispose();
+                _snapshot = new Bitmap(_chart.Width, _chart.Height);
+                _chart.DrawToBitmap(_snapshot, new Rectangle(0, 0, _chart.Width, _chart.Height));
+
+                _progress = 0f;
+                _chart.Visible = false;
+                _overlay.Visible = true;
+                _overlay.BringToFront();
+                _overlay.Invalidate();
+
+                _sw.Restart();
+                _timer.Start();
+            }
+
+            private void Timer_Tick(object? sender, EventArgs e)
+            {
+                double t = _sw.Elapsed.TotalMilliseconds / DurationMs;
+                bool finished = t >= 1.0;
+                if (finished) t = 1.0;
+
+                _progress = (float)(1 - Math.Pow(1 - t, 3)); // ease-out: hızlı başlar, yumuşak biter
+                _overlay.Invalidate();
+
+                if (finished)
+                {
+                    _timer.Stop();
+                    _chart.Visible = true;
+                    _overlay.Visible = false;
+                }
+            }
+
+            private void Overlay_Paint(object? sender, PaintEventArgs e)
+            {
+                e.Graphics.Clear(_backColor);
+                if (_snapshot == null || _progress <= 0.01f) return;
+
+                var rect = new Rectangle(0, 0, _overlay.Width, _overlay.Height);
+
+                // Sütun grafiğinde çubuklar alttan yukarı büyüyormuş gibi görünsün diye görünür alan
+                // alt kenardan başlayıp yukarı doğru genişler; çizgi grafiğinde soldan sağa açılsın
+                // diye sol kenardan başlayıp sağa doğru genişler.
+                Rectangle clip = _style == ChartRevealStyle.GrowFromBottom
+                    ? new Rectangle(0, (int)(rect.Height * (1 - _progress)), rect.Width, (int)(rect.Height * _progress) + 1)
+                    : new Rectangle(0, 0, (int)(rect.Width * _progress) + 1, rect.Height);
+
+                var oldClip = e.Graphics.Clip;
+                e.Graphics.SetClip(clip);
+                e.Graphics.DrawImage(_snapshot, rect);
+                e.Graphics.Clip = oldClip;
+            }
+
+            public void Dispose()
+            {
+                _timer.Stop();
+                _timer.Dispose();
+                _snapshot?.Dispose();
+            }
+        }
+
         // Dilimlerin altında kategori kategori değil; her renk için TEK bir kutucukta o rengin toplam
         // yüzdesini gösteren, grafiğin altında ortalanmış özel bir şerit. Gelir/Gider/Hedef tıklanabilir:
         // tıklanınca o türün kendi kategori kırılımına geçilir (bkz. BuildChart, BuildDrillDownLegend).
@@ -1204,6 +1314,7 @@ namespace PersonalFinanceApp
             pnlLineChartArea.Controls.Add(lineChart);
             pnlLineChartArea.Controls.Add(lblLineEmptyState);
             pnlLineChartArea.Controls.Add(pnlLineHeader);
+            _lineChartReveal = new ChartRevealAnimator(lineChart, pnlLineChartArea, AppBackColor, ChartRevealStyle.WipeLeftToRight);
 
             lblColumnChartTitle.Text = "Varlık Dağılımı";
             lblColumnChartTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
@@ -1234,6 +1345,7 @@ namespace PersonalFinanceApp
             pnlColumnChartArea.Controls.Add(columnChart);
             pnlColumnChartArea.Controls.Add(lblColumnEmptyState);
             pnlColumnChartArea.Controls.Add(pnlColumnHeader);
+            _columnChartReveal = new ChartRevealAnimator(columnChart, pnlColumnChartArea, AppBackColor, ChartRevealStyle.GrowFromBottom);
 
             pnlAssetCharts.Controls.Add(pnlColumnChartArea);
             pnlAssetCharts.Controls.Add(pnlLineChartArea);
@@ -1313,6 +1425,7 @@ namespace PersonalFinanceApp
 
             lineChart.ChartAreas["lineArea"].AxisY.LabelStyle.Format = "#,##0 ₺";
             lineChart.Series.Add(series);
+            if (this.IsHandleCreated) this.BeginInvoke(new Action(() => _lineChartReveal?.Reveal()));
         }
 
         private void BuildColumnChart(List<(string Symbol, string Name, decimal CostBasisTry)> costBasis)
@@ -1335,8 +1448,13 @@ namespace PersonalFinanceApp
             {
                 ChartType = SeriesChartType.Column,
                 ChartArea = "columnArea",
-                ToolTip = "#AXISLABEL: #VAL{N0} ₺"
+                ToolTip = "#AXISLABEL: #VAL{N0} ₺",
+                // String X değerleriyle AddXY kullanıldığında bu ayar olmadan Chart bazen tüm
+                // noktaları aynı X konumunda (dolayısıyla üst üste) çiziyor; kategori bazlı,
+                // yan yana çubuklar için gerekli.
+                IsXValueIndexed = true
             };
+            columnChart.ChartAreas["columnArea"].AxisX.Interval = 1;
 
             var shades = GenerateShades(AccentColor, costBasis.Count);
             for (int i = 0; i < costBasis.Count; i++)
@@ -1347,6 +1465,7 @@ namespace PersonalFinanceApp
 
             columnChart.ChartAreas["columnArea"].AxisY.LabelStyle.Format = "#,##0 ₺";
             columnChart.Series.Add(series);
+            if (this.IsHandleCreated) this.BeginInvoke(new Action(() => _columnChartReveal?.Reveal()));
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
