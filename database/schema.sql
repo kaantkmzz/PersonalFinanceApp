@@ -68,6 +68,15 @@ CREATE TABLE savings_goals (
     created_at      TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Hedeflerim: bir hedefe yapılan tekil yatırım/katkı geçmişi
+CREATE TABLE savings_goal_investments (
+    investment_id  SERIAL PRIMARY KEY,
+    goal_id        INTEGER NOT NULL REFERENCES savings_goals(goal_id) ON DELETE CASCADE,
+    user_id        INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    amount         NUMERIC(14,2) NOT NULL,
+    invested_at    TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE notes (
     note_id     SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
