@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
@@ -41,7 +42,7 @@ namespace PersonalFinanceApp
             this.ControlBox = false;
 
             pnlCard.Width = 480;
-            pnlCard.Height = 400;
+            pnlCard.Height = 360;
             pnlCard.BackColor = AppBackColor;
             pnlCard.Paint += (s, e) =>
             {
@@ -58,40 +59,44 @@ namespace PersonalFinanceApp
 
             Panel pnlIconBadge = CreateIconBadge("🏦");
             Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
-            Label lblHint = new Label { Text = "Kasanızda şu an bulunan\ntoplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = false, Left = 60, Width = 360, Height = 50, TextAlign = ContentAlignment.TopLeft };
 
-            Panel pnlField = new Panel { Left = 60, Top = 216, Width = 360, Height = 48 };
+            // Alt açıklama kaldırıldı — tek başlık yeterli. Kaldırılan boşluk yukarı çekildi,
+            // metin kutusu geniş olsun diye kart genişletildi (bkz. pnlCard.Width).
+            Panel pnlField = new Panel { Left = 40, Top = 180, Width = 400, Height = 52 };
             SetupSmoothContainer(pnlField, 10, FieldBackColor);
             txtInitialSavings.BorderStyle = BorderStyle.None;
             txtInitialSavings.BackColor = FieldBackColor;
             txtInitialSavings.ForeColor = TextLight;
             txtInitialSavings.Font = new Font("Segoe UI", 13F);
             txtInitialSavings.TextAlign = HorizontalAlignment.Center;
-            txtInitialSavings.Location = new Point(0, 13);
-            txtInitialSavings.Width = 360;
+            txtInitialSavings.Location = new Point(0, 15);
+            txtInitialSavings.Width = 400;
             txtInitialSavings.TextChanged += (s, e) => SmartFormatAmount(txtInitialSavings);
+            // "p", "y" gibi alt çıkıntılı (descender) harflerin native metin kutusunun alt sınırına
+            // çok yakın yazılıp kırpılmasını önlemek için metni birkaç piksel yukarı kaydırıyoruz
+            // (bkz. TransactionControl.ShiftEditTextUp — aynı teknik, burada doğrudan TextBox'a uygulanıyor).
+            txtInitialSavings.HandleCreated += (s, e) => ShiftTextBoxTextUp(txtInitialSavings, 3);
+            if (txtInitialSavings.IsHandleCreated) ShiftTextBoxTextUp(txtInitialSavings, 3);
             pnlField.Controls.Add(txtInitialSavings);
 
-            lblError.Left = 60;
-            lblError.Top = 270;
-            lblError.Width = 360;
+            lblError.Left = 40;
+            lblError.Top = 238;
+            lblError.Width = 400;
             lblError.Height = 24;
             lblError.ForeColor = DangerColor;
             lblError.BackColor = Color.Transparent;
             lblError.Font = new Font("Segoe UI", 9F);
             lblError.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 306, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            Button btnFinish = new Button { Text = "Tamamla", Left = 40, Top = 274, Width = 400, Height = 46, Cursor = Cursors.Hand };
             SetupRoundedButton(btnFinish, AccentColor, Color.White);
             btnFinish.Click += BtnFinish_Click;
 
             CenterHorizontally(pnlIconBadge, 0, 36);
             CenterHorizontally(lblPrompt, 0, 118);
-            CenterHorizontally(lblHint, 0, 154);
 
             pnlStep.Controls.Add(pnlIconBadge);
             pnlStep.Controls.Add(lblPrompt);
-            pnlStep.Controls.Add(lblHint);
             pnlStep.Controls.Add(pnlField);
             pnlStep.Controls.Add(lblError);
             pnlStep.Controls.Add(btnFinish);
@@ -112,9 +117,29 @@ namespace PersonalFinanceApp
                 e.Graphics.Clear(CardBackColor);
                 using var brush = new SolidBrush(Color.FromArgb(40, AccentColor));
                 e.Graphics.FillEllipse(brush, 0, 0, badge.Width - 1, badge.Height - 1);
-                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 28F), badge.ClientRectangle, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                // Emoji glifleri genelde alt tarafa doğru fazladan boşluk bırakıyor; küçültülmüş
+                // font + birkaç piksel yukarı kaydırılmış çizim dikdörtgeni ile yuvarlağın
+                // ortasına optik olarak hizalıyoruz.
+                var iconRect = new Rectangle(0, -4, badge.Width, badge.Height);
+                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 22F), iconRect, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
             return badge;
+        }
+
+        // TextBox'ın metin biçimlendirme dikdörtgenini (EM_SETRECT) birkaç piksel yukarı taşıyarak
+        // "p", "y" gibi alt çıkıntılı harflerin alt sınıra çok yakın yazılıp kırpılmasını önler.
+        private const int EM_SETRECT = 0xB3;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref RECT lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        private static void ShiftTextBoxTextUp(TextBox txt, int pixels)
+        {
+            var rect = new RECT { Left = 0, Top = -pixels, Right = txt.ClientSize.Width, Bottom = txt.ClientSize.Height };
+            SendMessage(txt.Handle, EM_SETRECT, IntPtr.Zero, ref rect);
         }
 
         private void CenterHorizontally(Control control, int unusedLeft, int top)
