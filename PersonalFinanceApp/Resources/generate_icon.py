@@ -152,20 +152,42 @@ simple_img = build_simple_icon()
 detailed_sizes = [48, 64, 128, 256]
 simple_sizes = [16, 20, 24, 32, 40]
 
-resized = [simple_img.resize((s, s), Image.LANCZOS) for s in simple_sizes] + \
-          [icon_img.resize((s, s), Image.LANCZOS) for s in detailed_sizes]
-all_sizes = simple_sizes + detailed_sizes
+frames = [(s, simple_img.resize((s, s), Image.LANCZOS)) for s in simple_sizes] + \
+         [(s, icon_img.resize((s, s), Image.LANCZOS)) for s in detailed_sizes]
 
 out_dir = os.path.dirname(os.path.abspath(__file__))
 icon_img.resize((256, 256), Image.LANCZOS).save(os.path.join(out_dir, "app_icon_preview.png"))
 simple_img.resize((32, 32), Image.LANCZOS).save(os.path.join(out_dir, "app_icon_preview_small.png"))
 
+# Pillow's built-in ICO writer collapses multi-size + append_images into a single
+# resized frame instead of keeping each custom-drawn size distinct (confirmed by
+# inspecting the ICONDIR header of a previous export: it only had 1 entry, not 9 —
+# this was the actual cause of the blurry/upscaled taskbar icon). Building the ICO
+# container by hand, with each frame stored as its own PNG blob (a format Windows
+# has supported per-frame since Vista), guarantees every requested size keeps its
+# own crisp, purpose-drawn image instead of being interpolated from one bitmap.
+import io, struct
+
+def write_ico(path, frames):
+    entries = []
+    images = []
+    for size, img in frames:
+        buf = io.BytesIO()
+        img.convert("RGBA").save(buf, format="PNG")
+        images.append(buf.getvalue())
+        entries.append(size)
+
+    with open(path, "wb") as f:
+        f.write(struct.pack("<HHH", 0, 1, len(frames)))
+        offset = 6 + 16 * len(frames)
+        for size, data in zip(entries, images):
+            wh = size if size < 256 else 0
+            f.write(struct.pack("<BBBBHHII", wh, wh, 0, 0, 1, 32, len(data), offset))
+            offset += len(data)
+        for data in images:
+            f.write(data)
+
 ico_path = os.path.join(out_dir, "AppIcon.ico")
-resized[0].save(
-    ico_path,
-    format="ICO",
-    sizes=[(s, s) for s in all_sizes],
-    append_images=resized[1:],
-)
+write_ico(ico_path, frames)
 
 print("Saved:", ico_path)
