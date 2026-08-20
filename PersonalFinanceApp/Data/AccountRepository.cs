@@ -273,6 +273,22 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        public void SetHomeLayout(int userId, string layoutJson)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE users SET home_layout = @homeLayout WHERE user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@homeLayout", layoutJson);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         public void SetAvatarColor(int userId, string hexColor)
         {
             using (var conn = DatabaseHelper.GetConnection())

@@ -21,7 +21,10 @@ CREATE TABLE users (
     cleanup_frequency            VARCHAR(10) NOT NULL DEFAULT 'never',
     cleanup_period_start         TIMESTAMP NOT NULL DEFAULT NOW(),
     cleanup_export_before_clear  BOOLEAN NOT NULL DEFAULT FALSE,
-    avatar_color                 VARCHAR(7) NOT NULL DEFAULT '#6366F1'
+    avatar_color                 VARCHAR(7) NOT NULL DEFAULT '#6366F1',
+    -- Ana Sayfa'daki isteğe bağlı widget'ların (Varlık Bildirimleri, Notlar, ...) hücre yerleşimi (JSON).
+    -- Boşsa hiç widget eklenmemiş demektir.
+    home_layout                  TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE categories (

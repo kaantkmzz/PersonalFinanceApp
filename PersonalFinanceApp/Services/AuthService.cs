@@ -173,7 +173,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, full_name, cleanup_frequency, cleanup_period_start, cleanup_export_before_clear, avatar_color FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, full_name, cleanup_frequency, cleanup_period_start, cleanup_export_before_clear, avatar_color, home_layout FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -194,6 +194,7 @@ namespace PersonalFinanceApp.Services
                                 int cleanupPeriodStartOrdinal = reader.GetOrdinal("cleanup_period_start");
                                 int cleanupExportOrdinal = reader.GetOrdinal("cleanup_export_before_clear");
                                 int avatarColorOrdinal = reader.GetOrdinal("avatar_color");
+                                int homeLayoutOrdinal = reader.GetOrdinal("home_layout");
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
@@ -214,7 +215,8 @@ namespace PersonalFinanceApp.Services
                                         CleanupFrequency = reader.GetString(cleanupFrequencyOrdinal),
                                         CleanupPeriodStart = reader.GetDateTime(cleanupPeriodStartOrdinal),
                                         CleanupExportBeforeClear = reader.GetBoolean(cleanupExportOrdinal),
-                                        AvatarColor = reader.GetString(avatarColorOrdinal)
+                                        AvatarColor = reader.GetString(avatarColorOrdinal),
+                                        HomeLayout = reader.GetString(homeLayoutOrdinal)
                                     };
                                 }
                             }

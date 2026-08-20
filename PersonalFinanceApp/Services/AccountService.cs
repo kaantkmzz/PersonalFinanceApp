@@ -117,5 +117,10 @@ namespace PersonalFinanceApp.Services
         {
             _repository.SetAvatarColor(userId, hexColor);
         }
+
+        public void SetHomeLayout(int userId, string layoutJson)
+        {
+            _repository.SetHomeLayout(userId, layoutJson);
+        }
     }
 }

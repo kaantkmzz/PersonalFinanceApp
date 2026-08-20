@@ -16,5 +16,9 @@
         public DateTime CleanupPeriodStart { get; set; } = DateTime.Now;
         public bool CleanupExportBeforeClear { get; set; }
         public string AvatarColor { get; set; } = "#6366F1";
+
+        // Ana Sayfa'daki isteğe bağlı widget'ların (Varlık Bildirimleri, Notlar, Hatırlatıcılar, ...)
+        // hangi hücrede durduğunu tutan JSON; boşsa hiç widget eklenmemiş demektir (bkz. HomeLayoutService).
+        public string HomeLayout { get; set; } = string.Empty;
     }
 }

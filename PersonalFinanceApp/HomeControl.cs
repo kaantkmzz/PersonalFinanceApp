@@ -41,6 +41,36 @@ namespace PersonalFinanceApp
         private Panel pnlNotifications = new Panel();
         private Panel pnlNotes = new Panel();
 
+        // --- Ana Sayfa widget yerleşimi (bkz. SetupWidgetGrid) ---
+        // Widget'lar 4 sütunluk, 2 satırlık bir ızgaraya (8 hücre) sürükle-bırak ile yerleştirilir;
+        // yerleşim kullanıcıya özgü (users.home_layout, JSON) kalıcı olarak saklanır. İlk açılışta
+        // (home_layout boş) hiç widget yerleşik değildir — sadece Cüzdan/Kasa/Varlıklarım görünür.
+        private class WidgetDef
+        {
+            public string Key = string.Empty;
+            public string Title = string.Empty;
+            public int ColSpan = 1;
+        }
+
+        private static readonly WidgetDef[] WidgetCatalog = new[]
+        {
+            new WidgetDef { Key = "notifications", Title = "Varlık Bildirimleri", ColSpan = 3 },
+            new WidgetDef { Key = "notes", Title = "Notlar", ColSpan = 1 },
+            new WidgetDef { Key = "reminders", Title = "Yaklaşan Hatırlatıcılar", ColSpan = 1 },
+            new WidgetDef { Key = "report", Title = "Bu Ayın Özeti", ColSpan = 1 },
+            new WidgetDef { Key = "transactions", Title = "Son İşlemler", ColSpan = 1 },
+            new WidgetDef { Key = "goals", Title = "Hedeflerim", ColSpan = 1 },
+        };
+
+        private const int GridCols = 4;
+
+        private readonly Dictionary<string, int> _placedWidgets = new Dictionary<string, int>();
+        private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
+        private readonly Panel[] _cellPanels = new Panel[8];
+        private Button btnAddWidget = new Button();
+        private Panel pnlWidgetPicker = new Panel();
+        private Label lblEmptyGridHint = new Label();
+
         // Etikete göre çalışan sayaç animasyonu zamanlayıcıları — bir widget yenilenirken (ör. tutarları
         // gizle aç/kapa, ya da mini-widget'lar yeniden dolarken) eski bir animasyon hâlâ sürüyorsa önce
         // onu durdurmak için (bkz. AnimateLabelValue, ClearWidgetContent).
@@ -76,12 +106,7 @@ namespace PersonalFinanceApp
             SetupUI();
             RefreshBalances();
             _ = LoadInvestCardAsync();
-            _ = LoadNotificationsAsync();
-            LoadNotesWidget();
-            LoadReminderWidget();
-            LoadMiniReportWidget();
-            LoadRecentTransactionsWidget();
-            LoadGoalsWidget();
+            SetupWidgetGrid();
         }
 
         private void SetupUI()
@@ -91,7 +116,10 @@ namespace PersonalFinanceApp
             // Sabit piksel konumlu dört sütun (bkz. CardLeft4/CardWidth) ve mini-widget satırı (bkz.
             // MiniRowTop/MiniRowHeight) esnek değil — Dock=Fill bunu MainForm.pnlContent'in AutoScroll'u
             // sayesinde bu boyutun altına küçültmüyor, aksi halde sağdaki/alttaki kartlar sessizce kırpılırdı.
-            this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + MiniRowHeight + 20);
+            // Widget ızgarası artık 2 satır olabiliyor (bkz. SetupWidgetGrid, GridCols) — yükseklik
+            // hesabı tek satırda kalmışsa alt satıra yerleştirilen widget'lar kırpılabilirdi.
+            const int gridRows = 2;
+            this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20));
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 
@@ -203,19 +231,10 @@ namespace PersonalFinanceApp
             lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
 
-            // Varlıklarım'da pozisyonu olan kullanıcılar için kâr/zarar bildirim kartı; pozisyon yoksa
-            // (bkz. LoadNotificationsAsync) tamamen gizlenir, boş kart gösterilmez. Sağında, Hedeflerim
-            // kartıyla aynı sütunda (CardLeft4), Notlar mini-widget'ı için yer bırakılıyor.
-            pnlNotifications.Left = CardLeft1;
-            pnlNotifications.Top = lblStatus.Top + 40;
-            pnlNotifications.Width = CardLeft4 - 16 - CardLeft1;
-            pnlNotifications.Visible = false;
+            // Varlıklarım'da pozisyonu olan kullanıcılar için kâr/zarar bildirim kartı (bkz.
+            // LoadNotificationsAsync). Artık sabit boyutlu bir widget hücresi — konumu ve görünürlüğü
+            // kullanıcının widget yerleşimine göre RebuildWidgetGrid tarafından yönetiliyor.
             SetupSmoothContainer(pnlNotifications, 16, CardBackColor);
-
-            pnlNotes.Left = CardLeft4;
-            pnlNotes.Top = pnlNotifications.Top;
-            pnlNotes.Width = CardWidth;
-            pnlNotes.Height = 232;
             SetupSmoothContainer(pnlNotes, 16, CardBackColor);
 
             this.Controls.Add(pnlWallet);
@@ -224,14 +243,13 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnTransfer);
             this.Controls.Add(btnHistory);
             this.Controls.Add(lblStatus);
-            this.Controls.Add(pnlNotifications);
-            this.Controls.Add(pnlNotes);
 
             SetupMiniWidgets();
         }
 
-        // Ana Sayfa'yı çeşitlendiren üç küçük, tıklanabilir önizleme: yaklaşan hatırlatıcılar,
-        // bu ayın rapor özeti ve son işlemler — her biri kendi tam ekranına götürür.
+        // Ana Sayfa'yı çeşitlendiren, kullanıcının sürükle-bırakla ekleyip çıkarabildiği önizleme
+        // widget'ları — her biri kendi tam ekranına götürür. Artık doğrudan this.Controls'a
+        // eklenmiyorlar; RebuildWidgetGrid, yerleştirilmiş olanları uygun bir "frame" içine koyar.
         private Panel pnlReminderWidget = new Panel();
         private Panel pnlMiniReportWidget = new Panel();
         private Panel pnlRecentTxWidget = new Panel();
@@ -243,11 +261,337 @@ namespace PersonalFinanceApp
             pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "Bu Ayın Özeti", "Rapor");
             pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "Son İşlemler", "İşlemler");
             pnlGoalsWidget = CreateWidgetCard(CardLeft4, "Hedeflerim", "Hedefler");
+        }
 
-            this.Controls.Add(pnlReminderWidget);
-            this.Controls.Add(pnlMiniReportWidget);
-            this.Controls.Add(pnlRecentTxWidget);
-            this.Controls.Add(pnlGoalsWidget);
+        // --- Widget ızgarası: 4 sütun × 2 satır, sürükle-bırakla düzenlenebilir ---
+
+        private Panel GetContentPanelFor(string key) => key switch
+        {
+            "notifications" => pnlNotifications,
+            "notes" => pnlNotes,
+            "reminders" => pnlReminderWidget,
+            "report" => pnlMiniReportWidget,
+            "transactions" => pnlRecentTxWidget,
+            "goals" => pnlGoalsWidget,
+            _ => throw new ArgumentException($"Bilinmeyen widget anahtarı: {key}")
+        };
+
+        private void LoadWidgetContent(string key)
+        {
+            switch (key)
+            {
+                case "notifications": _ = LoadNotificationsAsync(); break;
+                case "notes": LoadNotesWidget(); break;
+                case "reminders": LoadReminderWidget(); break;
+                case "report": LoadMiniReportWidget(); break;
+                case "transactions": LoadRecentTransactionsWidget(); break;
+                case "goals": LoadGoalsWidget(); break;
+            }
+        }
+
+        private void LoadPlacedWidgetsFromUser()
+        {
+            if (string.IsNullOrWhiteSpace(_user.HomeLayout)) return;
+            try
+            {
+                var loaded = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(_user.HomeLayout);
+                if (loaded == null) return;
+                foreach (var kv in loaded)
+                {
+                    if (WidgetCatalog.Any(w => w.Key == kv.Key))
+                        _placedWidgets[kv.Key] = kv.Value;
+                }
+            }
+            catch
+            {
+                // Bozuk/eski bir home_layout JSON'u varsa sessizce yok sayılır — kullanıcı widget'ları
+                // + panelinden yeniden ekleyebilir, bu kritik bir veri değil.
+            }
+        }
+
+        private void SaveLayout()
+        {
+            try
+            {
+                string json = System.Text.Json.JsonSerializer.Serialize(_placedWidgets);
+                _accountService.SetHomeLayout(_user.Id, json);
+                _user.HomeLayout = json;
+            }
+            catch
+            {
+                // Yerleşim kaydı başarısız olsa bile UI'da widget'lar zaten doğru yerde duruyor —
+                // bir sonraki oturumda eski yerleşime dönebilir, kritik değil.
+            }
+        }
+
+        private void SetupWidgetGrid()
+        {
+            LoadPlacedWidgetsFromUser();
+
+            for (int i = 0; i < _cellPanels.Length; i++)
+            {
+                int col = i % GridCols, row = i / GridCols;
+                Panel cell = new Panel
+                {
+                    Left = CardLeft1 + col * (CardWidth + 20),
+                    Top = MiniRowTop + row * (MiniRowHeight + 20),
+                    Width = CardWidth,
+                    Height = MiniRowHeight,
+                    BackColor = Color.Transparent,
+                    AllowDrop = true
+                };
+
+                cell.Paint += (s, e) =>
+                {
+                    if (cell.Tag is bool hovering && hovering)
+                    {
+                        using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                        e.Graphics.DrawRectangle(pen, 1, 1, cell.Width - 2, cell.Height - 2);
+                    }
+                };
+                cell.DragEnter += (s, e) => { e.Effect = GetDropEffect(e); cell.Tag = true; cell.Invalidate(); };
+                cell.DragLeave += (s, e) => { cell.Tag = false; cell.Invalidate(); };
+                int cellIndex = i;
+                cell.DragDrop += (s, e) =>
+                {
+                    cell.Tag = false; cell.Invalidate();
+                    if (e.Data?.GetData(typeof(string)) is string key) PlaceWidget(key, cellIndex);
+                };
+
+                this.Controls.Add(cell);
+                _cellPanels[i] = cell;
+            }
+
+            SetupWidgetPicker();
+            RebuildWidgetGrid();
+        }
+
+        private static DragDropEffects GetDropEffect(DragEventArgs e) =>
+            (e.Data?.GetDataPresent(typeof(string)) ?? false) ? DragDropEffects.Move : DragDropEffects.None;
+
+        private void SetupWidgetPicker()
+        {
+            btnAddWidget.Text = "+";
+            btnAddWidget.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            btnAddWidget.Width = 40;
+            btnAddWidget.Height = 36;
+            btnAddWidget.Left = CardLeft4 + CardWidth - btnAddWidget.Width;
+            btnAddWidget.Top = MiniRowTop - btnAddWidget.Height - 14;
+            btnAddWidget.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnAddWidget, AccentColor, Color.White);
+            btnAddWidget.Click += (s, e) =>
+            {
+                pnlWidgetPicker.Visible = !pnlWidgetPicker.Visible;
+                if (pnlWidgetPicker.Visible)
+                {
+                    BuildWidgetPickerRows();
+                    pnlWidgetPicker.BringToFront();
+                }
+            };
+
+            pnlWidgetPicker.Width = 280;
+            pnlWidgetPicker.Left = btnAddWidget.Right - pnlWidgetPicker.Width;
+            pnlWidgetPicker.Top = btnAddWidget.Bottom + 8;
+            pnlWidgetPicker.Visible = false;
+            SetupSmoothContainer(pnlWidgetPicker, 12, CardBackColor);
+
+            lblEmptyGridHint.Text = "Widget eklemek için sağ üstteki + butonuna tıklayın.";
+            lblEmptyGridHint.ForeColor = TextMuted;
+            lblEmptyGridHint.Font = new Font("Segoe UI", 10F);
+            lblEmptyGridHint.AutoSize = true;
+            lblEmptyGridHint.BackColor = Color.Transparent;
+            lblEmptyGridHint.Left = CardLeft1;
+            lblEmptyGridHint.Top = MiniRowTop + 20;
+
+            this.Controls.Add(lblEmptyGridHint);
+            this.Controls.Add(btnAddWidget);
+            this.Controls.Add(pnlWidgetPicker);
+            btnAddWidget.BringToFront();
+        }
+
+        // Widgetları Düzenle panelindeki satırları, güncel yerleşime göre (eklenmiş/eklenebilir) yeniden çizer.
+        private void BuildWidgetPickerRows()
+        {
+            pnlWidgetPicker.Controls.Clear();
+
+            Label lblTitle = new Label { Text = "Widgetları Düzenle", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = TextLight, Left = 16, Top = 14, AutoSize = true, BackColor = Color.Transparent };
+            Label lblHint = new Label { Text = "Sürükleyip ızgaraya bırakın", Font = new Font("Segoe UI", 8.5F), ForeColor = TextMuted, Left = 16, Top = 38, AutoSize = true, BackColor = Color.Transparent };
+            pnlWidgetPicker.Controls.Add(lblTitle);
+            pnlWidgetPicker.Controls.Add(lblHint);
+
+            int top = 64;
+            foreach (var def in WidgetCatalog)
+            {
+                bool placed = _placedWidgets.ContainsKey(def.Key);
+
+                Panel row = new Panel { Left = 12, Top = top, Width = pnlWidgetPicker.Width - 24, Height = 38, BackColor = Color.Transparent };
+
+                Label lblHandle = new Label { Text = "⠿", Font = new Font("Segoe UI", 10F), ForeColor = placed ? AppTheme.GridLineColor : TextMuted, Left = 4, Top = 10, Width = 18, Height = 18, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleCenter };
+                Label lblName = new Label { Text = def.Title, Font = new Font("Segoe UI", 9.5F), ForeColor = placed ? TextMuted : TextLight, Left = 26, Top = 0, Width = 160, Height = 38, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
+                Label lblStatus = new Label { Text = placed ? "Eklendi" : "", Font = new Font("Segoe UI", 8F), ForeColor = AppTheme.SuccessColor, Left = row.Width - 70, Top = 0, Width = 70, Height = 38, TextAlign = ContentAlignment.MiddleRight, BackColor = Color.Transparent };
+
+                row.Controls.Add(lblHandle);
+                row.Controls.Add(lblName);
+                row.Controls.Add(lblStatus);
+
+                if (!placed)
+                {
+                    row.Cursor = Cursors.SizeAll;
+                    MouseEventHandler startDrag = (s, e) => row.DoDragDrop(def.Key, DragDropEffects.Move);
+                    row.MouseDown += startDrag;
+                    lblHandle.MouseDown += startDrag;
+                    lblName.MouseDown += startDrag;
+                }
+
+                pnlWidgetPicker.Controls.Add(row);
+                top += 40;
+            }
+
+            pnlWidgetPicker.Height = top + 12;
+        }
+
+        // Bir widget'ı belirtilen hücreye (anchorCell) yerleştirir: hedef hücrelerle çakışan başka
+        // widget'lar varsa tahtadan kaldırılır (+ panelinden tekrar eklenebilir); tek bir widget'la ve
+        // aynı boyutta tam çakışma varsa (ve sürüklenen zaten tahtadaysa) yer değiştirme (takas) yapılır.
+        private void PlaceWidget(string key, int anchorCell)
+        {
+            var def = WidgetCatalog.FirstOrDefault(w => w.Key == key);
+            if (def == null) return;
+
+            int col = anchorCell % GridCols, row = anchorCell / GridCols;
+            if (col + def.ColSpan > GridCols) col = GridCols - def.ColSpan;
+            anchorCell = row * GridCols + col;
+
+            int? previousCell = _placedWidgets.TryGetValue(key, out var pc) ? pc : (int?)null;
+            _placedWidgets.Remove(key);
+
+            var newCells = new HashSet<int>(Enumerable.Range(anchorCell, def.ColSpan));
+
+            var displaced = _placedWidgets
+                .Where(kv => Enumerable.Range(kv.Value, WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => newCells.Contains(c)))
+                .Select(kv => kv.Key)
+                .ToList();
+
+            foreach (var dKey in displaced) _placedWidgets.Remove(dKey);
+
+            if (previousCell.HasValue && displaced.Count == 1)
+            {
+                var displacedDef = WidgetCatalog.First(w => w.Key == displaced[0]);
+                if (displacedDef.ColSpan == def.ColSpan)
+                {
+                    _placedWidgets[displaced[0]] = previousCell.Value;
+                }
+            }
+
+            _placedWidgets[key] = anchorCell;
+            SaveLayout();
+            RebuildWidgetGrid();
+        }
+
+        private void RemoveWidgetFromGrid(string key)
+        {
+            _placedWidgets.Remove(key);
+            SaveLayout();
+            RebuildWidgetGrid();
+        }
+
+        // Yerleştirilmiş her widget için (ilk seferinde) bir "frame" (sürükleme tutamacı + kaldırma
+        // düğmesi + gerçek içerik paneli) kurar/konumlandırır; yerleştirilmemiş olanların frame'i varsa gizler.
+        private void RebuildWidgetGrid()
+        {
+            foreach (var def in WidgetCatalog)
+            {
+                bool isPlaced = _placedWidgets.TryGetValue(def.Key, out int cell);
+                if (!isPlaced)
+                {
+                    if (_widgetFrames.TryGetValue(def.Key, out var hiddenFrame)) hiddenFrame.Visible = false;
+                    continue;
+                }
+
+                if (!_widgetFrames.TryGetValue(def.Key, out var frame))
+                {
+                    frame = CreateWidgetFrame(def);
+                    _widgetFrames[def.Key] = frame;
+                    this.Controls.Add(frame);
+                }
+
+                int col = cell % GridCols, row = cell / GridCols;
+                frame.Left = CardLeft1 + col * (CardWidth + 20);
+                frame.Top = MiniRowTop + row * (MiniRowHeight + 20);
+                frame.Width = def.ColSpan * CardWidth + (def.ColSpan - 1) * 20;
+                frame.Height = MiniRowHeight;
+                frame.Visible = true;
+                frame.BringToFront();
+
+                LoadWidgetContent(def.Key);
+            }
+
+            btnAddWidget.BringToFront();
+            if (pnlWidgetPicker.Visible) BuildWidgetPickerRows();
+            pnlWidgetPicker.BringToFront();
+
+            lblEmptyGridHint.Visible = _placedWidgets.Count == 0;
+        }
+
+        // Bir widget'ı barındıran dış çerçeve: sürükleme tutamacı ve kaldırma düğmesi, içerik panelinin
+        // kendi Controls.Clear() tabanlı yenilemelerinden (bkz. LoadReminderWidget vb.) etkilenmeyecek
+        // şekilde bu dış panelde tutuluyor.
+        private Panel CreateWidgetFrame(WidgetDef def)
+        {
+            Panel frame = new Panel { BackColor = Color.Transparent, AllowDrop = true };
+
+            frame.DragEnter += (s, e) => e.Effect = GetDropEffect(e);
+            frame.DragDrop += (s, e) =>
+            {
+                if (e.Data?.GetData(typeof(string)) is string key && _placedWidgets.TryGetValue(def.Key, out int myCell))
+                    PlaceWidget(key, myCell);
+            };
+
+            Panel content = GetContentPanelFor(def.Key);
+            content.Dock = DockStyle.Fill;
+            frame.Controls.Add(content);
+
+            Label dragHandle = new Label
+            {
+                Text = "⠿",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = TextMuted,
+                BackColor = Color.Transparent,
+                Left = 2,
+                Top = 8,
+                Width = 15,
+                Height = 16,
+                Cursor = Cursors.SizeAll,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            dragHandle.MouseDown += (s, e) =>
+            {
+                if (_placedWidgets.ContainsKey(def.Key)) frame.DoDragDrop(def.Key, DragDropEffects.Move);
+            };
+            frame.Controls.Add(dragHandle);
+            dragHandle.BringToFront();
+
+            Label removeBtn = new Label
+            {
+                Text = "✕",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = TextMuted,
+                BackColor = Color.Transparent,
+                Width = 18,
+                Height = 18,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Cursor = Cursors.Hand
+            };
+            void PositionRemoveBtn() { removeBtn.Left = frame.Width - 24; removeBtn.Top = 8; }
+            PositionRemoveBtn();
+            frame.Resize += (s, e) => PositionRemoveBtn();
+            removeBtn.Click += (s, e) => RemoveWidgetFromGrid(def.Key);
+            removeBtn.MouseEnter += (s, e) => removeBtn.ForeColor = AppTheme.DangerColor;
+            removeBtn.MouseLeave += (s, e) => removeBtn.ForeColor = TextMuted;
+            frame.Controls.Add(removeBtn);
+            removeBtn.BringToFront();
+
+            return frame;
         }
 
         private Panel CreateWidgetCard(int left, string titleText, string navigateTarget)
@@ -759,20 +1103,21 @@ namespace PersonalFinanceApp
         {
             RefreshBalances();
             _ = LoadInvestCardAsync();
-            _ = LoadNotificationsAsync();
 
-            // Eskiden yalnızca üstteki üç kart tazeleniyordu; mini-widget'lar (Hatırlatıcılar, Bu Ayın
-            // Özeti, Son İşlemler, Hedeflerim) yalnızca kurucuda dolduruluyordu — bu yüzden hem "tutarları
-            // gizle" aç/kapa hem de sayfa değiştirip geri dönme bu widget'ları hiç güncellemiyordu.
-            LoadNotesWidget();
-            LoadReminderWidget();
-            LoadMiniReportWidget();
-            LoadRecentTransactionsWidget();
-            LoadGoalsWidget();
+            // Yalnızca kullanıcının ızgaraya yerleştirdiği widget'ları tazele — yerleştirilmemiş
+            // olanların içeriğini üretmenin bir anlamı yok (bkz. WidgetCatalog/_placedWidgets).
+            if (_placedWidgets.ContainsKey("notifications")) _ = LoadNotificationsAsync();
+            if (_placedWidgets.ContainsKey("notes")) LoadNotesWidget();
+            if (_placedWidgets.ContainsKey("reminders")) LoadReminderWidget();
+            if (_placedWidgets.ContainsKey("report")) LoadMiniReportWidget();
+            if (_placedWidgets.ContainsKey("transactions")) LoadRecentTransactionsWidget();
+            if (_placedWidgets.ContainsKey("goals")) LoadGoalsWidget();
         }
 
         // Varlıklarım'daki pozisyonların anlık kâr/zararını "bildirim" tarzında listeler; en çok
-        // hareket edenler (yüzde olarak) üstte. Pozisyon yoksa kart tamamen gizlenir.
+        // hareket edenler (yüzde olarak) üstte. Pozisyon yoksa boş durum mesajı gösterilir (widget artık
+        // kullanıcı tarafından yerleştirildiğinden veri yoksa bile kartı tamamen gizlemek, ızgarada
+        // açıklanamayan bir boşluk bırakırdı).
         private async Task LoadNotificationsAsync()
         {
             var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
@@ -781,14 +1126,6 @@ namespace PersonalFinanceApp
             var withChange = holdings.Where(h => h.ProfitLossPercent.HasValue).ToList();
 
             pnlNotifications.Controls.Clear();
-
-            if (withChange.Count == 0)
-            {
-                pnlNotifications.Visible = false;
-                return;
-            }
-
-            pnlNotifications.Visible = true;
 
             Label lblHeader = new Label
             {
@@ -802,7 +1139,15 @@ namespace PersonalFinanceApp
             };
             pnlNotifications.Controls.Add(lblHeader);
 
-            var ordered = withChange.OrderByDescending(h => Math.Abs(h.ProfitLossPercent!.Value)).Take(5).ToList();
+            if (withChange.Count == 0)
+            {
+                AddWidgetLine(pnlNotifications, "Henüz bir bildirim yok.", 56, TextMuted, 20, () => _onNavigate?.Invoke("Varlıklarım"));
+                return;
+            }
+
+            // 4 satır (56 + 4*32 + 16 = 200px), sabit 210px yükseklikli widget hücresine sığacak
+            // şekilde sınırlandı (bkz. MiniRowHeight) — eskiden 5 satırdı ve dinamik yükseklik kullanıyordu.
+            var ordered = withChange.OrderByDescending(h => Math.Abs(h.ProfitLossPercent!.Value)).Take(4).ToList();
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
             int rowTop = 56;
@@ -840,8 +1185,6 @@ namespace PersonalFinanceApp
                 pnlNotifications.Controls.Add(lblChange);
                 rowTop += 32;
             }
-
-            pnlNotifications.Height = rowTop + 16;
         }
 
         // lblChange diğer kartlardaki (Cüzdan, Kasa vb.) sayma efektiyle tutarlı olsun diye yüzde ve
@@ -1094,7 +1437,7 @@ namespace PersonalFinanceApp
                     lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                     lblStatus.Text = "Transfer başarılı.";
                     RefreshBalances();
-                    _ = LoadNotificationsAsync();
+                    if (_placedWidgets.ContainsKey("notifications")) _ = LoadNotificationsAsync();
                 }
                 else
                 {
