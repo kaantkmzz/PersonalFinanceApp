@@ -4,11 +4,13 @@ import os, math, random
 SIZE = 512
 CENTER = SIZE / 2
 
-METAL_LIGHT = (172, 172, 182)
-METAL_MID = (108, 108, 120)
-METAL_DARK = (58, 58, 68)
+METAL_LIGHT = (222, 222, 230)
+METAL_MID = (168, 168, 180)
+METAL_DARK = (108, 108, 120)
 PURPLE = (139, 122, 255)
-PURPLE_DEEP = (99, 102, 241)
+# "FT" harfleri gri metal zeminle yeterince kontrast oluşturmuyordu — daha koyu, doygun bir mor
+# (eskisi 99,102,241'e göre belirgin şekilde koyulaştırıldı).
+PURPLE_DEEP = (40, 28, 128)
 PURPLE_GLOW = (180, 155, 255)
 
 def find_font(size, bold=True):
@@ -100,25 +102,27 @@ def build_icon():
     highlight = highlight.filter(ImageFilter.GaussianBlur(1.5))
     img.alpha_composite(highlight)
 
-    # "FT" wordmark with a metallic-purple bevel: dark drop shadow, deep-purple base, bright top highlight
-    font = find_font(int(SIZE * 0.40))
+    # "FT" wordmark with a metallic-purple bevel: dark drop shadow, deep-purple base, bright top highlight.
+    # Size bumped up and a stroke added for extra boldness/legibility against the metal disc.
+    font = find_font(int(SIZE * 0.44))
     text = "FT"
+    stroke_w = max(2, int(SIZE * 0.012))
     tmp = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     td = ImageDraw.Draw(tmp)
-    bbox = td.textbbox((0, 0), text, font=font)
+    bbox = td.textbbox((0, 0), text, font=font, stroke_width=stroke_w)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     tx = (SIZE - tw) / 2 - bbox[0]
     ty = (SIZE - th) / 2 - bbox[1] - 6
 
     shadow_layer = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow_layer).text((tx + 3, ty + 5), text, font=font, fill=(0, 0, 0, 200))
+    ImageDraw.Draw(shadow_layer).text((tx + 3, ty + 5), text, font=font, fill=(0, 0, 0, 200), stroke_width=stroke_w, stroke_fill=(0, 0, 0, 200))
     shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(3))
     img.alpha_composite(shadow_layer)
 
-    ImageDraw.Draw(img).text((tx, ty), text, font=font, fill=PURPLE_DEEP)
+    ImageDraw.Draw(img).text((tx, ty), text, font=font, fill=PURPLE_DEEP, stroke_width=stroke_w, stroke_fill=PURPLE_DEEP)
 
     highlight_text = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    ImageDraw.Draw(highlight_text).text((tx, ty - 2), text, font=font, fill=(*PURPLE_GLOW, 210))
+    ImageDraw.Draw(highlight_text).text((tx, ty - 2), text, font=font, fill=(*PURPLE_GLOW, 210), stroke_width=stroke_w, stroke_fill=(*PURPLE_GLOW, 210))
     mask = Image.new("L", (SIZE, SIZE), 0)
     ImageDraw.Draw(mask).rectangle([0, 0, SIZE, SIZE * 0.5], fill=255)
     mask = mask.filter(ImageFilter.GaussianBlur(8))

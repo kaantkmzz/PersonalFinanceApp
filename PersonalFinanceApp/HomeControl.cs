@@ -74,7 +74,10 @@ namespace PersonalFinanceApp
         // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget).
         private readonly HashSet<int> _highlightedCells = new HashSet<int>();
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
-        private readonly Panel[] _cellPanels = new Panel[12];
+        // 6 widget toplamda tam olarak 8 hücreyi (3+1+1+1+1+1) dolduruyor — 3. bir satır hiçbir zaman
+        // gerekmiyordu ve her zaman boş bir alan olarak kalıyordu (bkz. kullanıcı geri bildirimi);
+        // bunun yerine mevcut 2 satır yukarı (bkz. MiniRowTop) kaydırılarak boşluk giderildi.
+        private readonly Panel[] _cellPanels = new Panel[8];
         private Button btnAddWidget = new Button();
         private Panel pnlWidgetPicker = new Panel();
         private Label lblEmptyGridHint = new Label();
@@ -126,9 +129,9 @@ namespace PersonalFinanceApp
             // Sabit piksel konumlu dört sütun (bkz. CardLeft4/CardWidth) ve mini-widget satırı (bkz.
             // MiniRowTop/MiniRowHeight) esnek değil — Dock=Fill bunu MainForm.pnlContent'in AutoScroll'u
             // sayesinde bu boyutun altına küçültmüyor, aksi halde sağdaki/alttaki kartlar sessizce kırpılırdı.
-            // Widget ızgarası artık 3 satır olabiliyor (bkz. SetupWidgetGrid, GridCols) — yükseklik
-            // hesabı eksik kalırsa alt satırlara yerleştirilen widget'lar kırpılabilirdi.
-            const int gridRows = 3;
+            // Widget ızgarası 2 satır (bkz. SetupWidgetGrid, GridCols, _cellPanels) — yükseklik hesabı
+            // eksik kalırsa alt satıra yerleştirilen widget'lar kırpılabilirdi.
+            const int gridRows = 2;
             this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20));
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
