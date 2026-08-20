@@ -88,6 +88,10 @@ namespace PersonalFinanceApp
         {
             this.AutoScaleMode = AutoScaleMode.None;
             this.Dock = DockStyle.Fill;
+            // Sabit piksel konumlu dört sütun (bkz. CardLeft4/CardWidth) ve mini-widget satırı (bkz.
+            // MiniRowTop/MiniRowHeight) esnek değil — Dock=Fill bunu MainForm.pnlContent'in AutoScroll'u
+            // sayesinde bu boyutun altına küçültmüyor, aksi halde sağdaki/alttaki kartlar sessizce kırpılırdı.
+            this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + MiniRowHeight + 20);
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
 

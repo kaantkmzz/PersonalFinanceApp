@@ -1332,6 +1332,7 @@ namespace PersonalFinanceApp
             lineArea.AxisY.LabelStyle.ForeColor = TextMuted;
             lineArea.AxisY.LineColor = AppTheme.GridLineColor;
             lineArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
+            lineArea.AxisX.Interval = 1;
             lineChart.ChartAreas.Add(lineArea);
 
             lblLineEmptyState.Dock = DockStyle.Fill;
@@ -1459,7 +1460,11 @@ namespace PersonalFinanceApp
                 Color = Color.FromArgb(60, AccentColor),
                 BorderColor = AccentColor,
                 BorderWidth = 3,
-                ToolTip = "#VALX{dd.MM}: #VAL{N0} ₺"
+                ToolTip = "#AXISLABEL: #VAL{N0} ₺",
+                // String X değerleriyle AddXY kullanıldığında bu ayar olmadan Chart bazen tüm
+                // noktaları aynı X konumunda (dolayısıyla üst üste) çiziyor — sütun grafiğindeki
+                // aynı sorunun burada da yaşanmaması için (bkz. BuildColumnChart) gerekli.
+                IsXValueIndexed = true
             };
 
             foreach (var snap in snapshots)

@@ -68,7 +68,11 @@ namespace PersonalFinanceApp
         {
             this.Text = "Kişisel Finans Takip Sistemi";
             this.WindowState = FormWindowState.Maximized;
-            this.MinimumSize = new Size(1300, 700);
+            // Ekranlar (özellikle Ana Sayfa'nın dört sabit 320px'lik sütunu, bkz. HomeControl.CardLeft4)
+            // esnek değil, sabit piksel konumlarıyla tasarlandı — pencere bu boyuttan küçültülürse
+            // sağdaki/alttaki kartlar akıp küçülmek yerine sessizce kırpılıyordu. Eski 1300x700 sınırı
+            // bu genişliğin altındaydı; gerçek ihtiyaca göre büyütüldü.
+            this.MinimumSize = new Size(1680, 960);
             this.Font = new Font("Segoe UI", 9F);
             this.BackColor = ContentBackColor;
 
@@ -77,6 +81,9 @@ namespace PersonalFinanceApp
             pnlContent.Dock = DockStyle.Fill;
             pnlContent.BackColor = ContentBackColor;
             pnlContent.Padding = new Padding(30);
+            // MinimumSize sınırını her nasılsa aşan bir durum olursa (ör. çoklu monitör/DPI tuhaflığı)
+            // içerik sessizce kırpılmak yerine kaydırma çubuğuyla erişilebilir kalsın diye.
+            pnlContent.AutoScroll = true;
             EnableDoubleBuffering(pnlContent);
 
             this.Controls.Add(pnlContent);
