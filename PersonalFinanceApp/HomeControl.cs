@@ -69,6 +69,10 @@ namespace PersonalFinanceApp
         private const int ButtonsTop = 30 + 240 + 16;
 
         private readonly Dictionary<string, int> _placedWidgets = new Dictionary<string, int>();
+        // Sürükleme sırasında kesikli çerçeveyle vurgulanan hücreler — sürüklenen widget'ın gerçek
+        // kapladığı hücre sayısını (ör. 3 hücreli Varlık Bildirimleri) doğru yansıtsın diye tek hücre
+        // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget).
+        private readonly HashSet<int> _highlightedCells = new HashSet<int>();
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
         private readonly Panel[] _cellPanels = new Panel[12];
         private Button btnAddWidget = new Button();
@@ -347,20 +351,23 @@ namespace PersonalFinanceApp
                     AllowDrop = true
                 };
 
+                int cellIndex = i;
                 cell.Paint += (s, e) =>
                 {
-                    if (cell.Tag is bool hovering && hovering)
+                    if (_highlightedCells.Contains(cellIndex))
                     {
                         using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
                         e.Graphics.DrawRectangle(pen, 1, 1, cell.Width - 2, cell.Height - 2);
                     }
                 };
-                cell.DragEnter += (s, e) => { e.Effect = GetDropEffect(e); cell.Tag = true; cell.Invalidate(); };
-                cell.DragLeave += (s, e) => { cell.Tag = false; cell.Invalidate(); };
-                int cellIndex = i;
+                // Sürüklenen widget 3 hücre kaplıyorsa (ör. Varlık Bildirimleri), kesikli kutu da o üç
+                // hücrenin tamamını göstermeli — önceden yalnızca imlecin üzerinde olduğu tek hücre
+                // vurgulanıyordu, gerçek yerleşim boyutunu yanıltıcı şekilde 1 birim gösteriyordu.
+                cell.DragEnter += (s, e) => { e.Effect = GetDropEffect(e); HighlightDragTarget(cellIndex, e.Data); };
+                cell.DragLeave += (s, e) => ClearDragHighlight();
                 cell.DragDrop += (s, e) =>
                 {
-                    cell.Tag = false; cell.Invalidate();
+                    ClearDragHighlight();
                     if (e.Data?.GetData(typeof(string)) is string key) PlaceWidget(key, cellIndex);
                 };
 
@@ -486,6 +493,40 @@ namespace PersonalFinanceApp
         // ızgaradaki ilk boş hücreye taşınmaya çalışılır; gerçekten hiç yer kalmadıysa (nadir) tahtadan
         // kaldırılır ve + panelinden tekrar eklenebilir. Önceden yalnızca "tek widget'la tam takas"
         // durumu ele alınıyordu, geri kalan her şey sessizce siliniyordu.
+        // anchorCell'e bırakılırsa key'in gerçekte hangi hücreleri kaplayacağını (satır sınırına göre
+        // kırpılmış) hesaplar — hem yerleştirme hem de sürükleme sırasındaki önizleme aynı mantığı kullanır.
+        private List<int> GetClampedSpanCells(string key, int anchorCell)
+        {
+            var def = WidgetCatalog.FirstOrDefault(w => w.Key == key);
+            if (def == null) return new List<int> { anchorCell };
+            int col = anchorCell % GridCols, row = anchorCell / GridCols;
+            if (col + def.ColSpan > GridCols) col = GridCols - def.ColSpan;
+            anchorCell = row * GridCols + col;
+            return Enumerable.Range(anchorCell, def.ColSpan).ToList();
+        }
+
+        private void HighlightDragTarget(int anchorCell, IDataObject? data)
+        {
+            _highlightedCells.Clear();
+            if (data?.GetData(typeof(string)) is string key)
+            {
+                foreach (var c in GetClampedSpanCells(key, anchorCell)) _highlightedCells.Add(c);
+            }
+            RefreshDragHighlightVisuals();
+        }
+
+        private void ClearDragHighlight()
+        {
+            _highlightedCells.Clear();
+            RefreshDragHighlightVisuals();
+        }
+
+        private void RefreshDragHighlightVisuals()
+        {
+            foreach (var cell in _cellPanels) cell.Invalidate();
+            foreach (var frame in _widgetFrames.Values) frame.Invalidate();
+        }
+
         private void PlaceWidget(string key, int anchorCell)
         {
             var def = WidgetCatalog.FirstOrDefault(w => w.Key == key);
@@ -650,9 +691,15 @@ namespace PersonalFinanceApp
             // kare görünümlü bir dolgu kalıyordu. Düz (opak) AppBackColor ile bu ortadan kalkıyor.
             Panel frame = new Panel { BackColor = AppBackColor, AllowDrop = true };
 
-            frame.DragEnter += (s, e) => e.Effect = GetDropEffect(e);
+            frame.DragEnter += (s, e) =>
+            {
+                e.Effect = GetDropEffect(e);
+                if (_placedWidgets.TryGetValue(def.Key, out int myCell)) HighlightDragTarget(myCell, e.Data);
+            };
+            frame.DragLeave += (s, e) => ClearDragHighlight();
             frame.DragDrop += (s, e) =>
             {
+                ClearDragHighlight();
                 if (e.Data?.GetData(typeof(string)) is string key && _placedWidgets.TryGetValue(def.Key, out int myCell))
                     PlaceWidget(key, myCell);
             };
