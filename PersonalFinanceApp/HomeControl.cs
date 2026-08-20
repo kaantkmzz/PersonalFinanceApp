@@ -817,13 +817,8 @@ namespace PersonalFinanceApp
                     BackColor = Color.Transparent
                 };
 
-                string changeText = _user.HideAmountsEnabled
-                    ? "••••••"
-                    : $"{arrow} %{Math.Abs(h.ProfitLossPercent!.Value).ToString("0.0", tr)}   {h.ProfitLossTry!.Value.ToString("+#,##0;-#,##0", tr)} ₺";
-
                 Label lblChange = new Label
                 {
-                    Text = changeText,
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     ForeColor = changeColor,
                     Left = pnlNotifications.Width - 220,
@@ -833,6 +828,7 @@ namespace PersonalFinanceApp
                     TextAlign = ContentAlignment.MiddleRight,
                     BackColor = Color.Transparent
                 };
+                AnimateNotificationChange(lblChange, arrow, Math.Abs(h.ProfitLossPercent!.Value), h.ProfitLossTry!.Value);
 
                 pnlNotifications.Controls.Add(lblSymbol);
                 pnlNotifications.Controls.Add(lblChange);
@@ -842,14 +838,61 @@ namespace PersonalFinanceApp
             pnlNotifications.Height = rowTop + 16;
         }
 
-        // Varlık Bildirimleri'nin sağındaki boş alana, en son düzenlenen 5 notu başlık+tarihle listeler.
+        // lblChange diğer kartlardaki (Cüzdan, Kasa vb.) sayma efektiyle tutarlı olsun diye yüzde ve
+        // tutarı aynı anda, tek bir zamanlayıcıyla 0'dan hedef değerine sayarak dolduruyor — ikisi de
+        // aynı metne yazıldığından AnimateLabelValue'nun tek değerli formatter'ı yeterli değil.
+        private void AnimateNotificationChange(Label label, string arrow, decimal targetPercent, decimal targetAmount)
+        {
+            if (_cardAnimTimers.TryGetValue(label, out var existingTimer))
+            {
+                existingTimer.Stop();
+                existingTimer.Dispose();
+                _cardAnimTimers.Remove(label);
+            }
+
+            if (_user.HideAmountsEnabled)
+            {
+                label.Text = "••••••";
+                return;
+            }
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var timer = new System.Windows.Forms.Timer { Interval = 16 };
+            const int durationMs = 800;
+
+            timer.Tick += (s, e) =>
+            {
+                if (label.IsDisposed) { timer.Stop(); timer.Dispose(); _cardAnimTimers.Remove(label); return; }
+
+                double t = sw.Elapsed.TotalMilliseconds / durationMs;
+                bool finished = t >= 1.0;
+                if (finished) t = 1.0;
+
+                double eased = 1 - Math.Pow(1 - t, 3);
+                decimal shownPercent = finished ? targetPercent : targetPercent * (decimal)eased;
+                decimal shownAmount = finished ? targetAmount : Math.Round(targetAmount * (decimal)eased);
+                label.Text = $"{arrow} %{shownPercent.ToString("0.0", tr)}   {shownAmount.ToString("+#,##0;-#,##0", tr)} ₺";
+
+                if (finished)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    _cardAnimTimers.Remove(label);
+                }
+            };
+            _cardAnimTimers[label] = timer;
+            timer.Start();
+        }
+
+        // Varlık Bildirimleri'nin sağındaki boş alana, en son düzenlenen 4 notu başlık+tarihle listeler.
         private void LoadNotesWidget()
         {
             pnlNotes.Controls.Clear();
 
             Label lblHeader = new Label
             {
-                Text = "📝 Notlar",
+                Text = "Notlar",
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 ForeColor = TextLight,
                 Left = 20,
@@ -862,50 +905,64 @@ namespace PersonalFinanceApp
             Action goToNotes = () => _onNavigate?.Invoke("Notlar");
             MakeClickable(lblHeader, goToNotes);
 
-            var notes = _noteService.GetRecentlyUpdatedNotes(_user.Id, 5);
+            var notes = _noteService.GetRecentlyUpdatedNotes(_user.Id, 4);
             var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            // Kutu 232px sabit (pnlNotes.Height, SetupUI'da bir kez ayarlanır ve burada değiştirilmez);
+            // 4 satır bu boyu dolduracak şekilde 40px aralıklı. Etiket kendi 40px'lik dilimini tamamen
+            // dolduruyor (26px'te bile "g/ğ" gibi alt uzantılı harflerin kuyruğu hâlâ kesiliyordu) —
+            // dar bir kutuda ortalanan metin, kutu küçüldükçe hizalama aşağı değil merkeze doğru kayar.
+            const int rowHeight = 40;
+            const int rowLabelHeight = rowHeight;
+            int top = 56;
 
             if (notes.Count == 0)
             {
-                AddWidgetLine(pnlNotes, "Henüz not yok.", 56, TextMuted, 20, goToNotes);
-                return;
+                AddWidgetLine(pnlNotes, "Henüz not yok.", top, TextMuted, 20, goToNotes);
             }
-
-            int top = 56;
-            foreach (var note in notes)
+            else
             {
-                Label lblTitle = new Label
+                const int dateWidth = 100;
+                const int rightMargin = 20;
+                int dateLeft = CardWidth - rightMargin - dateWidth;
+                const int titleDateGap = 12;
+                int titleWidth = dateLeft - titleDateGap - 20;
+
+                foreach (var note in notes)
                 {
-                    Text = string.IsNullOrWhiteSpace(note.Title) ? "(Başlıksız)" : note.Title,
-                    ForeColor = TextLight,
-                    Left = 20,
-                    Top = top,
-                    Width = CardWidth - 132,
-                    Height = 22,
-                    AutoSize = false,
-                    AutoEllipsis = true,
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    BackColor = Color.Transparent,
-                    Font = new Font("Segoe UI", 10F)
-                };
-                Label lblDate = new Label
-                {
-                    // "dd.MM.yyyy" bu makinenin ~150% DPI ölçeğinde 85px'te bile yıl kısmı kesiliyordu.
-                    Text = note.UpdatedAt.ToString("dd.MM.yyyy", tr),
-                    ForeColor = TextMuted,
-                    Left = CardWidth - 120,
-                    Top = top,
-                    Width = 100,
-                    Height = 22,
-                    TextAlign = ContentAlignment.MiddleRight,
-                    BackColor = Color.Transparent,
-                    Font = new Font("Segoe UI", 9F)
-                };
-                pnlNotes.Controls.Add(lblTitle);
-                pnlNotes.Controls.Add(lblDate);
-                MakeClickable(lblTitle, goToNotes);
-                MakeClickable(lblDate, goToNotes);
-                top += 32;
+                    Label lblTitle = new Label
+                    {
+                        Text = string.IsNullOrWhiteSpace(note.Title) ? "(Başlıksız)" : note.Title,
+                        ForeColor = TextLight,
+                        Left = 20,
+                        Top = top,
+                        Width = titleWidth,
+                        Height = rowLabelHeight,
+                        AutoSize = false,
+                        AutoEllipsis = true,
+                        TextAlign = ContentAlignment.MiddleLeft,
+                        BackColor = Color.Transparent,
+                        Font = new Font("Segoe UI", 10F)
+                    };
+                    Label lblDate = new Label
+                    {
+                        // "dd.MM.yyyy" bu makinenin ~150% DPI ölçeğinde 85px'te bile yıl kısmı kesiliyordu.
+                        Text = note.UpdatedAt.ToString("dd.MM.yyyy", tr),
+                        ForeColor = TextMuted,
+                        Left = dateLeft,
+                        Top = top,
+                        Width = dateWidth,
+                        Height = rowLabelHeight,
+                        TextAlign = ContentAlignment.MiddleRight,
+                        BackColor = Color.Transparent,
+                        Font = new Font("Segoe UI", 9F)
+                    };
+                    pnlNotes.Controls.Add(lblTitle);
+                    pnlNotes.Controls.Add(lblDate);
+                    MakeClickable(lblTitle, goToNotes);
+                    MakeClickable(lblDate, goToNotes);
+                    top += rowHeight;
+                }
             }
         }
 

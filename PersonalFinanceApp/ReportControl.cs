@@ -647,10 +647,24 @@ namespace PersonalFinanceApp
                     foreach (var item in large)
                         indices.Add(AddPoint(item.Name, item.Amount, color));
 
+                    // Tek başına kalan küçük bir dilim (< %4) dışarıdaki etiket+bağlantı çizgisiyle
+                    // komşu dilimin üzerine biniyordu (ör. "%1 Amerikan Doları" etiketi "%4 Gram
+                    // Altın"ın üstüne çıkıyordu) — kırılım görünümündeki aynı eşikle etiketini
+                    // tamamen kapatıyoruz; dilim kendi rengiyle pastada görünmeye devam ediyor.
                     if (small.Count == 1)
-                        indices.Add(AddPoint(small[0].Name, small[0].Amount, color));
+                    {
+                        int idx = AddPoint(small[0].Name, small[0].Amount, color);
+                        indices.Add(idx);
+                        series.Points[idx]["PieLabelStyle"] = "Disabled";
+                    }
                     else if (small.Count > 1)
-                        indices.Add(AddPoint("Diğer", small.Sum(i => i.Amount), color, small));
+                    {
+                        decimal smallTotal = small.Sum(i => i.Amount);
+                        int idx = AddPoint("Diğer", smallTotal, color, small);
+                        indices.Add(idx);
+                        if (smallTotal < smallSliceThreshold)
+                            series.Points[idx]["PieLabelStyle"] = "Disabled";
+                    }
                 }
 
                 AddGroupedPoints(current.IncomeBreakdown.Select(x => (x.CategoryName, x.TotalAmount)), IncomeColor, "income");
