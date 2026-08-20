@@ -33,6 +33,7 @@ namespace PersonalFinanceApp
             this.WindowState = FormWindowState.Maximized;
             this.MinimumSize = new Size(900, 600);
             this.Font = new Font("Segoe UI", 10F);
+            this.Icon = AppIconHelper.GetAppIcon();
             this.Resize += (s, e) => CenterCard();
             this.FormClosing += LoginForm_FormClosing;
 
