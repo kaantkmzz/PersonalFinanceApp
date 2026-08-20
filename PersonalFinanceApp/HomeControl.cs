@@ -377,16 +377,11 @@ namespace PersonalFinanceApp
 
         private void SetupWidgetPicker()
         {
-            btnAddWidget.Text = "+";
-            btnAddWidget.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            btnAddWidget.Text = string.Empty;
             btnAddWidget.Width = 40;
             btnAddWidget.Height = 36;
-            btnAddWidget.Left = CardLeft4 + CardWidth - btnAddWidget.Width;
-            // Transfer Et/Transfer Geçmişi butonlarıyla aynı satırda, en sağda — ızgara artık butonların
-            // hemen altından başladığından (bkz. MiniRowTop) araya sığmıyordu.
-            btnAddWidget.Top = ButtonsTop;
             btnAddWidget.Cursor = Cursors.Hand;
-            SetupRoundedButton(btnAddWidget, AccentColor, Color.White);
+            SetupAddWidgetButton(btnAddWidget, AccentColor);
             btnAddWidget.Click += (s, e) =>
             {
                 pnlWidgetPicker.Visible = !pnlWidgetPicker.Visible;
@@ -399,10 +394,20 @@ namespace PersonalFinanceApp
 
             // "Yaklaşan Hatırlatıcılar" gibi uzun başlıklar 280px'te elipslenmek zorunda kalıyordu.
             pnlWidgetPicker.Width = 320;
-            pnlWidgetPicker.Left = btnAddWidget.Right - pnlWidgetPicker.Width;
-            pnlWidgetPicker.Top = btnAddWidget.Bottom + 8;
             pnlWidgetPicker.Visible = false;
             SetupSmoothContainer(pnlWidgetPicker, 12, CardBackColor);
+
+            // + butonu, sayfanın gerçek sağ üst köşesinde dursun diye (Transfer Et satırına değil)
+            // pencerenin genişliğine göre konumlanıyor; yeniden boyutlanınca da yeniden hesaplanıyor.
+            void PositionAddWidgetButton()
+            {
+                btnAddWidget.Left = this.ClientSize.Width - btnAddWidget.Width - 20;
+                btnAddWidget.Top = 20;
+                pnlWidgetPicker.Left = btnAddWidget.Right - pnlWidgetPicker.Width;
+                pnlWidgetPicker.Top = btnAddWidget.Bottom + 8;
+            }
+            PositionAddWidgetButton();
+            this.Resize += (s, e) => PositionAddWidgetButton();
 
             lblEmptyGridHint.Text = "Widget eklemek için sağ üstteki + butonuna tıklayın.";
             lblEmptyGridHint.ForeColor = TextMuted;
@@ -443,7 +448,9 @@ namespace PersonalFinanceApp
                 // durum etiketine (yalnızca yerleştirilmiş widget'larda dolu) ayrılan sabit pay küçültüldü
                 // ve isim etiketi genişletildi; AutoEllipsis de yine de sığmayan durumlar için güvence.
                 Label lblHandle = new Label { Text = "⠿", Font = new Font("Segoe UI", 10F), ForeColor = placed ? AppTheme.GridLineColor : TextMuted, Left = 4, Top = 10, Width = 18, Height = 18, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleCenter };
-                Label lblStatus = new Label { Text = placed ? "Eklendi" : "", Font = new Font("Segoe UI", 8F), ForeColor = AppTheme.SuccessColor, Left = row.Width - 56, Top = 0, Width = 56, Height = 38, TextAlign = ContentAlignment.MiddleRight, BackColor = Color.Transparent };
+                // 56px'te "Eklendi" kırpılıp "Eklend" olarak görünüyordu; genişletildi ve satırın
+                // sağ kenarından biraz boşluk bırakıldı.
+                Label lblStatus = new Label { Text = placed ? "Eklendi" : "", Font = new Font("Segoe UI", 8F), ForeColor = AppTheme.SuccessColor, Left = row.Width - 74, Top = 0, Width = 70, Height = 38, TextAlign = ContentAlignment.MiddleRight, BackColor = Color.Transparent };
                 Label lblName = new Label { Text = def.Title, Font = new Font("Segoe UI", 9.5F), ForeColor = placed ? TextMuted : TextLight, Left = 26, Top = 0, Width = lblStatus.Left - 26, Height = 38, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
 
                 row.Controls.Add(lblHandle);
@@ -459,7 +466,7 @@ namespace PersonalFinanceApp
                     MouseEventHandler startDrag = (s, e) =>
                     {
                         pnlWidgetPicker.Visible = false;
-                        row.DoDragDrop(def.Key, DragDropEffects.Move);
+                        StartWidgetDrag(row, def.Key, def.ColSpan);
                     };
                     row.MouseDown += startDrag;
                     lblHandle.MouseDown += startDrag;
@@ -473,9 +480,12 @@ namespace PersonalFinanceApp
             pnlWidgetPicker.Height = top + 12;
         }
 
-        // Bir widget'ı belirtilen hücreye (anchorCell) yerleştirir: hedef hücrelerle çakışan başka
-        // widget'lar varsa tahtadan kaldırılır (+ panelinden tekrar eklenebilir); tek bir widget'la ve
-        // aynı boyutta tam çakışma varsa (ve sürüklenen zaten tahtadaysa) yer değiştirme (takas) yapılır.
+        // Bir widget'ı belirtilen hücreye (anchorCell) yerleştirir. Hedef hücrelerle çakışan başka
+        // widget'lar varsa (3 hücre kaplayan Varlık Bildirimleri'ni taşırken bu, aynı anda 1-3 farklı
+        // widget'la çakışabilir) SİLİNMEZ — önce sürüklenenin boşalttığı eski yere (uygunsa), yoksa
+        // ızgaradaki ilk boş hücreye taşınmaya çalışılır; gerçekten hiç yer kalmadıysa (nadir) tahtadan
+        // kaldırılır ve + panelinden tekrar eklenebilir. Önceden yalnızca "tek widget'la tam takas"
+        // durumu ele alınıyordu, geri kalan her şey sessizce siliniyordu.
         private void PlaceWidget(string key, int anchorCell)
         {
             var def = WidgetCatalog.FirstOrDefault(w => w.Key == key);
@@ -496,19 +506,91 @@ namespace PersonalFinanceApp
                 .ToList();
 
             foreach (var dKey in displaced) _placedWidgets.Remove(dKey);
+            _placedWidgets[key] = anchorCell;
 
-            if (previousCell.HasValue && displaced.Count == 1)
+            foreach (var dKey in displaced)
             {
-                var displacedDef = WidgetCatalog.First(w => w.Key == displaced[0]);
-                if (displacedDef.ColSpan == def.ColSpan)
+                var dDef = WidgetCatalog.First(w => w.Key == dKey);
+                int? target = null;
+                if (previousCell.HasValue && dDef.ColSpan == def.ColSpan && IsCellRangeFree(previousCell.Value, dDef.ColSpan))
                 {
-                    _placedWidgets[displaced[0]] = previousCell.Value;
+                    target = previousCell.Value;
+                    previousCell = null; // eski yer sadece bir widget'a verilebilir
                 }
+                else
+                {
+                    target = FindFreeCell(dDef.ColSpan);
+                }
+                if (target.HasValue) _placedWidgets[dKey] = target.Value;
             }
 
-            _placedWidgets[key] = anchorCell;
             SaveLayout();
             RebuildWidgetGrid();
+        }
+
+        // [anchorCell, anchorCell+span) hücrelerinin tamamı satır sınırını aşmadan boşta mı?
+        private bool IsCellRangeFree(int anchorCell, int span)
+        {
+            int col = anchorCell % GridCols;
+            if (col + span > GridCols) return false;
+            var cells = Enumerable.Range(anchorCell, span).ToList();
+            return !_placedWidgets.Any(kv => Enumerable.Range(kv.Value, WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => cells.Contains(c)));
+        }
+
+        // Verilen genişlikte bir widget için ızgarada uygun ilk boş hücreyi (satır satır, soldan sağa) bulur.
+        private int? FindFreeCell(int span)
+        {
+            int rows = _cellPanels.Length / GridCols;
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c <= GridCols - span; c++)
+                {
+                    int anchor = r * GridCols + c;
+                    if (IsCellRangeFree(anchor, span)) return anchor;
+                }
+            }
+            return null;
+        }
+
+        // Sürükleme sırasında, widget'ın gerçek boyutunu (ör. Varlık Bildirimleri'nin 3 hücre kapladığını)
+        // gösteren yarı saydam bir önizleme dikdörtgenini fareyle birlikte hareket ettirir — öncesinde
+        // sürükleme sırasında yalnızca varsayılan (küçük, tek hücrelik izlenim veren) imleç görünüyordu.
+        private Form? _dragPreviewForm;
+
+        private void StartWidgetDrag(Control source, string key, int colSpan)
+        {
+            int width = colSpan * CardWidth + (colSpan - 1) * 20;
+            _dragPreviewForm = new Form
+            {
+                FormBorderStyle = FormBorderStyle.None,
+                ShowInTaskbar = false,
+                StartPosition = FormStartPosition.Manual,
+                Size = new Size(width, MiniRowHeight),
+                BackColor = AccentColor,
+                Opacity = 0.35,
+                TopMost = true
+            };
+            _dragPreviewForm.Show();
+
+            GiveFeedbackEventHandler onGiveFeedback = (s, e) =>
+            {
+                e.UseDefaultCursors = true;
+                if (_dragPreviewForm == null) return;
+                var p = System.Windows.Forms.Cursor.Position;
+                _dragPreviewForm.Location = new Point(p.X + 16, p.Y + 16);
+            };
+            source.GiveFeedback += onGiveFeedback;
+            try
+            {
+                source.DoDragDrop(key, DragDropEffects.Move);
+            }
+            finally
+            {
+                source.GiveFeedback -= onGiveFeedback;
+                _dragPreviewForm?.Close();
+                _dragPreviewForm?.Dispose();
+                _dragPreviewForm = null;
+            }
         }
 
         private void RemoveWidgetFromGrid(string key)
@@ -562,7 +644,11 @@ namespace PersonalFinanceApp
         // şekilde bu dış panelde tutuluyor.
         private Panel CreateWidgetFrame(WidgetDef def)
         {
-            Panel frame = new Panel { BackColor = Color.Transparent, AllowDrop = true };
+            // BackColor=Transparent burada WinForms'un "sahte" saydamlığına düşüyordu: köşelerdeki
+            // yuvarlatma, içerik panelinin kendi rounded-rect çizimiyle oluşuyor, ama dış çerçevenin
+            // KENDİSİ saydam olduğunda o köşe üçgenlerinin arkasında doğru koyu renk yerine bozuk/
+            // kare görünümlü bir dolgu kalıyordu. Düz (opak) AppBackColor ile bu ortadan kalkıyor.
+            Panel frame = new Panel { BackColor = AppBackColor, AllowDrop = true };
 
             frame.DragEnter += (s, e) => e.Effect = GetDropEffect(e);
             frame.DragDrop += (s, e) =>
@@ -575,12 +661,15 @@ namespace PersonalFinanceApp
             content.Dock = DockStyle.Fill;
             frame.Controls.Add(content);
 
+            // Aynı sebeple (frame'in kendi "saydam" arka planı, altındaki kartın gerçek CardBackColor
+            // dolgusuyla eşleşmiyordu) tutamaç ve kaldırma düğmesinin arkasında koyu bir leke
+            // görünüyordu — bu iki etiket artık kartın dolgu rengiyle aynı, düz bir arka plan kullanıyor.
             Label dragHandle = new Label
             {
                 Text = "⠿",
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = TextMuted,
-                BackColor = Color.Transparent,
+                BackColor = CardBackColor,
                 Left = 2,
                 Top = 8,
                 Width = 15,
@@ -590,7 +679,7 @@ namespace PersonalFinanceApp
             };
             dragHandle.MouseDown += (s, e) =>
             {
-                if (_placedWidgets.ContainsKey(def.Key)) frame.DoDragDrop(def.Key, DragDropEffects.Move);
+                if (_placedWidgets.ContainsKey(def.Key)) StartWidgetDrag(frame, def.Key, def.ColSpan);
             };
             frame.Controls.Add(dragHandle);
             dragHandle.BringToFront();
@@ -600,7 +689,7 @@ namespace PersonalFinanceApp
                 Text = "✕",
                 Font = new Font("Segoe UI", 8.5F),
                 ForeColor = TextMuted,
-                BackColor = Color.Transparent,
+                BackColor = CardBackColor,
                 Width = 18,
                 Height = 18,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -1087,6 +1176,30 @@ namespace PersonalFinanceApp
                     e.Graphics.FillPath(brush, path);
             };
             pnl.SizeChanged += (s, e) => pnl.Invalidate();
+        }
+
+        // "+" widget ekleme butonu: yazı tipi glifiyle ("+") çizildiğinde optik olarak ortalanmış
+        // durmuyordu (fontların glif kutusu genelde alt çıkıntı payı bırakır) — bunun yerine iki
+        // çizgiyi elle, tam merkeze göre çiziyoruz.
+        private void SetupAddWidgetButton(Button btn, Color bgColor)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.BackColor = Color.Transparent;
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(btn.Parent?.BackColor ?? AppBackColor);
+                using (var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8))
+                using (var brush = new SolidBrush(bgColor))
+                    e.Graphics.FillPath(brush, path);
+
+                float cx = btn.Width / 2f, cy = btn.Height / 2f;
+                float arm = Math.Min(btn.Width, btn.Height) / 4.2f;
+                using var pen = new Pen(Color.White, 2.4f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+                e.Graphics.DrawLine(pen, cx - arm, cy, cx + arm, cy);
+                e.Graphics.DrawLine(pen, cx, cy - arm, cx, cy + arm);
+            };
         }
 
         private void SetupRoundedButton(Button btn, Color bgColor, Color textColor)
