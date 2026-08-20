@@ -60,10 +60,17 @@ namespace PersonalFinanceApp
             cmbTo.SelectedIndexChanged += (s, e) => EnsureDifferentAccounts(cmbTo, cmbFrom);
 
             Label lblAmount = new Label { Text = "Tutar:", Left = 30, Top = 170, ForeColor = TextLight, AutoSize = true };
-            txtAmount.Left = 30;
-            txtAmount.Top = 196;
-            txtAmount.Width = 300;
+            Panel pnlAmount = new Panel { Left = 30, Top = 196, Width = 300, Height = 38 };
+            SetupSmoothContainer(pnlAmount, 8, CardBackColor);
+            txtAmount.BorderStyle = BorderStyle.None;
+            txtAmount.Font = new Font("Segoe UI", 10.5F);
+            txtAmount.BackColor = CardBackColor;
+            txtAmount.ForeColor = TextLight;
+            txtAmount.Left = 10;
+            txtAmount.Top = 9;
+            txtAmount.Width = 280;
             txtAmount.TextChanged += (s, e) => SmartFormatAmount(txtAmount);
+            pnlAmount.Controls.Add(txtAmount);
 
             lblError.Left = 30;
             lblError.Top = 228;
@@ -91,9 +98,23 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblTo);
             this.Controls.Add(pnlTo);
             this.Controls.Add(lblAmount);
-            this.Controls.Add(txtAmount);
+            this.Controls.Add(pnlAmount);
             this.Controls.Add(lblError);
             this.Controls.Add(btnOk);
+        }
+
+        private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor)
+        {
+            pnl.BackColor = AppBackColor;
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor);
+                using var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
+                using var brush = new SolidBrush(bgColor);
+                e.Graphics.FillPath(brush, path);
+            };
+            pnl.SizeChanged += (s, e) => pnl.Invalidate();
         }
 
         // "Nereden" ile "Nereye" aynı hesaba ayarlanamaz; biri değişince diğeri çakışıyorsa otomatik kaydırılır.

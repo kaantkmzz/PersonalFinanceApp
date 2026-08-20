@@ -75,6 +75,7 @@ namespace PersonalFinanceApp
             this.MinimumSize = new Size(1680, 960);
             this.Font = new Font("Segoe UI", 9F);
             this.BackColor = ContentBackColor;
+            this.Icon = AppIconHelper.GetAppIcon();
 
             EnableDoubleBuffering(this);
 

@@ -533,7 +533,9 @@ namespace PersonalFinanceApp
 
             targetPanel.Controls.Clear();
 
-            Action goToAssets = () => _onNavigate?.Invoke("Varlıklarım");
+            // Bu widget "Bu Ayın Özeti" kartına ait olduğundan, hangi sayfasında olursa olsun
+            // tıklama her zaman Rapor ekranına götürmeli (önceden bu sayfa Varlıklarım'a atıyordu).
+            Action goToAssets = () => _onNavigate?.Invoke("Rapor");
 
             var grouped = holdings
                 .Where(h => (h.CurrentValueTry ?? 0) > 0)

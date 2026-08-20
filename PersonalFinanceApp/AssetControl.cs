@@ -96,13 +96,16 @@ namespace PersonalFinanceApp
             // "Varlık Ara:" yazısının kutunun üstüne/içine binmesine yol açıyordu) satır aralığı 24'ten 28'e çıkarıldı.
             const int rowGap = 28;
             Label lblSearch = new Label { Text = "Varlık Ara:", Left = 20, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
-            cmbSearch.Left = 20; cmbSearch.Top = row2Top + rowGap; cmbSearch.Width = 220; cmbSearch.Font = new Font("Segoe UI", 10F);
+            Panel pnlSearch = new Panel { Left = 20, Top = row2Top + rowGap, Width = 220, Height = 34 };
+            cmbSearch.Font = new Font("Segoe UI", 10F);
             cmbSearch.DropDownStyle = ComboBoxStyle.DropDownList;
             foreach (var item in AssetCatalog.Items)
             {
                 cmbSearch.Items.Add($"{item.Symbol} — {item.Name}");
             }
             cmbSearch.SelectedIndexChanged += CmbSearch_SelectedIndexChanged;
+            pnlSearch.Controls.Add(cmbSearch);
+            SetupCustomComboBox(pnlSearch, cmbSearch);
 
             lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + rowGap + 32; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 26;
             lblSelectedPrice.ForeColor = TextMuted;
@@ -137,7 +140,7 @@ namespace PersonalFinanceApp
 
             pnlTop.Controls.Add(lblTitle);
             pnlTop.Controls.Add(lblSearch);
-            pnlTop.Controls.Add(cmbSearch);
+            pnlTop.Controls.Add(pnlSearch);
             pnlTop.Controls.Add(lblSelectedPrice);
             pnlTop.Controls.Add(btnModeAmount);
             pnlTop.Controls.Add(btnModeQuantity);
@@ -419,6 +422,51 @@ namespace PersonalFinanceApp
         {
             pnlStatsFlow.Left = Math.Max(20, pnlBottom.ClientSize.Width - pnlStatsFlow.PreferredSize.Width - GridRightInset);
             pnlStatsFlow.Top = (pnlBottom.ClientSize.Height - pnlStatsFlow.PreferredSize.Height) / 2;
+        }
+
+        // ComboBox'ın varsayılan beyaz sistem çizimini (kutu + açılır liste) tema renklerine göre
+        // kendi çizdiğimiz sürümle değiştirir; bkz. TransactionControl.SetupCustomComboBox.
+        private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
+        {
+            SetupSmoothContainer(pnl, 8, CardBackColor);
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
+
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 22;
+            cmb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            };
+
+            cmb.Left = 10; cmb.Top = 7; cmb.Width = pnl.Width - 20;
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+
+            Panel pnlArrow = new Panel();
+            pnlArrow.Width = 28;
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.BackColor = CardBackColor;
+            pnlArrow.Cursor = Cursors.Hand;
+            pnlArrow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 5;
+                int ay = pnlArrow.Height / 2 - 2;
+                using var brush = new SolidBrush(TextMuted);
+                e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 10, ay), new Point(ax + 5, ay + 6) });
+            };
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(pnl.Parent?.BackColor ?? AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; pnl.SizeChanged += (s, e) => pnl.Invalidate(); }

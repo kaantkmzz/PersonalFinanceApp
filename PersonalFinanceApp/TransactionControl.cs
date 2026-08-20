@@ -37,6 +37,8 @@ namespace PersonalFinanceApp
         private TextBox txtSearch = new TextBox();
         private Button btnSearch = new Button();
         private Label lblStatus = new Label();
+        private Label lblSearch = new Label();
+        private Panel pnlSearch = new Panel();
 
         private DataGridView dgvTransactions = new DataGridView();
         private List<Transaction> _cachedTransactions = new List<Transaction>();
@@ -119,9 +121,10 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White, false);
             btnAdd.Click += BtnAdd_Click;
 
-            // Arama kutusu, İşlem Ekle butonunun hemen yanında, aynı satırda.
-            Label lblSearch = new Label { Text = "Ara:", Left = 695, Top = 150, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlSearch = new Panel { Left = 695, Top = 175, Width = 140, Height = 36 };
+            // Arama kutusu, tablonun sağ kenarına hizalı (bkz. PositionSearchArea, pencere
+            // yeniden boyutlanınca da tablonun sonuna hizalı kalması için)
+            lblSearch.Text = "Ara:"; lblSearch.Top = 150; lblSearch.ForeColor = TextMuted; lblSearch.AutoSize = true;
+            pnlSearch.Top = 175; pnlSearch.Width = 140; pnlSearch.Height = 36;
             SetupSmoothContainer(pnlSearch, 8, CardBackColor);
             txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 120;
             txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
@@ -130,7 +133,7 @@ namespace PersonalFinanceApp
             pnlSearch.Controls.Add(txtSearch);
 
             btnSearch.Text = "🔍";
-            btnSearch.Left = 843; btnSearch.Top = 175; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            btnSearch.Top = 175; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
             SetupRoundedButton(btnSearch, AccentColor, Color.White, false);
             btnSearch.Click += (s, e) => RefreshGrid();
 
@@ -148,6 +151,18 @@ namespace PersonalFinanceApp
             pnlTop.Controls.Add(btnAdd);
             pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
             pnlTop.Controls.Add(lblStatus);
+
+            // Arama kutusunu tablonun (pnlGrid) sağ kenarıyla hizalar; pnlGrid'in sağ dolgusu (40)
+            // ile aynı hizada dursun diye pencere yeniden boyutlanınca da yeniden konumlandırılır.
+            void PositionSearchArea()
+            {
+                int rightEdge = pnlTop.Width - 40;
+                btnSearch.Left = rightEdge - btnSearch.Width;
+                pnlSearch.Left = btnSearch.Left - 10 - pnlSearch.Width;
+                lblSearch.Left = pnlSearch.Left;
+            }
+            PositionSearchArea();
+            this.Resize += (s, e) => PositionSearchArea();
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;

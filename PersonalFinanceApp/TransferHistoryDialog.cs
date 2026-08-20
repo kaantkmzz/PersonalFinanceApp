@@ -76,6 +76,10 @@ namespace PersonalFinanceApp
             dgvHistory.DefaultCellStyle.SelectionBackColor = AccentColor;
             dgvHistory.DefaultCellStyle.SelectionForeColor = Color.White;
 
+            // Kaydırma çubuğu Windows'un yerleşik denetimi olduğundan BackColor/ForeColor'a uymuyor;
+            // handle oluşunca koyu temaya göre boyatıyoruz.
+            dgvHistory.HandleCreated += (s, e) => DarkTitleBarHelper.SetScrollBarDarkMode(dgvHistory, AppTheme.IsDark);
+
             Panel pnlGridWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2, 6, 2, 6) };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
             pnlGridWrapper.Controls.Add(dgvHistory);

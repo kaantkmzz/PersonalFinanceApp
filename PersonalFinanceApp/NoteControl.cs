@@ -140,6 +140,11 @@ namespace PersonalFinanceApp
             dgvNotes.CellPainting += DgvNotes_CellPainting;
             dgvNotes.RowPrePaint += DgvNotes_RowPrePaint;
 
+            // Kendi çizdiğimiz (owner-paint) satır/hücreler çift arabelleğe alınmadan çiziliyordu;
+            // bu da özellikle yeniden çizim sırasında önceki karenin kalıntılarının (ör. bir üstteki
+            // satırın metni) bir sonraki satırın arkasında "hayalet" olarak görünmesine yol açıyordu.
+            EnableDoubleBuffering(dgvNotes);
+
             pnlGridWrapper.Controls.Add(dgvNotes);
 
             pnlLeft.Controls.Add(lblTitle);
@@ -527,6 +532,16 @@ namespace PersonalFinanceApp
             path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
             path.CloseFigure();
             return path;
+        }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
         }
     }
 
