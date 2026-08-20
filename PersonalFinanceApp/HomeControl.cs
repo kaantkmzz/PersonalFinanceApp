@@ -42,9 +42,12 @@ namespace PersonalFinanceApp
         private Panel pnlNotes = new Panel();
 
         // --- Ana Sayfa widget yerleşimi (bkz. SetupWidgetGrid) ---
-        // Widget'lar 4 sütunluk, 2 satırlık bir ızgaraya (8 hücre) sürükle-bırak ile yerleştirilir;
+        // Widget'lar 4 sütunluk, 3 satırlık bir ızgaraya (12 hücre) sürükle-bırak ile yerleştirilir;
         // yerleşim kullanıcıya özgü (users.home_layout, JSON) kalıcı olarak saklanır. İlk açılışta
         // (home_layout boş) hiç widget yerleşik değildir — sadece Cüzdan/Kasa/Varlıklarım görünür.
+        // Üç satır olmasının sebebi: butonların hemen altındaki boşluk (eskiden hiç kullanılmıyordu)
+        // artık ilk satır olarak da widget alabiliyor — kullanıcı geri bildirimi, Varlık Bildirimleri
+        // gibi geniş bir widget'ı hem "şu anki" hem "bir üstteki" konuma koyabilmek istedi.
         private class WidgetDef
         {
             public string Key = string.Empty;
@@ -63,10 +66,11 @@ namespace PersonalFinanceApp
         };
 
         private const int GridCols = 4;
+        private const int ButtonsTop = 30 + 240 + 16;
 
         private readonly Dictionary<string, int> _placedWidgets = new Dictionary<string, int>();
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
-        private readonly Panel[] _cellPanels = new Panel[8];
+        private readonly Panel[] _cellPanels = new Panel[12];
         private Button btnAddWidget = new Button();
         private Panel pnlWidgetPicker = new Panel();
         private Label lblEmptyGridHint = new Label();
@@ -76,7 +80,9 @@ namespace PersonalFinanceApp
         // onu durdurmak için (bkz. AnimateLabelValue, ClearWidgetContent).
         private readonly Dictionary<Control, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Control, System.Windows.Forms.Timer>();
 
-        private const int MiniRowTop = 630;
+        // Eskiden 630'du; butonların/durum satırının hemen altında kullanılmayan büyük bir boşluk
+        // bırakıyordu (bkz. yukarıdaki not) — ızgara artık o boşluğu da kapsayacak şekilde yukarı çekildi.
+        private const int MiniRowTop = 400;
         private const int MiniRowHeight = 210;
 
         // "Bu Ayın Özeti" kutusundaki iki sayfa arası geçiş: 0 = genel dağılım, 1 = varlık dağılımı.
@@ -116,9 +122,9 @@ namespace PersonalFinanceApp
             // Sabit piksel konumlu dört sütun (bkz. CardLeft4/CardWidth) ve mini-widget satırı (bkz.
             // MiniRowTop/MiniRowHeight) esnek değil — Dock=Fill bunu MainForm.pnlContent'in AutoScroll'u
             // sayesinde bu boyutun altına küçültmüyor, aksi halde sağdaki/alttaki kartlar sessizce kırpılırdı.
-            // Widget ızgarası artık 2 satır olabiliyor (bkz. SetupWidgetGrid, GridCols) — yükseklik
-            // hesabı tek satırda kalmışsa alt satıra yerleştirilen widget'lar kırpılabilirdi.
-            const int gridRows = 2;
+            // Widget ızgarası artık 3 satır olabiliyor (bkz. SetupWidgetGrid, GridCols) — yükseklik
+            // hesabı eksik kalırsa alt satırlara yerleştirilen widget'lar kırpılabilirdi.
+            const int gridRows = 3;
             this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20));
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
@@ -189,7 +195,7 @@ namespace PersonalFinanceApp
             AddInvestStatRow("Pozisyon", lblInvestPosValue, 168);
 
             // Butonlar Cüzdan kutucuğunun altına, sol hizalı (üç kutu eklenince sağa hizalama anlamını yitirdi)
-            const int buttonsTop = 30 + 240 + 16;
+            const int buttonsTop = ButtonsTop;
             const int btnWidth = 190;
             const int btnGap = 14;
 
@@ -376,7 +382,9 @@ namespace PersonalFinanceApp
             btnAddWidget.Width = 40;
             btnAddWidget.Height = 36;
             btnAddWidget.Left = CardLeft4 + CardWidth - btnAddWidget.Width;
-            btnAddWidget.Top = MiniRowTop - btnAddWidget.Height - 14;
+            // Transfer Et/Transfer Geçmişi butonlarıyla aynı satırda, en sağda — ızgara artık butonların
+            // hemen altından başladığından (bkz. MiniRowTop) araya sığmıyordu.
+            btnAddWidget.Top = ButtonsTop;
             btnAddWidget.Cursor = Cursors.Hand;
             SetupRoundedButton(btnAddWidget, AccentColor, Color.White);
             btnAddWidget.Click += (s, e) =>
