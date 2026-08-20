@@ -389,7 +389,8 @@ namespace PersonalFinanceApp
                 }
             };
 
-            pnlWidgetPicker.Width = 280;
+            // "Yaklaşan Hatırlatıcılar" gibi uzun başlıklar 280px'te elipslenmek zorunda kalıyordu.
+            pnlWidgetPicker.Width = 320;
             pnlWidgetPicker.Left = btnAddWidget.Right - pnlWidgetPicker.Width;
             pnlWidgetPicker.Top = btnAddWidget.Bottom + 8;
             pnlWidgetPicker.Visible = false;
@@ -406,6 +407,10 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblEmptyGridHint);
             this.Controls.Add(btnAddWidget);
             this.Controls.Add(pnlWidgetPicker);
+            // WinForms'ta önce eklenen denetim üstte kalır — sekiz (şeffaf) hücre paneli bundan önce
+            // eklendiği için ipucu metnini büyük ölçüde örtüyordu (sadece hücreler arası dar boşluktan
+            // birkaç harf sızıyordu). Öne alarak düzeltiyoruz.
+            lblEmptyGridHint.BringToFront();
             btnAddWidget.BringToFront();
         }
 
@@ -426,9 +431,12 @@ namespace PersonalFinanceApp
 
                 Panel row = new Panel { Left = 12, Top = top, Width = pnlWidgetPicker.Width - 24, Height = 38, BackColor = Color.Transparent };
 
+                // "Yaklaşan Hatırlatıcılar" gibi uzun başlıklar eskiden 160px'e sığmayıp kesiliyordu —
+                // durum etiketine (yalnızca yerleştirilmiş widget'larda dolu) ayrılan sabit pay küçültüldü
+                // ve isim etiketi genişletildi; AutoEllipsis de yine de sığmayan durumlar için güvence.
                 Label lblHandle = new Label { Text = "⠿", Font = new Font("Segoe UI", 10F), ForeColor = placed ? AppTheme.GridLineColor : TextMuted, Left = 4, Top = 10, Width = 18, Height = 18, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleCenter };
-                Label lblName = new Label { Text = def.Title, Font = new Font("Segoe UI", 9.5F), ForeColor = placed ? TextMuted : TextLight, Left = 26, Top = 0, Width = 160, Height = 38, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
-                Label lblStatus = new Label { Text = placed ? "Eklendi" : "", Font = new Font("Segoe UI", 8F), ForeColor = AppTheme.SuccessColor, Left = row.Width - 70, Top = 0, Width = 70, Height = 38, TextAlign = ContentAlignment.MiddleRight, BackColor = Color.Transparent };
+                Label lblStatus = new Label { Text = placed ? "Eklendi" : "", Font = new Font("Segoe UI", 8F), ForeColor = AppTheme.SuccessColor, Left = row.Width - 56, Top = 0, Width = 56, Height = 38, TextAlign = ContentAlignment.MiddleRight, BackColor = Color.Transparent };
+                Label lblName = new Label { Text = def.Title, Font = new Font("Segoe UI", 9.5F), ForeColor = placed ? TextMuted : TextLight, Left = 26, Top = 0, Width = lblStatus.Left - 26, Height = 38, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
 
                 row.Controls.Add(lblHandle);
                 row.Controls.Add(lblName);
@@ -437,7 +445,14 @@ namespace PersonalFinanceApp
                 if (!placed)
                 {
                     row.Cursor = Cursors.SizeAll;
-                    MouseEventHandler startDrag = (s, e) => row.DoDragDrop(def.Key, DragDropEffects.Move);
+                    // Panel, sağ sütunun (CardLeft4) tam üzerinde açılıyor — sürükleme sırasında açık
+                    // kalırsa oraya bırakmayı imkansız kılıyordu (bırakma hedefi panelin kendisi oluyordu,
+                    // altındaki hücre değil). Sürükleme başlar başlamaz paneli kapatıyoruz.
+                    MouseEventHandler startDrag = (s, e) =>
+                    {
+                        pnlWidgetPicker.Visible = false;
+                        row.DoDragDrop(def.Key, DragDropEffects.Move);
+                    };
                     row.MouseDown += startDrag;
                     lblHandle.MouseDown += startDrag;
                     lblName.MouseDown += startDrag;
@@ -526,6 +541,7 @@ namespace PersonalFinanceApp
                 LoadWidgetContent(def.Key);
             }
 
+            lblEmptyGridHint.BringToFront();
             btnAddWidget.BringToFront();
             if (pnlWidgetPicker.Visible) BuildWidgetPickerRows();
             pnlWidgetPicker.BringToFront();
