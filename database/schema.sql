@@ -15,7 +15,6 @@ CREATE TABLE users (
     monthly_income        NUMERIC(14,2) NOT NULL DEFAULT 0,
     wallet_balance        NUMERIC(14,2) NOT NULL DEFAULT 0,
     safe_balance           NUMERIC(14,2) NOT NULL DEFAULT 0,
-    invest_balance         NUMERIC(14,2) NOT NULL DEFAULT 0,
     last_income_month     INTEGER,
     last_income_year      INTEGER,
     full_name                    TEXT NOT NULL DEFAULT '',
