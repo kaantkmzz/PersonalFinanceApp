@@ -45,7 +45,7 @@ namespace PersonalFinanceApp
         private void SetupDialog()
         {
             this.AutoScaleMode = AutoScaleMode.None;
-            this.ClientSize = new Size(400, 600);
+            this.ClientSize = new Size(400, 660);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -58,20 +58,23 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblTitle);
 
             // --- Tip ---
+            // Not: Label ile kutu arasındaki boşluk, bu makinenin ~150% DPI ölçeğinde etiket
+            // metninin gerçek piksel yüksekliğinin eski (22px) boşluktan büyük olması yüzünden
+            // yetersizdi — etiketin alt kısmı kutunun üstüne biniyordu. Boşluklar büyütüldü.
             Label lblType = new Label { Text = "Tip:", Left = 20, Top = 68, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlType = new Panel { Left = 20, Top = 90, Width = 360, Height = 38 };
+            Panel pnlType = new Panel { Left = 20, Top = 98, Width = 360, Height = 38 };
             cmbType.Left = 5; cmbType.Top = 8; cmbType.Width = 350;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.Items.Add("Hedef");
-            cmbType.SelectedIndex = _transaction.Type switch { "income" => 0, "goal" => 2, _ => 1 };
+            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.Items.Add("Hedef"); cmbType.Items.Add("Yatırım");
+            cmbType.SelectedIndex = _transaction.Type switch { "income" => 0, "goal" => 2, "invest" => 3, _ => 1 };
             cmbType.SelectedIndexChanged += (s, e) => LoadCategories();
             pnlType.Controls.Add(cmbType);
             SetupCustomComboBox(pnlType, cmbType);
             this.Controls.Add(lblType); this.Controls.Add(pnlType);
 
             // --- Kategori ---
-            Label lblCategory = new Label { Text = "Kategori:", Left = 20, Top = 138, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlCategory = new Panel { Left = 20, Top = 160, Width = 360, Height = 38 };
+            Label lblCategory = new Label { Text = "Kategori:", Left = 20, Top = 150, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlCategory = new Panel { Left = 20, Top = 180, Width = 360, Height = 38 };
             cmbCategory.Left = 5; cmbCategory.Top = 8; cmbCategory.Width = 350;
             cmbCategory.Font = new Font("Segoe UI", 9.5F); cmbCategory.DropDownStyle = ComboBoxStyle.DropDownList;
             pnlCategory.Controls.Add(cmbCategory);
@@ -79,8 +82,8 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblCategory); this.Controls.Add(pnlCategory);
 
             // --- Tutar ---
-            Label lblAmount = new Label { Text = "Tutar:", Left = 20, Top = 208, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlAmount = new Panel { Left = 20, Top = 230, Width = 360, Height = 38 };
+            Label lblAmount = new Label { Text = "Tutar:", Left = 20, Top = 232, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlAmount = new Panel { Left = 20, Top = 262, Width = 360, Height = 38 };
             SetupSmoothContainer(pnlAmount, 8, CardBackColor);
             txtAmount.Left = 12; txtAmount.Top = 9; txtAmount.Width = 336;
             txtAmount.Font = new Font("Segoe UI", 10.5F); txtAmount.BorderStyle = BorderStyle.None;
@@ -91,8 +94,8 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblAmount); this.Controls.Add(pnlAmount);
 
             // --- Tarih ---
-            Label lblDate = new Label { Text = "Tarih:", Left = 20, Top = 278, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlDate = new Panel { Left = 20, Top = 300, Width = 360, Height = 38 };
+            Label lblDate = new Label { Text = "Tarih:", Left = 20, Top = 314, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlDate = new Panel { Left = 20, Top = 344, Width = 360, Height = 38 };
             SetupSmoothContainer(pnlDate, 8, CardBackColor);
             dtpDate.Left = 8; dtpDate.Top = 6; dtpDate.Width = 344;
             dtpDate.Font = new Font("Segoe UI", 10F);
@@ -115,8 +118,8 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblDate); this.Controls.Add(pnlDate);
 
             // --- Açıklama ---
-            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 348, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlDesc = new Panel { Left = 20, Top = 370, Width = 360, Height = 38 };
+            Label lblDescription = new Label { Text = "Açıklama (opsiyonel):", Left = 20, Top = 396, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlDesc = new Panel { Left = 20, Top = 426, Width = 360, Height = 38 };
             SetupSmoothContainer(pnlDesc, 8, CardBackColor);
             txtDescription.Left = 12; txtDescription.Top = 9; txtDescription.Width = 336;
             txtDescription.Font = new Font("Segoe UI", 10.5F); txtDescription.BorderStyle = BorderStyle.None;
@@ -126,28 +129,28 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblDescription); this.Controls.Add(pnlDesc);
 
             // --- Butonlar ---
-            Button btnSave = new Button { Text = "Kaydet", Left = 20, Top = 432, Width = 172, Height = 40, Cursor = Cursors.Hand };
+            Button btnSave = new Button { Text = "Kaydet", Left = 20, Top = 488, Width = 172, Height = 40, Cursor = Cursors.Hand };
             SetupRoundedButton(btnSave, AccentColor, Color.White);
             btnSave.Click += BtnSave_Click;
             this.Controls.Add(btnSave);
 
-            Button btnCancel = new Button { Text = "İptal", Left = 208, Top = 432, Width = 172, Height = 40, Cursor = Cursors.Hand };
+            Button btnCancel = new Button { Text = "İptal", Left = 208, Top = 488, Width = 172, Height = 40, Cursor = Cursors.Hand };
             SetupRoundedButton(btnCancel, Color.FromArgb(80, 85, 105), Color.White);
             btnCancel.Click += (s, e) => this.Close();
             this.Controls.Add(btnCancel);
 
-            Button btnDelete = new Button { Text = "🗑️ İşlemi Sil", Left = 20, Top = 480, Width = 360, Height = 40, Cursor = Cursors.Hand };
+            Button btnDelete = new Button { Text = "🗑️ İşlemi Sil", Left = 20, Top = 536, Width = 360, Height = 40, Cursor = Cursors.Hand };
             SetupRoundedButton(btnDelete, DangerColor, Color.White);
             btnDelete.Click += BtnDelete_Click;
             this.Controls.Add(btnDelete);
 
-            lblStatus.Left = 20; lblStatus.Top = 528; lblStatus.Width = 360; lblStatus.Height = 25;
+            lblStatus.Left = 20; lblStatus.Top = 584; lblStatus.Width = 360; lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
             this.Controls.Add(lblStatus);
         }
 
-        private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", _ => "expense" };
+        private string GetSelectedType() => cmbType.SelectedItem?.ToString() switch { "Gelir" => "income", "Hedef" => "goal", "Yatırım" => "invest", _ => "expense" };
 
         private bool _suppressAmountFormatting = false;
 

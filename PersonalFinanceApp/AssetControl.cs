@@ -12,7 +12,6 @@ namespace PersonalFinanceApp
     {
         private readonly User _user;
         private readonly AssetService _assetService = new AssetService();
-        private readonly AccountService _accountService = new AccountService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -26,7 +25,6 @@ namespace PersonalFinanceApp
         private Panel pnlGrid = new Panel();
         private Panel pnlBottom = new Panel();
 
-        private Label lblInvestBalance = new Label();
         private ComboBox cmbSearch = new ComboBox();
         private Label lblSelectedPrice = new Label();
         private TextBox txtBuyQuantity = new TextBox();
@@ -63,7 +61,6 @@ namespace PersonalFinanceApp
 
         public void RefreshData()
         {
-            RefreshInvestBalance();
             _ = LoadHoldingsAsync();
         }
 
@@ -81,17 +78,10 @@ namespace PersonalFinanceApp
 
             Label lblTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true };
 
-            // Başlığın hemen sağında, aynı satırda; sabit yeşil yerine tema rengiyle (AccentColor) uyumlu.
-            lblInvestBalance.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-            lblInvestBalance.ForeColor = AccentColor;
-            lblInvestBalance.AutoSize = true;
-            lblInvestBalance.Top = 24;
-            lblInvestBalance.Text = "Yatırım Bakiyesi: ...";
-            lblInvestBalance.Left = lblTitle.Left + lblTitle.PreferredWidth + 20;
-            // Bakiye Transferi butonu kaldırıldı — Ana Sayfa'daki "Transfer Et" artık Cüzdan/Kasa/Varlıklarım
-            // arasında her yönde transfer yapabiliyor (bkz. HomeControl.BtnTransfer_Click, TransferDialog).
+            // Varlıklarım'ın artık kendi bakiyesi yok — alım/satım doğrudan Kasa'dan yapılıyor (bkz.
+            // AssetService.BuyAssetAsync/SellAssetAsync), bu yüzden burada ayrı bir bakiye etiketi yok.
 
-            // İkinci satır: arama/alım araç çubuğu (üstteki bakiye satırıyla çakışmasın diye ayrı bir satırda)
+            // İkinci satır: arama/alım araç çubuğu
             const int row2Top = 95;
 
             // Etiket ile kutunun arasında yeterli boşluk olsun diye (dar aralık bazı DPI ayarlarında
@@ -128,7 +118,6 @@ namespace PersonalFinanceApp
             lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
 
             pnlTop.Controls.Add(lblTitle);
-            pnlTop.Controls.Add(lblInvestBalance);
             pnlTop.Controls.Add(lblSearch);
             pnlTop.Controls.Add(cmbSearch);
             pnlTop.Controls.Add(lblSelectedPrice);
@@ -186,17 +175,6 @@ namespace PersonalFinanceApp
             this.Controls.Add(pnlGrid);
             this.Controls.Add(pnlBottom);
             this.Controls.Add(pnlTop);
-
-            RefreshInvestBalance();
-        }
-
-        private void RefreshInvestBalance()
-        {
-            decimal balance = _accountService.GetInvestBalance(_user.Id);
-            var tr = new System.Globalization.CultureInfo("tr-TR");
-            lblInvestBalance.Text = _user.HideAmountsEnabled
-                ? "Yatırım Bakiyesi: ••••••"
-                : $"Yatırım Bakiyesi: {balance.ToString("#,##0.00", tr)} ₺";
         }
 
         private int _priceRequestToken;
@@ -239,7 +217,6 @@ namespace PersonalFinanceApp
             {
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150); lblStatus.Text = "Alım başarılı.";
                 txtBuyQuantity.Clear();
-                RefreshInvestBalance();
                 await LoadHoldingsAsync();
             }
             else
@@ -329,7 +306,6 @@ namespace PersonalFinanceApp
                 dialog.ShowDialog();
                 if (dialog.ChangesMade)
                 {
-                    RefreshInvestBalance();
                     _ = LoadHoldingsAsync();
                 }
             }

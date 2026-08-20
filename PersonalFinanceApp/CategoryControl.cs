@@ -98,26 +98,9 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
             btnAdd.Click += BtnAdd_Click;
 
-            lblStatus.Left = 20;
-            lblStatus.Top = 145;
-            lblStatus.AutoSize = true;
-            lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
-            lblStatus.Font = new Font("Segoe UI", 9F);
-
-            pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblFilter); pnlTop.Controls.Add(pnlFilter);
-            pnlTop.Controls.Add(lblNew); pnlTop.Controls.Add(pnlNewCat); pnlTop.Controls.Add(lblNewType); pnlTop.Controls.Add(pnlNewType);
-            pnlTop.Controls.Add(btnAdd);
-            pnlTop.Controls.Add(lblStatus);
-
-            // --- ORTA PANEL (Tablo) ---
-            pnlGrid.Dock = DockStyle.Fill;
-            pnlGrid.Padding = new Padding(20, 0, 40, 0);
-            pnlGrid.BackColor = AppBackColor;
-
-            // Arama kutusu artık üstteki kalabalık filtre satırında değil; tablonun hemen üstünde,
-            // sağ üst köşesinde, metin kutusu ile buton aynı hizada.
-            Panel pnlSearchRow = new Panel { Dock = DockStyle.Top, Height = 46, BackColor = AppBackColor };
-            Panel pnlSearch = new Panel { Top = 6, Width = 160, Height = 36 };
+            // Arama kutusu, Ekle butonunun hemen yanında, aynı satırda.
+            Label lblSearch = new Label { Text = "Ara:", Left = 680, Top = 70, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 680, Top = 95, Width = 160, Height = 36 };
             SetupSmoothContainer(pnlSearch, 8, CardBackColor);
             txtSearch.Left = 10; txtSearch.Top = 8; txtSearch.Width = 140;
             txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.BorderStyle = BorderStyle.None;
@@ -126,21 +109,25 @@ namespace PersonalFinanceApp
             pnlSearch.Controls.Add(txtSearch);
 
             btnSearch.Text = "🔍";
-            btnSearch.Top = 6; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            btnSearch.Left = 848; btnSearch.Top = 95; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
             SetupRoundedButton(btnSearch, AccentColor, Color.White);
             btnSearch.Click += (s, e) => LoadCategories();
 
-            void PositionSearchRow()
-            {
-                btnSearch.Left = pnlSearchRow.ClientSize.Width - btnSearch.Width;
-                pnlSearch.Left = btnSearch.Left - 8 - pnlSearch.Width;
-            }
-            pnlSearchRow.Resize += (s, e) => PositionSearchRow();
+            lblStatus.Left = 20;
+            lblStatus.Top = 145;
+            lblStatus.AutoSize = true;
+            lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+            lblStatus.Font = new Font("Segoe UI", 9F);
 
-            pnlSearchRow.Controls.Add(pnlSearch);
-            pnlSearchRow.Controls.Add(btnSearch);
-            pnlGrid.Controls.Add(pnlSearchRow);
-            PositionSearchRow();
+            pnlTop.Controls.Add(lblTitle); pnlTop.Controls.Add(lblFilter); pnlTop.Controls.Add(pnlFilter);
+            pnlTop.Controls.Add(lblNew); pnlTop.Controls.Add(pnlNewCat); pnlTop.Controls.Add(lblNewType); pnlTop.Controls.Add(pnlNewType);
+            pnlTop.Controls.Add(btnAdd); pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
+            pnlTop.Controls.Add(lblStatus);
+
+            // --- ORTA PANEL (Tablo) ---
+            pnlGrid.Dock = DockStyle.Fill;
+            pnlGrid.Padding = new Padding(20, 0, 40, 0);
+            pnlGrid.BackColor = AppBackColor;
 
             Panel pnlGridWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2, 6, 2, 6) };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -169,7 +156,7 @@ namespace PersonalFinanceApp
 
             dgvCategories.CellPainting += DgvCategories_CellPainting;
 
-            dgvCategories.HandleCreated += (s, e) => DarkTitleBarHelper.SetScrollBarDarkMode(dgvCategories, AppTheme.IsDark);
+            dgvCategories.HandleCreated += (s, e) => DarkTitleBarHelper.SetDataGridViewScrollBarDarkMode(dgvCategories, AppTheme.IsDark);
 
             pnlGridWrapper.Controls.Add(dgvCategories);
             pnlGrid.Controls.Add(pnlGridWrapper);

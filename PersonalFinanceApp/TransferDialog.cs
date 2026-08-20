@@ -2,10 +2,10 @@ using PersonalFinanceApp.Helpers;
 
 namespace PersonalFinanceApp
 {
-    public enum TransferAccount { Wallet, Safe, Invest }
+    public enum TransferAccount { Wallet, Safe }
 
-    // Cüzdan / Kasa / Varlıklarım arasında herhangi bir yönde transfer. Altı ayrı radio button yerine
-    // "Nereden" / "Nereye" iki açılır kutu — yön sayısı artsa da (bkz. AccountService) arayüz sade kalır.
+    // Cüzdan / Kasa arasında transfer. Varlıklarım artık kendi bakiyesini tutmuyor (alım/satım
+    // doğrudan Kasa'dan yapılıyor, bkz. AssetService) — bu yüzden burada seçenek olarak yok.
     public partial class TransferDialog : Form
     {
         public decimal Amount { get; private set; }
@@ -18,7 +18,7 @@ namespace PersonalFinanceApp
         private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
 
-        private static readonly string[] AccountLabels = { "Cüzdan", "Kasa", "Varlıklarım" };
+        private static readonly string[] AccountLabels = { "Cüzdan", "Kasa" };
 
         private ComboBox cmbFrom = new ComboBox();
         private ComboBox cmbTo = new ComboBox();

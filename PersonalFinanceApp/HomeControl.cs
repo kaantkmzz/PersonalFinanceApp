@@ -14,6 +14,7 @@ namespace PersonalFinanceApp
         private readonly TransactionService _transactionService = new TransactionService();
         private readonly ReportService _reportService = new ReportService();
         private readonly SavingsGoalService _savingsGoalService = new SavingsGoalService();
+        private readonly NoteService _noteService = new NoteService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -33,8 +34,12 @@ namespace PersonalFinanceApp
         private Label lblWalletAmount = new Label();
         private Label lblSafeAmount = new Label();
         private Label lblInvestAmount = new Label();
+        private Label lblInvestPLValue = new Label();
+        private Label lblInvestCostValue = new Label();
+        private Label lblInvestPosValue = new Label();
         private Label lblStatus = new Label();
         private Panel pnlNotifications = new Panel();
+        private Panel pnlNotes = new Panel();
 
         // Etikete göre çalışan sayaç animasyonu zamanlayıcıları — bir widget yenilenirken (ör. tutarları
         // gizle aç/kapa, ya da mini-widget'lar yeniden dolarken) eski bir animasyon hâlâ sürüyorsa önce
@@ -70,7 +75,9 @@ namespace PersonalFinanceApp
             InitializeComponent();
             SetupUI();
             RefreshBalances();
+            _ = LoadInvestCardAsync();
             _ = LoadNotificationsAsync();
+            LoadNotesWidget();
             LoadReminderWidget();
             LoadMiniReportWidget();
             LoadRecentTransactionsWidget();
@@ -114,7 +121,11 @@ namespace PersonalFinanceApp
             pnlSafe.Controls.Add(lblSafeTitle);
             pnlSafe.Controls.Add(lblSafeAmount);
 
-            Panel pnlInvest = new Panel { Left = CardLeft3, Top = 30, Width = CardWidth, Height = 240 };
+            // Varlıklarım'ın artık kendi bakiyesi yok; bu kutu artık Varlıklarım ekranındaki güncel
+            // portföy değerini (kâr/zararına göre yeşil/kırmızı ok ile) gösteriyor. Sağa doğru
+            // genişletilip Kâr/Zarar, Toplam Maliyet, Pozisyon bilgileri de eklendi.
+            const int investCardWidth = CardLeft4 + CardWidth - CardLeft3; // 660
+            Panel pnlInvest = new Panel { Left = CardLeft3, Top = 30, Width = investCardWidth, Height = 240 };
             SetupSmoothContainer(pnlInvest, 16, CardBackColor);
             Label lblInvestIcon = new Label { Text = "📈", Font = new Font("Segoe UI Emoji", 32F), ForeColor = TextLight, Left = 20, Top = 15, AutoSize = true, BackColor = Color.Transparent };
             Label lblInvestTitle = new Label { Text = "Varlıklarım", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 130, AutoSize = true, BackColor = Color.Transparent };
@@ -128,6 +139,22 @@ namespace PersonalFinanceApp
             pnlInvest.Controls.Add(lblInvestIcon);
             pnlInvest.Controls.Add(lblInvestTitle);
             pnlInvest.Controls.Add(lblInvestAmount);
+
+            void AddInvestStatRow(string title, Label valueLabel, int top)
+            {
+                Label lblStatTitle = new Label { Text = title, Font = new Font("Segoe UI", 9.5F), ForeColor = TextMuted, Left = 380, Top = top, AutoSize = true, BackColor = Color.Transparent };
+                valueLabel.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+                valueLabel.ForeColor = TextLight;
+                valueLabel.Left = 380;
+                valueLabel.Top = top + 24;
+                valueLabel.AutoSize = true;
+                valueLabel.BackColor = Color.Transparent;
+                pnlInvest.Controls.Add(lblStatTitle);
+                pnlInvest.Controls.Add(valueLabel);
+            }
+            AddInvestStatRow("Kâr / Zarar", lblInvestPLValue, 32);
+            AddInvestStatRow("Toplam Maliyet", lblInvestCostValue, 100);
+            AddInvestStatRow("Pozisyon", lblInvestPosValue, 168);
 
             // Butonlar Cüzdan kutucuğunun altına, sol hizalı (üç kutu eklenince sağa hizalama anlamını yitirdi)
             const int buttonsTop = 30 + 240 + 16;
@@ -173,12 +200,19 @@ namespace PersonalFinanceApp
             lblStatus.Font = new Font("Segoe UI", 9F);
 
             // Varlıklarım'da pozisyonu olan kullanıcılar için kâr/zarar bildirim kartı; pozisyon yoksa
-            // (bkz. LoadNotificationsAsync) tamamen gizlenir, boş kart gösterilmez.
+            // (bkz. LoadNotificationsAsync) tamamen gizlenir, boş kart gösterilmez. Sağında, Hedeflerim
+            // kartıyla aynı sütunda (CardLeft4), Notlar mini-widget'ı için yer bırakılıyor.
             pnlNotifications.Left = CardLeft1;
             pnlNotifications.Top = lblStatus.Top + 40;
-            pnlNotifications.Width = AllCardsRight - CardLeft1;
+            pnlNotifications.Width = CardLeft4 - 16 - CardLeft1;
             pnlNotifications.Visible = false;
             SetupSmoothContainer(pnlNotifications, 16, CardBackColor);
+
+            pnlNotes.Left = CardLeft4;
+            pnlNotes.Top = pnlNotifications.Top;
+            pnlNotes.Width = CardWidth;
+            pnlNotes.Height = 232;
+            SetupSmoothContainer(pnlNotes, 16, CardBackColor);
 
             this.Controls.Add(pnlWallet);
             this.Controls.Add(pnlSafe);
@@ -187,6 +221,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnHistory);
             this.Controls.Add(lblStatus);
             this.Controls.Add(pnlNotifications);
+            this.Controls.Add(pnlNotes);
 
             SetupMiniWidgets();
         }
@@ -422,18 +457,22 @@ namespace PersonalFinanceApp
         }
 
         // Kartın sağ alt köşesindeki iki nokta: tıklanınca genel/varlık sayfaları arasında geçiş yapar.
+        // Görünen nokta (dotSize) ile tıklanabilir alan (hitSize) ayrı tutuluyor; eskiden ikisi de 7px'ti
+        // ve tıklamak zordu — tıklama alanı görünenden büyük tutularak (nokta ortalanarak) kolaylaştırıldı.
         private void SetupMiniPageDots()
         {
-            const int dotSize = 7;
-            const int gap = 6;
-            const int rightPad = 14;
-            int dot1Left = CardWidth - rightPad - dotSize;
-            int dot0Left = dot1Left - gap - dotSize;
-            const int dotTop = MiniRowHeight - 16;
+            const int dotSize = 11;
+            const int hitSize = 22;
+            const int gap = 2;
+            const int rightPad = 10;
+            int dot1Left = CardWidth - rightPad - hitSize;
+            int dot0Left = dot1Left - gap - hitSize;
+            const int dotTop = MiniRowHeight - hitSize - 6;
+            const int dotOffset = (hitSize - dotSize) / 2;
 
             void SetupDot(Panel dot, int left, int page)
             {
-                dot.Left = left; dot.Top = dotTop; dot.Width = dotSize; dot.Height = dotSize;
+                dot.Left = left; dot.Top = dotTop; dot.Width = hitSize; dot.Height = hitSize;
                 dot.BackColor = Color.Transparent;
                 dot.Cursor = Cursors.Hand;
                 dot.Paint += (s, e) =>
@@ -441,7 +480,7 @@ namespace PersonalFinanceApp
                     e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     Color c = _miniReportPage == page ? AccentColor : AppTheme.GridLineColor;
                     using var brush = new SolidBrush(c);
-                    e.Graphics.FillEllipse(brush, 0, 0, dotSize, dotSize);
+                    e.Graphics.FillEllipse(brush, dotOffset, dotOffset, dotSize, dotSize);
                 };
                 dot.Click += (s, e) =>
                 {
@@ -713,11 +752,13 @@ namespace PersonalFinanceApp
         public void RefreshData()
         {
             RefreshBalances();
+            _ = LoadInvestCardAsync();
             _ = LoadNotificationsAsync();
 
             // Eskiden yalnızca üstteki üç kart tazeleniyordu; mini-widget'lar (Hatırlatıcılar, Bu Ayın
             // Özeti, Son İşlemler, Hedeflerim) yalnızca kurucuda dolduruluyordu — bu yüzden hem "tutarları
             // gizle" aç/kapa hem de sayfa değiştirip geri dönme bu widget'ları hiç güncellemiyordu.
+            LoadNotesWidget();
             LoadReminderWidget();
             LoadMiniReportWidget();
             LoadRecentTransactionsWidget();
@@ -801,14 +842,107 @@ namespace PersonalFinanceApp
             pnlNotifications.Height = rowTop + 16;
         }
 
+        // Varlık Bildirimleri'nin sağındaki boş alana, en son düzenlenen 5 notu başlık+tarihle listeler.
+        private void LoadNotesWidget()
+        {
+            pnlNotes.Controls.Clear();
+
+            Label lblHeader = new Label
+            {
+                Text = "📝 Notlar",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 20,
+                Top = 16,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlNotes.Controls.Add(lblHeader);
+
+            Action goToNotes = () => _onNavigate?.Invoke("Notlar");
+            MakeClickable(lblHeader, goToNotes);
+
+            var notes = _noteService.GetRecentlyUpdatedNotes(_user.Id, 5);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            if (notes.Count == 0)
+            {
+                AddWidgetLine(pnlNotes, "Henüz not yok.", 56, TextMuted, 20, goToNotes);
+                return;
+            }
+
+            int top = 56;
+            foreach (var note in notes)
+            {
+                Label lblTitle = new Label
+                {
+                    Text = string.IsNullOrWhiteSpace(note.Title) ? "(Başlıksız)" : note.Title,
+                    ForeColor = TextLight,
+                    Left = 20,
+                    Top = top,
+                    Width = CardWidth - 132,
+                    Height = 22,
+                    AutoSize = false,
+                    AutoEllipsis = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 10F)
+                };
+                Label lblDate = new Label
+                {
+                    // "dd.MM.yyyy" bu makinenin ~150% DPI ölçeğinde 85px'te bile yıl kısmı kesiliyordu.
+                    Text = note.UpdatedAt.ToString("dd.MM.yyyy", tr),
+                    ForeColor = TextMuted,
+                    Left = CardWidth - 120,
+                    Top = top,
+                    Width = 100,
+                    Height = 22,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9F)
+                };
+                pnlNotes.Controls.Add(lblTitle);
+                pnlNotes.Controls.Add(lblDate);
+                MakeClickable(lblTitle, goToNotes);
+                MakeClickable(lblDate, goToNotes);
+                top += 32;
+            }
+        }
+
         private void RefreshBalances()
         {
             var (wallet, safe) = _accountService.GetBalances(_user.Id);
-            decimal invest = _accountService.GetInvestBalance(_user.Id);
 
             AnimateCardValue(lblWalletAmount, wallet);
             AnimateCardValue(lblSafeAmount, safe);
-            AnimateCardValue(lblInvestAmount, invest);
+        }
+
+        // Varlıklarım kutusu: güncel portföy değeri (kâr/zararına göre ok+renk), Kâr/Zarar, Toplam
+        // Maliyet, Pozisyon — hepsi Varlıklarım ekranındaki (AssetControl) hesaplarla aynı.
+        private async Task LoadInvestCardAsync()
+        {
+            var holdings = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
+            if (this.IsDisposed) return;
+
+            decimal totalValue = holdings.Sum(h => h.CurrentValueTry ?? 0);
+            decimal totalCost = holdings.Sum(h => h.AvgCostTry * h.Quantity);
+            decimal totalPl = totalValue - totalCost;
+            bool isProfit = totalPl >= 0;
+            Color plColor = isProfit ? IncomeColor : ExpenseColor;
+            string arrow = isProfit ? "▲" : "▼";
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            AnimateLabelValue(lblInvestAmount, totalValue, v => $"{arrow} {v.ToString("#,##0", tr)} ₺", hiddenText: $"{arrow} ••••••");
+            lblInvestAmount.ForeColor = plColor;
+
+            AnimateLabelValue(lblInvestPLValue, totalPl, v => v.ToString("+#,##0;-#,##0", tr) + " ₺", hiddenText: "••••••");
+            lblInvestPLValue.ForeColor = plColor;
+
+            AnimateCardValue(lblInvestCostValue, totalCost);
+
+            // Pozisyon sayısı hassas bir tutar değil (bkz. AssetControl'ün Pozisyon çipi) — tutarları
+            // gizle açıkken bile düz gösteriliyor.
+            lblInvestPosValue.Text = holdings.Count.ToString();
         }
 
         // Kart tutarını 0'dan gerçek değerine sayarak (count-up) belirtir; tutarlar gizliyse animasyonsuz gösterir.
@@ -885,18 +1019,6 @@ namespace PersonalFinanceApp
                         break;
                     case (TransferAccount.Safe, TransferAccount.Wallet):
                         success = _accountService.TransferToWallet(_user.Id, dialog.Amount, out errorMessage);
-                        break;
-                    case (TransferAccount.Wallet, TransferAccount.Invest):
-                        success = _accountService.TransferWalletToInvest(_user.Id, dialog.Amount, out errorMessage);
-                        break;
-                    case (TransferAccount.Safe, TransferAccount.Invest):
-                        success = _accountService.TransferSafeToInvest(_user.Id, dialog.Amount, out errorMessage);
-                        break;
-                    case (TransferAccount.Invest, TransferAccount.Wallet):
-                        success = _accountService.TransferInvestToWallet(_user.Id, dialog.Amount, out errorMessage);
-                        break;
-                    case (TransferAccount.Invest, TransferAccount.Safe):
-                        success = _accountService.TransferInvestToSafe(_user.Id, dialog.Amount, out errorMessage);
                         break;
                     default:
                         success = false;

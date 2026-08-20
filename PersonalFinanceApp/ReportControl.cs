@@ -1386,7 +1386,10 @@ namespace PersonalFinanceApp
 
             lblTitle.Text = "Rapor — Varlıklarım";
 
-            lblCard1Title.Text = "Yatırım Bakiyesi";
+            // Varlıklarım'ın artık kendi ayrı bakiyesi yok (alım/satım Kasa'dan yapılıyor); ilk kart
+            // AssetControl'ün alt istatistik çubuğuyla tutarlı olsun diye "Yatırım Bakiyesi" yerine
+            // "Pozisyon" (sahip olunan varlık sayısı) gösteriyor.
+            lblCard1Title.Text = "Pozisyon";
             lblCard2Title.Text = "Toplam Maliyet";
             lblCard3Title.Text = "Güncel Değer";
             lblCard4Title.Text = "Kâr / Zarar";
@@ -1401,12 +1404,14 @@ namespace PersonalFinanceApp
             var costBasis = _assetService.GetHoldingsCostBasisBySymbol(_user.Id);
             var snapshots = _assetService.GetPortfolioSnapshots(_user.Id);
 
-            decimal investBalance = _accountService.GetInvestBalance(_user.Id);
             decimal totalCost = holdings.Sum(h => h.AvgCostTry * h.Quantity);
             decimal totalValue = holdings.Sum(h => h.CurrentValueTry ?? 0);
             decimal totalPl = totalValue - totalCost;
 
-            AnimateCardValue(lblIncome, investBalance, IncomeColor);
+            // Pozisyon sayısı hassas bir tutar değil (bkz. AssetControl'ün Pozisyon çipi) — tutarları
+            // gizle açıkken bile düz gösteriliyor.
+            lblIncome.ForeColor = IncomeColor;
+            lblIncome.Text = holdings.Count.ToString();
             AnimateCardValue(lblExpense, totalCost, TextLight);
             AnimateCardValue(lblNet, totalValue, SafeColor);
             AnimateCardValue(lblSafeBalance, totalPl, totalPl >= 0 ? IncomeColor : ExpenseColor);

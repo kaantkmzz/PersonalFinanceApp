@@ -82,7 +82,8 @@ CREATE TABLE notes (
     user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     title       TEXT,
     content     TEXT,
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE reminders (

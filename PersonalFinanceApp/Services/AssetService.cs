@@ -101,13 +101,13 @@ namespace PersonalFinanceApp.Services
             if (!price.HasValue) return (false, "Anlık fiyat alınamadı, lütfen daha sonra tekrar deneyin.");
 
             decimal totalTry = quantity * price.Value;
-            decimal investBalance = _accountService.GetInvestBalance(userId);
-            if (totalTry > investBalance)
+            var (_, safeBalance) = _accountService.GetBalances(userId);
+            if (totalTry > safeBalance)
             {
-                return (false, $"Yatırım bakiyenizde yeterli bakiye yok. Mevcut: {investBalance:N2} ₺");
+                return (false, $"Kasanızda yeterli bakiye yok. Mevcut: {safeBalance:N2} ₺");
             }
 
-            _accountService.AdjustInvestBalance(userId, -totalTry);
+            _accountService.AdjustSafeBalance(userId, -totalTry);
 
             var existing = _repository.GetHolding(userId, symbol);
             decimal newQuantity = (existing?.Quantity ?? 0) + quantity;
@@ -155,7 +155,7 @@ namespace PersonalFinanceApp.Services
             else
                 _repository.UpsertHolding(userId, symbol, catalogItem.AssetType, newQuantity, existing.AvgCostTry);
 
-            _accountService.AdjustInvestBalance(userId, totalTry);
+            _accountService.AdjustSafeBalance(userId, totalTry);
 
             _repository.AddAssetTransaction(new AssetTransaction
             {

@@ -7,20 +7,32 @@ namespace PersonalFinanceApp.Data
     {
         public List<Note> GetByUserId(int userId)
         {
+            return GetByUserId(userId, "created_at", null);
+        }
+
+        // Ana Sayfa'daki Notlar mini-widget'ı için: en son DÜZENLENEN (created değil, updated_at'e göre) notlar.
+        public List<Note> GetRecentlyUpdated(int userId, int limit)
+        {
+            return GetByUserId(userId, "updated_at", limit);
+        }
+
+        private List<Note> GetByUserId(int userId, string orderColumn, int? limit)
+        {
             var notes = new List<Note>();
 
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = @"
-                    SELECT note_id, user_id, title, content, created_at
+                string query = $@"
+                    SELECT note_id, user_id, title, content, created_at, updated_at
                     FROM notes
                     WHERE user_id = @userId
-                    ORDER BY created_at DESC";
+                    ORDER BY {orderColumn} DESC" + (limit.HasValue ? " LIMIT @limit" : "");
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
+                    if (limit.HasValue) cmd.Parameters.AddWithValue("@limit", limit.Value);
 
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -32,7 +44,8 @@ namespace PersonalFinanceApp.Data
                                 UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
                                 Title = reader.IsDBNull(reader.GetOrdinal("title")) ? string.Empty : reader.GetString(reader.GetOrdinal("title")),
                                 Content = reader.IsDBNull(reader.GetOrdinal("content")) ? string.Empty : reader.GetString(reader.GetOrdinal("content")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("updated_at"))
                             });
                         }
                     }
@@ -48,8 +61,8 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                    INSERT INTO notes (user_id, title, content, created_at)
-                    VALUES (@userId, @title, @content, @createdAt)
+                    INSERT INTO notes (user_id, title, content, created_at, updated_at)
+                    VALUES (@userId, @title, @content, @createdAt, @createdAt)
                     RETURNING note_id";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
@@ -69,12 +82,13 @@ namespace PersonalFinanceApp.Data
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "UPDATE notes SET title = @title, content = @content WHERE note_id = @noteId AND user_id = @userId";
+                string query = "UPDATE notes SET title = @title, content = @content, updated_at = @updatedAt WHERE note_id = @noteId AND user_id = @userId";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@title", title);
                     cmd.Parameters.AddWithValue("@content", content);
+                    cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow);
                     cmd.Parameters.AddWithValue("@noteId", noteId);
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.ExecuteNonQuery();
