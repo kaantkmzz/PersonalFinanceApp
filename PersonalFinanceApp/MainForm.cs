@@ -17,6 +17,8 @@ namespace PersonalFinanceApp
         private Button? _activeButton;
         private string? _activeMenuLabel;
         private System.Windows.Forms.Timer _reminderTimer = new System.Windows.Forms.Timer();
+        private readonly System.Windows.Forms.Timer _backgroundCheckTimer = new System.Windows.Forms.Timer();
+        private bool _backgroundCheckRunning = false;
         private bool _isLoggingOut = false;
         private readonly NotifyIcon _trayIcon = new NotifyIcon();
         private bool _trayHintShown = false;
@@ -105,6 +107,14 @@ namespace PersonalFinanceApp
             _reminderTimer.Interval = 30000;
             _reminderTimer.Tick += ReminderTimer_Tick;
             _reminderTimer.Start();
+
+            // Bütçe limiti, fiyat alarmı, tekrarlanan hedef katkısı gibi periyodik arka plan
+            // kontrolleri için ayrı bir zamanlayıcı — hatırlatıcı zamanlayıcısından ayrı tutuyoruz
+            // ki oradaki çalışan koda dokunmayalım. 60sn: fiyat/bütçe kontrolleri 30sn'lik
+            // hatırlatıcı kadar sık olmak zorunda değil.
+            _backgroundCheckTimer.Interval = 60000;
+            _backgroundCheckTimer.Tick += BackgroundCheckTimer_Tick;
+            _backgroundCheckTimer.Start();
 
             this.FormClosing += MainForm_FormClosing;
 
@@ -624,6 +634,7 @@ namespace PersonalFinanceApp
             if (_isLoggingOut || ExitRequested)
             {
                 _reminderTimer.Stop();
+                _backgroundCheckTimer.Stop();
                 _trayIcon.Visible = false;
                 _trayIcon.Dispose();
                 return;
@@ -644,8 +655,19 @@ namespace PersonalFinanceApp
 
             // Windows kapanıyor/oturum kapanıyor gibi diğer durumlarda normal şekilde kapan.
             _reminderTimer.Stop();
+            _backgroundCheckTimer.Stop();
             _trayIcon.Visible = false;
             _trayIcon.Dispose();
+        }
+
+        // Tepside tek bir balon bildirimi göstermenin tek noktası — hatırlatıcı, bütçe aşımı,
+        // fiyat alarmı, hedef tamamlanması gibi tüm arka plan bildirimleri bunu kullanır.
+        private void ShowTrayBalloon(string title, string text, int durationMs = 6000)
+        {
+            _trayIcon.BalloonTipTitle = title;
+            _trayIcon.BalloonTipText = text;
+            _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+            _trayIcon.ShowBalloonTip(durationMs);
         }
 
         private void ReminderTimer_Tick(object? sender, EventArgs e)
@@ -660,11 +682,26 @@ namespace PersonalFinanceApp
                     continue;
                 }
 
-                _trayIcon.BalloonTipTitle = "Hatırlatıcı";
-                _trayIcon.BalloonTipText = reminder.Title;
-                _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
-                _trayIcon.ShowBalloonTip(6000);
+                ShowTrayBalloon("Hatırlatıcı", reminder.Title);
                 reminderService.MarkAsNotified(reminder.Id, _user.Id);
+            }
+        }
+
+        // Bütçe limiti, fiyat alarmı, tekrarlanan hedef katkısı gibi periyodik arka plan
+        // kontrollerinin hepsi burada toplanır (her biri kendi fazında eklenir). async void
+        // tick handler'ı bir await noktasında mesaj döngüsüne kontrolü geri verdiği için,
+        // yavaş bir kontrol sürerken bir sonraki tick'in üst üste binmesini bu guard engeller.
+        private async void BackgroundCheckTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_backgroundCheckRunning) return;
+            _backgroundCheckRunning = true;
+            try
+            {
+                await Task.CompletedTask;
+            }
+            finally
+            {
+                _backgroundCheckRunning = false;
             }
         }
 
