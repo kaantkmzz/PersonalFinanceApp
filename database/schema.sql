@@ -8,6 +8,7 @@
 -- ALTER TABLE ile uygulanan her değişiklik burada da CREATE TABLE'a yansıtılır ve
 -- denetlenebilirlik için burada tarihleniyor):
 --   2026-08-21  categories.budget_limit eklendi (Faz 2 — kategori bütçe limiti)
+--   2026-08-21  categories.color, categories.icon eklendi (Faz 3 — kategori renk/ikon)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -39,6 +40,8 @@ CREATE TABLE categories (
     type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal', 'invest')),
     -- Aylık harcama limiti; sadece 'expense' tipi kategorilerde anlamlı, aşılınca tepsi bildirimi gösterilir.
     budget_limit NUMERIC(14,2),
+    color        VARCHAR(7),  -- "#RRGGBB"
+    icon         VARCHAR(10), -- tek bir emoji
     CONSTRAINT chk_budget_limit CHECK (budget_limit IS NULL OR (type = 'expense' AND budget_limit > 0))
 );
 

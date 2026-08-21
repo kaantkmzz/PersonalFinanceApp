@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Linq;
 using System.Collections.Generic;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -31,6 +32,9 @@ namespace PersonalFinanceApp
         private Control[] _budgetControls = Array.Empty<Control>();
         private Label lblStatus = new Label();
         private Category? _category;
+        private string? _selectedColor;
+        private ComboBox cmbIcon = new ComboBox();
+        private readonly List<Panel> _colorSwatches = new List<Panel>();
 
         public CategoryDetailsDialog(User user, int categoryId, string categoryName)
         {
@@ -111,6 +115,56 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnSaveBudget);
             _budgetControls = new Control[] { lblBudget, pnlBudget, btnSaveBudget };
 
+            // Renk + ikon seçimi, bütçe satırının sağında aynı yükseklikte.
+            Label lblColorIcon = new Label { Text = "Renk / İkon:", Left = 400, Top = 332, ForeColor = TextMuted, AutoSize = true };
+            this.Controls.Add(lblColorIcon);
+
+            const int swatchSize = 20, swatchGap = 4;
+            for (int i = 0; i < AvatarHelper.Palette.Length && i < 6; i++)
+            {
+                Color swatchColor = AvatarHelper.Palette[i];
+                string hex = AvatarHelper.ToHex(swatchColor);
+                Panel swatch = new Panel
+                {
+                    Left = 400 + i * (swatchSize + swatchGap),
+                    Top = 359,
+                    Width = swatchSize,
+                    Height = swatchSize,
+                    Cursor = Cursors.Hand,
+                    Tag = hex
+                };
+                swatch.Paint += (s, e) =>
+                {
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    e.Graphics.Clear(this.BackColor);
+                    bool isSelected = _selectedColor == hex;
+                    if (isSelected)
+                    {
+                        using var ring = new Pen(TextLight, 2f);
+                        e.Graphics.DrawEllipse(ring, 0, 0, swatch.Width - 1, swatch.Height - 1);
+                    }
+                    int inset = isSelected ? 4 : 1;
+                    using var brush = new SolidBrush(swatchColor);
+                    e.Graphics.FillEllipse(brush, inset, inset, swatch.Width - inset * 2, swatch.Height - inset * 2);
+                };
+                swatch.Click += (s, e) =>
+                {
+                    _selectedColor = (_selectedColor == hex) ? null : hex; // tekrar tıklayınca rengi kaldır
+                    foreach (var sw in _colorSwatches) sw.Invalidate();
+                    SaveColorIcon();
+                };
+                _colorSwatches.Add(swatch);
+                this.Controls.Add(swatch);
+            }
+
+            cmbIcon.Left = 545; cmbIcon.Top = 355; cmbIcon.Width = 115; cmbIcon.Height = 36;
+            cmbIcon.Font = new Font("Segoe UI Emoji", 11F); cmbIcon.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbIcon.Items.Add("(yok)");
+            foreach (var icon in CategoryService.IconOptions) cmbIcon.Items.Add(icon);
+            cmbIcon.SelectedIndex = 0;
+            cmbIcon.SelectedIndexChanged += (s, e) => SaveColorIcon();
+            this.Controls.Add(cmbIcon);
+
             // Alt Kısım: Yeniden Adlandırma ve Silme (Eski Kategoriler ekranından taşındı)
             Panel pnlRename = new Panel { Left = 20, Top = 410, Width = 200, Height = 36 };
             SetupSmoothContainer(pnlRename, 8, CardBackColor);
@@ -140,8 +194,12 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblStatus);
         }
 
+        private bool _loadingCategoryInfo;
+
         private void LoadCategoryInfo()
         {
+            _loadingCategoryInfo = true;
+
             _category = _categoryService.GetUserCategories(_user.Id).FirstOrDefault(c => c.Id == _categoryId);
 
             bool isExpense = _category?.Type == "expense";
@@ -151,6 +209,26 @@ namespace PersonalFinanceApp
             {
                 txtBudgetLimit.Text = _category.BudgetLimit.Value.ToString("0.##");
             }
+
+            _selectedColor = _category?.Color;
+            foreach (var sw in _colorSwatches) sw.Invalidate();
+
+            int iconIndex = 0;
+            if (!string.IsNullOrEmpty(_category?.Icon))
+            {
+                int found = Array.IndexOf(CategoryService.IconOptions, _category.Icon);
+                if (found >= 0) iconIndex = found + 1; // "(yok)" ilk sırada
+            }
+            cmbIcon.SelectedIndex = iconIndex;
+
+            _loadingCategoryInfo = false;
+        }
+
+        private void SaveColorIcon()
+        {
+            if (_loadingCategoryInfo) return;
+            string? icon = cmbIcon.SelectedIndex > 0 ? cmbIcon.SelectedItem?.ToString() : null;
+            _categoryService.SetColorIcon(_categoryId, _user.Id, _selectedColor, icon);
         }
 
         private void BtnSaveBudget_Click(object? sender, EventArgs e)

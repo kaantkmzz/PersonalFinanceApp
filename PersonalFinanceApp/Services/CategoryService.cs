@@ -92,6 +92,17 @@ namespace PersonalFinanceApp.Services
             _repository.SetBudgetLimit(categoryId, userId, budgetLimit);
             return true;
         }
+
+        // Kategori ekleme/düzenleme ekranlarında kullanıcının seçebileceği sabit ikon listesi.
+        public static readonly string[] IconOptions =
+        {
+            "🛒", "🍔", "🏠", "🚗", "⚡", "📱", "🎬", "💊", "👕", "✈️", "🎓", "💰", "📈", "🎁", "☕", "🐾"
+        };
+
+        public void SetColorIcon(int categoryId, int userId, string? color, string? icon)
+        {
+            _repository.SetColorIcon(categoryId, userId, color, icon);
+        }
         // İsme göre kategori arar; yoksa otomatik oluşturur (kullanıcı serbestçe kategori adı yazabilsin diye)
         public Category GetOrCreateCategory(int userId, string name, string type)
         {

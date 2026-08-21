@@ -224,12 +224,46 @@ namespace PersonalFinanceApp
 
         private void DgvCategories_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex >= 0 && e.ColumnIndex > 0 && e.ColumnIndex < dgvCategories.ColumnCount)
+            if (e.RowIndex < 0 || e.ColumnIndex <= 0 || e.ColumnIndex >= dgvCategories.ColumnCount) return;
+
+            bool isAdColumn = dgvCategories.Columns[e.ColumnIndex].Name == "Ad";
+            if (isAdColumn)
+            {
+                string renkHex = dgvCategories.Rows[e.RowIndex].Cells["RenkHex"]?.Value?.ToString() ?? "";
+                string ikon = dgvCategories.Rows[e.RowIndex].Cells["IkonEmoji"]?.Value?.ToString() ?? "";
+
+                e.PaintBackground(e.CellBounds, true);
+                e.Graphics!.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                int textLeft = e.CellBounds.Left + 8;
+
+                if (!string.IsNullOrEmpty(renkHex))
+                {
+                    Color dotColor = AvatarHelper.ParseColor(renkHex, TextMuted);
+                    int dotSize = 10;
+                    int dotTop = e.CellBounds.Top + (e.CellBounds.Height - dotSize) / 2;
+                    using (var brush = new SolidBrush(dotColor))
+                        e.Graphics.FillEllipse(brush, textLeft, dotTop, dotSize, dotSize);
+                    textLeft += dotSize + 6;
+                }
+
+                if (!string.IsNullOrEmpty(ikon))
+                {
+                    var iconRect = new Rectangle(textLeft, e.CellBounds.Top, 24, e.CellBounds.Height);
+                    TextRenderer.DrawText(e.Graphics, ikon, new Font("Segoe UI Emoji", 9.5F), iconRect, TextLight, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                    textLeft += 22;
+                }
+
+                var textRect = new Rectangle(textLeft, e.CellBounds.Top, e.CellBounds.Right - textLeft, e.CellBounds.Height);
+                TextRenderer.DrawText(e.Graphics, e.Value?.ToString() ?? "", e.CellStyle!.Font, textRect, e.CellStyle.ForeColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            }
+            else
             {
                 e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (Pen p = new Pen(AppTheme.RowSeparatorColor, 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
-                e.Handled = true;
             }
+
+            using (Pen p = new Pen(AppTheme.RowSeparatorColor, 1)) { e.Graphics!.DrawLine(p, e.CellBounds.Left, e.CellBounds.Top + 10, e.CellBounds.Left, e.CellBounds.Bottom - 10); }
+            e.Handled = true;
         }
 
         private void DgvCategories_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
@@ -280,7 +314,9 @@ namespace PersonalFinanceApp
                     ? ""
                     : _user.HideAmountsEnabled
                         ? "••• / •••"
-                        : $"{(monthlyExpense.TryGetValue(c.Id, out decimal spent) ? spent : 0).ToString("#,##0", tr)} / {c.BudgetLimit.Value.ToString("#,##0", tr)} ₺"
+                        : $"{(monthlyExpense.TryGetValue(c.Id, out decimal spent) ? spent : 0).ToString("#,##0", tr)} / {c.BudgetLimit.Value.ToString("#,##0", tr)} ₺",
+                RenkHex = c.Color ?? "",
+                IkonEmoji = c.Icon ?? ""
             }).ToList();
 
             dgvCategories.DataSource = displayList;
@@ -292,6 +328,8 @@ namespace PersonalFinanceApp
                 dgvCategories.Columns["ToplamTutar"]!.HeaderText = "Toplam Tutar";
                 dgvCategories.Columns["Butce"]!.FillWeight = 70;
                 dgvCategories.Columns["Butce"]!.HeaderText = "Bu Ayki Bütçe";
+                dgvCategories.Columns["RenkHex"]!.Visible = false;
+                dgvCategories.Columns["IkonEmoji"]!.Visible = false;
             }
         }
 

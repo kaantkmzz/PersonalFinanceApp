@@ -12,7 +12,7 @@ namespace PersonalFinanceApp.Data
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "SELECT category_id, user_id, name, type, budget_limit FROM categories WHERE user_id = @userId ORDER BY type, name";
+                string query = "SELECT category_id, user_id, name, type, budget_limit, color, icon FROM categories WHERE user_id = @userId ORDER BY type, name";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
@@ -23,13 +23,17 @@ namespace PersonalFinanceApp.Data
                         while (reader.Read())
                         {
                             int budgetLimitOrdinal = reader.GetOrdinal("budget_limit");
+                            int colorOrdinal = reader.GetOrdinal("color");
+                            int iconOrdinal = reader.GetOrdinal("icon");
                             categories.Add(new Category
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("category_id")),
                                 UserId = reader.GetInt32(reader.GetOrdinal("user_id")),
                                 Name = reader.GetString(reader.GetOrdinal("name")),
                                 Type = reader.GetString(reader.GetOrdinal("type")),
-                                BudgetLimit = reader.IsDBNull(budgetLimitOrdinal) ? null : reader.GetDecimal(budgetLimitOrdinal)
+                                BudgetLimit = reader.IsDBNull(budgetLimitOrdinal) ? null : reader.GetDecimal(budgetLimitOrdinal),
+                                Color = reader.IsDBNull(colorOrdinal) ? null : reader.GetString(colorOrdinal),
+                                Icon = reader.IsDBNull(iconOrdinal) ? null : reader.GetString(iconOrdinal)
                             });
                         }
                     }
@@ -124,6 +128,24 @@ namespace PersonalFinanceApp.Data
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@budgetLimit", (object?)budgetLimit ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@categoryId", categoryId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void SetColorIcon(int categoryId, int userId, string? color, string? icon)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE categories SET color = @color, icon = @icon WHERE category_id = @categoryId AND user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@color", (object?)color ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@icon", (object?)icon ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@categoryId", categoryId);
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.ExecuteNonQuery();
