@@ -21,6 +21,7 @@ namespace PersonalFinanceApp
         private static Color TextLight => AppTheme.TextLight;
         private static Color TextMuted => AppTheme.TextMuted;
         private static Color AccentColor => AppTheme.AccentColor;
+        private static Color DangerColor => AppTheme.DangerColor;
 
         private Panel pnlTop = new Panel();
         private Panel pnlGrid = new Panel();
@@ -42,6 +43,15 @@ namespace PersonalFinanceApp
 
         private DataGridView dgvTransactions = new DataGridView();
         private List<Transaction> _cachedTransactions = new List<Transaction>();
+
+        private CheckBox chkDateFilter = new CheckBox();
+        private DateTimePicker dtpStart = new DateTimePicker();
+        private DateTimePicker dtpEnd = new DateTimePicker();
+
+        private Button btnBulkMode = new Button();
+        private Button btnBulkDelete = new Button();
+        private Button btnBulkCategory = new Button();
+        private bool _bulkModeActive = false;
 
         public TransactionControl(User user)
         {
@@ -112,6 +122,24 @@ namespace PersonalFinanceApp
             txtDescription.BackColor = CardBackColor; txtDescription.ForeColor = TextLight;
             pnlDesc.Controls.Add(txtDescription);
 
+            // Tarih Aralığı Filtresi (Tip/Kategori/Tutar satırının sağında, aynı hizada)
+            chkDateFilter.Text = "Tarih Aralığı"; chkDateFilter.ForeColor = TextMuted; chkDateFilter.Left = 540; chkDateFilter.Top = 75; chkDateFilter.AutoSize = true;
+            chkDateFilter.CheckedChanged += (s, e) =>
+            {
+                dtpStart.Enabled = dtpEnd.Enabled = chkDateFilter.Checked;
+                RefreshGrid();
+            };
+
+            dtpStart.Left = 540; dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Format = DateTimePickerFormat.Short; dtpStart.Enabled = false;
+            dtpStart.Value = DateTime.Today.AddMonths(-1);
+            dtpStart.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
+
+            Label lblDateSep = new Label { Text = "—", Left = 690, Top = 106, ForeColor = TextMuted, AutoSize = true };
+
+            dtpEnd.Left = 705; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Format = DateTimePickerFormat.Short; dtpEnd.Enabled = false;
+            dtpEnd.Value = DateTime.Today;
+            dtpEnd.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
+
             btnAdd.Text = "➕ İşlem Ekle";
             btnAdd.Left = 540;
             btnAdd.Top = 175;
@@ -147,6 +175,7 @@ namespace PersonalFinanceApp
             pnlTop.Controls.Add(lblType); pnlTop.Controls.Add(pnlType);
             pnlTop.Controls.Add(lblCategory); pnlTop.Controls.Add(pnlCategory);
             pnlTop.Controls.Add(lblAmount); pnlTop.Controls.Add(pnlAmount);
+            pnlTop.Controls.Add(chkDateFilter); pnlTop.Controls.Add(dtpStart); pnlTop.Controls.Add(lblDateSep); pnlTop.Controls.Add(dtpEnd);
             pnlTop.Controls.Add(lblDescription); pnlTop.Controls.Add(pnlDesc);
             pnlTop.Controls.Add(btnAdd);
             pnlTop.Controls.Add(lblSearch); pnlTop.Controls.Add(pnlSearch); pnlTop.Controls.Add(btnSearch);
@@ -222,7 +251,29 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnRecurring, Color.FromArgb(80, 85, 105), Color.White, false);
             btnRecurring.Click += (s, e) => { using (var dialog = new RecurringTransactionDialog(_user)) { dialog.ShowDialog(); } LoadTransactions(); };
 
+            btnBulkMode.Top = 20; btnBulkMode.Height = 38; btnBulkMode.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnBulkMode, Color.FromArgb(80, 85, 105), Color.White, false);
+            btnBulkMode.Click += BtnBulkMode_Click;
+
+            btnBulkDelete.Text = "🗑️ Seçilenleri Sil";
+            btnBulkDelete.Top = 20; btnBulkDelete.Height = 38; btnBulkDelete.Cursor = Cursors.Hand;
+            btnBulkDelete.Width = TextRenderer.MeasureText(btnBulkDelete.Text, btnBulkDelete.Font).Width + 44;
+            SetupRoundedButton(btnBulkDelete, DangerColor, Color.White, false);
+            btnBulkDelete.Click += BtnBulkDelete_Click;
+            btnBulkDelete.Visible = false;
+
+            btnBulkCategory.Text = "🔀 Kategori Değiştir";
+            btnBulkCategory.Top = 20; btnBulkCategory.Height = 38; btnBulkCategory.Cursor = Cursors.Hand;
+            btnBulkCategory.Width = TextRenderer.MeasureText(btnBulkCategory.Text, btnBulkCategory.Font).Width + 44;
+            SetupRoundedButton(btnBulkCategory, Color.FromArgb(80, 85, 105), Color.White, false);
+            btnBulkCategory.Click += BtnBulkCategory_Click;
+            btnBulkCategory.Visible = false;
+
+            SetBulkModeButtonText();
+            PositionBottomButtons();
+
             pnlBottom.Controls.Add(btnExport); pnlBottom.Controls.Add(btnRecurring);
+            pnlBottom.Controls.Add(btnBulkMode); pnlBottom.Controls.Add(btnBulkDelete); pnlBottom.Controls.Add(btnBulkCategory);
 
             this.Controls.Add(pnlGrid); this.Controls.Add(pnlBottom); this.Controls.Add(pnlTop);
         }
@@ -263,12 +314,22 @@ namespace PersonalFinanceApp
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
             string searchText = txtSearch.Text.Trim();
-            var visibleTransactions = string.IsNullOrEmpty(searchText)
+            IEnumerable<Transaction> visibleTransactions = string.IsNullOrEmpty(searchText)
                 ? _cachedTransactions
                 : _cachedTransactions.Where(t =>
                     tr.CompareInfo.IndexOf(t.CategoryName ?? string.Empty, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0 ||
                     tr.CompareInfo.IndexOf(t.Description ?? string.Empty, searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0
-                  ).ToList();
+                  );
+
+            // Satır bazlı tarih-aralığı sorgusu repository'de yok (sadece toplam/kategori kırılımı
+            // sorgusu var, bkz. Rapor ekranı) — mevcut arama filtresi deseniyle tutarlı olsun diye
+            // burada da bellek-içi (in-memory) filtreliyoruz.
+            if (chkDateFilter.Checked)
+            {
+                DateTime start = dtpStart.Value.Date;
+                DateTime end = dtpEnd.Value.Date.AddDays(1);
+                visibleTransactions = visibleTransactions.Where(t => t.TransactionDate >= start && t.TransactionDate < end);
+            }
 
             // Tarih sütununu Açıklama'nın hemen önüne aldık
             var displayList = visibleTransactions.Select(t => new
@@ -386,6 +447,102 @@ namespace PersonalFinanceApp
                     }
                     catch (Exception ex) { lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Text = $"Dışa aktarma başarısız: {ex.Message}"; }
                 }
+            }
+        }
+
+        private void SetBulkModeButtonText()
+        {
+            btnBulkMode.Text = _bulkModeActive ? "✖️ Toplu İşlemi Kapat" : "☑️ Toplu İşlem";
+            btnBulkMode.Width = TextRenderer.MeasureText(btnBulkMode.Text, btnBulkMode.Font).Width + 44;
+        }
+
+        // btnBulkMode'un metni (dolayısıyla genişliği) moda göre değiştiği için, sağındaki
+        // butonların konumu her toggle'da yeniden hesaplanır.
+        private void PositionBottomButtons()
+        {
+            btnBulkMode.Left = btnRecurring.Left + btnRecurring.Width + 20;
+            btnBulkDelete.Left = btnBulkMode.Left + btnBulkMode.Width + 20;
+            btnBulkCategory.Left = btnBulkDelete.Left + btnBulkDelete.Width + 20;
+        }
+
+        // Arama kutusu her keystroke'ta dgvTransactions.DataSource'u yeniden bağlayıp seçimi
+        // sessizce sıfırlıyor; toplu seçim sırasında bu şaşırtıcı olacağından, toplu mod açıkken
+        // aramayı devre dışı bırakmak en basit ve güvenli çözüm.
+        private void BtnBulkMode_Click(object? sender, EventArgs e)
+        {
+            _bulkModeActive = !_bulkModeActive;
+            dgvTransactions.MultiSelect = _bulkModeActive;
+            txtSearch.Enabled = !_bulkModeActive;
+            btnSearch.Enabled = !_bulkModeActive;
+            btnBulkDelete.Visible = _bulkModeActive;
+            btnBulkCategory.Visible = _bulkModeActive;
+            SetBulkModeButtonText();
+            PositionBottomButtons();
+
+            if (!_bulkModeActive) dgvTransactions.ClearSelection();
+        }
+
+        private void BtnBulkDelete_Click(object? sender, EventArgs e)
+        {
+            if (dgvTransactions.SelectedRows.Count == 0)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Lütfen en az bir işlem seçin.";
+                return;
+            }
+
+            var confirm = MessageBox.Show($"{dgvTransactions.SelectedRows.Count} işlemi silmek istediğinize emin misiniz?", "Onay",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes) return;
+
+            var selectedIds = dgvTransactions.SelectedRows.Cast<DataGridViewRow>()
+                .Select(r => Convert.ToInt32(r.Cells["ID"].Value)).ToList();
+
+            int deleted = 0;
+            foreach (var id in selectedIds)
+            {
+                if (_transactionService.DeleteTransaction(id, _user.Id, out _)) deleted++;
+            }
+
+            lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+            lblStatus.Text = $"{deleted} işlem silindi.";
+            LoadTransactions();
+        }
+
+        private void BtnBulkCategory_Click(object? sender, EventArgs e)
+        {
+            if (dgvTransactions.SelectedRows.Count == 0)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Lütfen en az bir işlem seçin.";
+                return;
+            }
+
+            var selectedIds = dgvTransactions.SelectedRows.Cast<DataGridViewRow>()
+                .Select(r => Convert.ToInt32(r.Cells["ID"].Value)).ToList();
+            var selectedTx = _cachedTransactions.Where(t => selectedIds.Contains(t.Id)).ToList();
+
+            var distinctTypes = selectedTx.Select(t => t.Type).Distinct().ToList();
+            if (distinctTypes.Count > 1 || (distinctTypes.Count == 1 && distinctTypes[0] != "income" && distinctTypes[0] != "expense"))
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Toplu kategori değişikliği için aynı tipte (gelir/gider) işlemler seçin.";
+                return;
+            }
+
+            string type = distinctTypes[0];
+            using var dialog = new BulkCategoryDialog(_user, type);
+            if (dialog.ShowDialog() == DialogResult.OK && dialog.SelectedCategoryId.HasValue)
+            {
+                int updated = 0;
+                foreach (var t in selectedTx)
+                {
+                    if (_transactionService.UpdateTransaction(t.Id, _user.Id, dialog.SelectedCategoryId.Value, t.Amount, t.Type, t.Description, t.TransactionDate, out _))
+                        updated++;
+                }
+                lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                lblStatus.Text = $"{updated} işlemin kategorisi değiştirildi.";
+                LoadTransactions();
             }
         }
 
