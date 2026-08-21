@@ -150,7 +150,18 @@ namespace PersonalFinanceApp
             {
                 if (e.Button == MouseButtons.Left) RestoreFromTray();
             };
-            _trayIcon.BalloonTipClicked += (s, e) => RestoreFromTray();
+            _trayIcon.BalloonTipClicked += (s, e) =>
+            {
+                RestoreFromTray();
+                if (_lastReminderBalloonDate.HasValue)
+                {
+                    var date = _lastReminderBalloonDate.Value;
+                    _lastReminderBalloonDate = null;
+                    NavigateTo("Hatırlatıcılar");
+                    using var dialog = new ReminderDayDialog(_user, date);
+                    dialog.ShowDialog();
+                }
+            };
         }
 
         private void HideToTray()
@@ -679,6 +690,11 @@ namespace PersonalFinanceApp
             _trayIcon.ShowBalloonTip(durationMs);
         }
 
+        // BalloonTipClicked, tepside o an hangi hatırlatıcının gösterildiğini bilemediği için
+        // (Windows API balon tıklamasında veri taşımıyor) son gösterilen hatırlatıcının tarihini
+        // burada saklıyoruz; tıklanınca o günün ReminderDayDialog'u açılabiliyor.
+        private DateTime? _lastReminderBalloonDate;
+
         private void ReminderTimer_Tick(object? sender, EventArgs e)
         {
             var reminderService = new ReminderService();
@@ -691,8 +707,9 @@ namespace PersonalFinanceApp
                     continue;
                 }
 
+                _lastReminderBalloonDate = reminder.ReminderDate.Date;
                 ShowTrayBalloon("Hatırlatıcı", reminder.Title);
-                reminderService.MarkAsNotified(reminder.Id, _user.Id);
+                reminderService.AdvanceOrMarkNotified(reminder);
             }
         }
 

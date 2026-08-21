@@ -9,5 +9,6 @@
         public bool IsCompleted { get; set; }
         public bool IsNotified { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string? Recurrence { get; set; } // null, "daily", "weekly", "monthly"
     }
 }

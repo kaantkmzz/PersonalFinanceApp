@@ -13,7 +13,7 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                SELECT reminder_id, user_id, title, reminder_date, is_completed, is_notified, created_at
+                SELECT reminder_id, user_id, title, reminder_date, is_completed, is_notified, created_at, recurrence
                 FROM reminders
                 WHERE user_id = @userId
                 ORDER BY reminder_date ASC";
@@ -26,6 +26,7 @@ namespace PersonalFinanceApp.Data
                     {
                         while (reader.Read())
                         {
+                            int recurrenceOrdinal = reader.GetOrdinal("recurrence");
                             reminders.Add(new Reminder
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("reminder_id")),
@@ -34,7 +35,8 @@ namespace PersonalFinanceApp.Data
                                 ReminderDate = reader.GetDateTime(reader.GetOrdinal("reminder_date")),
                                 IsCompleted = reader.GetBoolean(reader.GetOrdinal("is_completed")),
                                 IsNotified = reader.GetBoolean(reader.GetOrdinal("is_notified")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                Recurrence = reader.IsDBNull(recurrenceOrdinal) ? null : reader.GetString(recurrenceOrdinal)
                             });
                         }
                     }
@@ -50,8 +52,8 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                    INSERT INTO reminders (user_id, title, reminder_date, is_completed, created_at)
-                    VALUES (@userId, @title, @reminderDate, FALSE, @createdAt)
+                    INSERT INTO reminders (user_id, title, reminder_date, is_completed, created_at, recurrence)
+                    VALUES (@userId, @title, @reminderDate, FALSE, @createdAt, @recurrence)
                     RETURNING reminder_id";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
@@ -60,6 +62,7 @@ namespace PersonalFinanceApp.Data
                     cmd.Parameters.AddWithValue("@title", reminder.Title);
                     cmd.Parameters.AddWithValue("@reminderDate", reminder.ReminderDate);
                     cmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow);
+                    cmd.Parameters.AddWithValue("@recurrence", (object?)reminder.Recurrence ?? DBNull.Value);
 
                     return (int)(cmd.ExecuteScalar() ?? 0);
                 }
@@ -114,6 +117,26 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        // Tekrarlanan hatırlatıcı bir sonraki oluşuma ilerletildiğinde (otomatik bildirim sonrası,
+        // manuel "Tamamlandı" işaretlemesinde veya "ertele" ile) kullanılır: tarihi günceller ve
+        // is_notified'ı sıfırlar ki seri devam etsin/tekrar bildirilebilsin.
+        public void RescheduleAndUnnotify(int reminderId, int userId, DateTime newDate)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE reminders SET reminder_date = @newDate, is_notified = FALSE WHERE reminder_id = @reminderId AND user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@newDate", newDate);
+                    cmd.Parameters.AddWithValue("@reminderId", reminderId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // Zamanı gelmiş ama henüz bildirimi gösterilmemiş, tamamlanmamış hatırlatıcıları getirir
         public List<Reminder> GetDueUnnotified(int userId, DateTime now)
         {
@@ -123,7 +146,7 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-            SELECT reminder_id, user_id, title, reminder_date, is_completed, is_notified, created_at
+            SELECT reminder_id, user_id, title, reminder_date, is_completed, is_notified, created_at, recurrence
             FROM reminders
             WHERE user_id = @userId AND reminder_date <= @now AND is_notified = FALSE AND is_completed = FALSE";
 
@@ -136,6 +159,7 @@ namespace PersonalFinanceApp.Data
                     {
                         while (reader.Read())
                         {
+                            int recurrenceOrdinal = reader.GetOrdinal("recurrence");
                             reminders.Add(new Reminder
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("reminder_id")),
@@ -144,7 +168,8 @@ namespace PersonalFinanceApp.Data
                                 ReminderDate = reader.GetDateTime(reader.GetOrdinal("reminder_date")),
                                 IsCompleted = reader.GetBoolean(reader.GetOrdinal("is_completed")),
                                 IsNotified = reader.GetBoolean(reader.GetOrdinal("is_notified")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                Recurrence = reader.IsDBNull(recurrenceOrdinal) ? null : reader.GetString(recurrenceOrdinal)
                             });
                         }
                     }

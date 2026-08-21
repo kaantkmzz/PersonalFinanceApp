@@ -12,6 +12,7 @@
 --   2026-08-21  asset_price_alerts tablosu eklendi (Faz 4 — varlık fiyat alarmı)
 --   2026-08-21  asset_transactions.realized_pl_try eklendi (Faz 5 — gerçekleşen kâr/zarar)
 --   2026-08-21  savings_goals.due_date/recurring_frequency/recurring_amount/last_contribution_date eklendi (Faz 6 — hedef tarihi + otomatik katkı)
+--   2026-08-21  reminders.recurrence eklendi (Faz 7 — tekrarlanan hatırlatıcı + ertele)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -113,7 +114,8 @@ CREATE TABLE reminders (
     reminder_date   TIMESTAMP NOT NULL,
     is_completed    BOOLEAN NOT NULL DEFAULT FALSE,
     is_notified     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    recurrence      VARCHAR(10) -- null, 'daily', 'weekly', 'monthly'
 );
 
 CREATE TABLE transfer_history (
