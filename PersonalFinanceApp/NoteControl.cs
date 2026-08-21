@@ -31,6 +31,8 @@ namespace PersonalFinanceApp
         private Button btnSave = new Button();
         private Button btnDelete = new Button();
         private Label lblStatus = new Label();
+        private TextBox txtSearch = new TextBox();
+        private Button btnSearch = new Button();
 
         protected override CreateParams CreateParams
         {
@@ -99,12 +101,24 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnNew, AccentColor, Color.White, false);
             btnNew.Click += BtnNew_Click;
 
+            Label lblSearch = new Label { Text = "Ara:", Left = 20, Top = 108, ForeColor = TextMuted, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 20, Top = 130, Width = 340, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.BorderStyle = BorderStyle.None; txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.Location = new Point(10, 8); txtSearch.Width = 320;
+            txtSearch.TextChanged += (s, e) => LoadNotes();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍"; btnSearch.Left = 370; btnSearch.Top = 130; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White, false);
+            btnSearch.Click += (s, e) => LoadNotes();
+
             Panel pnlGridWrapper = new Panel
             {
                 Left = 20,
-                Top = 115,
+                Top = 176,
                 Width = 420,
-                Height = 600,
+                Height = 539,
                 Padding = new Padding(2, 6, 2, 6)
             };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -149,6 +163,9 @@ namespace PersonalFinanceApp
 
             pnlLeft.Controls.Add(lblTitle);
             pnlLeft.Controls.Add(btnNew);
+            pnlLeft.Controls.Add(lblSearch);
+            pnlLeft.Controls.Add(pnlSearch);
+            pnlLeft.Controls.Add(btnSearch);
             pnlLeft.Controls.Add(pnlGridWrapper);
 
             // --- Sağ panel: not düzenleme alanı ---
@@ -350,7 +367,16 @@ namespace PersonalFinanceApp
         {
             _cachedNotes = _noteService.GetUserNotes(_user.Id);
 
-            var displayList = _cachedNotes.Select(n => new
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            string searchText = txtSearch.Text.Trim();
+            var visibleNotes = string.IsNullOrEmpty(searchText)
+                ? _cachedNotes
+                : _cachedNotes.Where(n =>
+                    tr.CompareInfo.IndexOf(n.Title ?? "", searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0 ||
+                    tr.CompareInfo.IndexOf(n.Content ?? "", searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0
+                  ).ToList();
+
+            var displayList = visibleNotes.Select(n => new
             {
                 ID = n.Id,
                 Başlık = string.IsNullOrWhiteSpace(n.Title) ? "(Başlıksız)" : n.Title,
