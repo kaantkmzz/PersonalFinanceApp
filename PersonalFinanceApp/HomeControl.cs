@@ -15,6 +15,8 @@ namespace PersonalFinanceApp
         private readonly ReportService _reportService = new ReportService();
         private readonly SavingsGoalService _savingsGoalService = new SavingsGoalService();
         private readonly NoteService _noteService = new NoteService();
+        private readonly CategoryService _categoryService = new CategoryService();
+        private readonly RecurringTransactionService _recurringTransactionService = new RecurringTransactionService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -63,6 +65,8 @@ namespace PersonalFinanceApp
             new WidgetDef { Key = "report", Title = "Bu Ayın Özeti", ColSpan = 1 },
             new WidgetDef { Key = "transactions", Title = "Son İşlemler", ColSpan = 1 },
             new WidgetDef { Key = "goals", Title = "Hedeflerim", ColSpan = 1 },
+            new WidgetDef { Key = "cashflow", Title = "Nakit Akışı Tahmini", ColSpan = 1 },
+            new WidgetDef { Key = "quickadd", Title = "Hızlı İşlem Ekle", ColSpan = 1 },
         };
 
         private const int GridCols = 4;
@@ -74,9 +78,10 @@ namespace PersonalFinanceApp
         // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget).
         private readonly HashSet<int> _highlightedCells = new HashSet<int>();
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
-        // 6 widget toplamda tam olarak 8 hücreyi (3+1+1+1+1+1) dolduruyor — 3. bir satır hiçbir zaman
-        // gerekmiyordu ve her zaman boş bir alan olarak kalıyordu (bkz. kullanıcı geri bildirimi);
-        // bunun yerine mevcut 2 satır yukarı (bkz. MiniRowTop) kaydırılarak boşluk giderildi.
+        // Izgara 8 hücrelik (2 satır × 4 sütun, bkz. MiniRowTop) — katalogdaki widget sayısı bunu
+        // aşabilir (kullanıcı hepsini aynı anda yerleştirmek zorunda değil, + panelinden istediği
+        // kadarını sürükleyip bırakır, bkz. BuildWidgetPickerRows). Üçüncü bir satır eskiden vardı;
+        // butonların altındaki kullanılmayan boşluk ilk satır olarak da widget alabildiğinden kaldırıldı.
         private readonly Panel[] _cellPanels = new Panel[8];
         private Button btnAddWidget = new Button();
         private Panel pnlWidgetPicker = new Panel();
@@ -267,6 +272,8 @@ namespace PersonalFinanceApp
         private Panel pnlMiniReportWidget = new Panel();
         private Panel pnlRecentTxWidget = new Panel();
         private Panel pnlGoalsWidget = new Panel();
+        private Panel pnlCashflowWidget = new Panel();
+        private Panel pnlQuickAddWidget = new Panel();
 
         private void SetupMiniWidgets()
         {
@@ -274,6 +281,11 @@ namespace PersonalFinanceApp
             pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "Bu Ayın Özeti", "Rapor");
             pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "Son İşlemler", "İşlemler");
             pnlGoalsWidget = CreateWidgetCard(CardLeft4, "Hedeflerim", "Hedefler");
+            // Bu ikisi kendi başlığını Load* metodunda kendi çiziyor (Varlık Bildirimleri/Notlar ile
+            // aynı desen) — "quickadd" tıklanabilir olmamalı (içinde kendi etkileşimli denetimleri var,
+            // bkz. LoadQuickAddWidget), bu yüzden CreateWidgetCard'ın MakeClickable'ını kullanmıyoruz.
+            SetupSmoothContainer(pnlCashflowWidget, 16, CardBackColor);
+            SetupSmoothContainer(pnlQuickAddWidget, 16, CardBackColor);
         }
 
         // --- Widget ızgarası: 4 sütun × 2 satır, sürükle-bırakla düzenlenebilir ---
@@ -286,6 +298,8 @@ namespace PersonalFinanceApp
             "report" => pnlMiniReportWidget,
             "transactions" => pnlRecentTxWidget,
             "goals" => pnlGoalsWidget,
+            "cashflow" => pnlCashflowWidget,
+            "quickadd" => pnlQuickAddWidget,
             _ => throw new ArgumentException($"Bilinmeyen widget anahtarı: {key}")
         };
 
@@ -299,6 +313,8 @@ namespace PersonalFinanceApp
                 case "report": LoadMiniReportWidget(); break;
                 case "transactions": LoadRecentTransactionsWidget(); break;
                 case "goals": LoadGoalsWidget(); break;
+                case "cashflow": LoadCashflowWidget(); break;
+                case "quickadd": LoadQuickAddWidget(); break;
             }
         }
 
@@ -1186,6 +1202,246 @@ namespace PersonalFinanceApp
             return bar;
         }
 
+        // Aktif tekrarlayan işlemlerin sıklığına göre önümüzdeki 30 günün yaklaşık net etkisini
+        // (Cüzdan+Kasa üzerinden) hesaplayıp tahmini bakiyeyi gösterir. "goal"/"invest" tipinde
+        // tekrarlayan işlem yok (bkz. RecurringTransactionDialog, sadece income/expense üretiyor),
+        // bu yüzden yalnızca bu ikisi cüzdanı etkiler.
+        private void LoadCashflowWidget()
+        {
+            ClearWidgetContent(pnlCashflowWidget);
+
+            Action goToTransactions = () => _onNavigate?.Invoke("İşlemler");
+
+            Label lblHeader = new Label
+            {
+                Text = "📅 Nakit Akışı Tahmini",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 18,
+                Top = 14,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlCashflowWidget.Controls.Add(lblHeader);
+            MakeClickable(lblHeader, goToTransactions);
+
+            Label lblSub = new Label
+            {
+                Text = "30 gün sonrası tahmini bakiye",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = TextMuted,
+                Left = 18,
+                Top = 44,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlCashflowWidget.Controls.Add(lblSub);
+            MakeClickable(lblSub, goToTransactions);
+
+            var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            decimal currentTotal = wallet + safe;
+
+            var activeRecurring = _recurringTransactionService.GetUserRecurring(_user.Id).Where(r => r.IsActive).ToList();
+
+            decimal expectedIncome = 0, expectedExpense = 0;
+            foreach (var r in activeRecurring)
+            {
+                int occurrences = r.Frequency switch
+                {
+                    "daily" => 30,
+                    "weekly" => 30 / 7,
+                    _ => 1 // "monthly"
+                };
+                if (r.Type == "income") expectedIncome += r.Amount * occurrences;
+                else if (r.Type == "expense") expectedExpense += r.Amount * occurrences;
+            }
+
+            decimal projected = currentTotal + expectedIncome - expectedExpense;
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            Label lblProjected = new Label
+            {
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
+                ForeColor = projected >= currentTotal ? IncomeColor : ExpenseColor,
+                Left = 18,
+                Top = 66,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlCashflowWidget.Controls.Add(lblProjected);
+            MakeClickable(lblProjected, goToTransactions);
+            AnimateLabelValue(lblProjected, projected, v => v.ToString("#,##0", tr) + " ₺", hiddenText: "••••••");
+
+            if (activeRecurring.Count == 0)
+            {
+                AddWidgetLine(pnlCashflowWidget, "Aktif tekrarlayan işlem yok.", 112, TextMuted, 18, goToTransactions);
+                return;
+            }
+
+            Label lblIncome = AddWidgetLine(pnlCashflowWidget, "Beklenen Gelir: +0 ₺", 112, IncomeColor, 18, goToTransactions);
+            Label lblExpense = AddWidgetLine(pnlCashflowWidget, "Beklenen Gider: -0 ₺", 142, ExpenseColor, 18, goToTransactions);
+            AnimateLabelValue(lblIncome, expectedIncome, v => $"Beklenen Gelir: +{v.ToString("#,##0", tr)} ₺", hiddenText: "Beklenen Gelir: ••••••");
+            AnimateLabelValue(lblExpense, expectedExpense, v => $"Beklenen Gider: -{v.ToString("#,##0", tr)} ₺", hiddenText: "Beklenen Gider: ••••••");
+        }
+
+        // Ana ekrandan ayrılmadan hızlıca gelir/gider eklemek için: Tip + Kategori + Tutar + Ekle.
+        // Diğer mini-widget'ların aksine tıklanınca başka ekrana GÖTÜRMEZ (MakeClickable ile
+        // sarmalanmaz) — kendi Click handler'ı doğrudan TransactionService.AddTransaction çağırır.
+        private void LoadQuickAddWidget()
+        {
+            ClearWidgetContent(pnlQuickAddWidget);
+
+            Label lblHeader = new Label
+            {
+                Text = "⚡ Hızlı İşlem Ekle",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 18,
+                Top = 14,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlQuickAddWidget.Controls.Add(lblHeader);
+
+            ComboBox cmbType = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
+            Panel pnlType = new Panel { Left = 18, Top = 48, Width = 104, Height = 34 };
+            cmbType.Left = 6; cmbType.Top = 6; cmbType.Width = 92;
+            pnlType.Controls.Add(cmbType);
+            SetupHomeComboBox(pnlType, cmbType);
+            cmbType.Items.Add("Gelir"); cmbType.Items.Add("Gider"); cmbType.SelectedIndex = 1;
+
+            ComboBox cmbCategory = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5F) };
+            Panel pnlCategory = new Panel { Left = 130, Top = 48, Width = CardWidth - 130 - 18, Height = 34 };
+            cmbCategory.Left = 6; cmbCategory.Top = 6; cmbCategory.Width = pnlCategory.Width - 12;
+            pnlCategory.Controls.Add(cmbCategory);
+            SetupHomeComboBox(pnlCategory, cmbCategory);
+
+            Panel pnlAmount = new Panel { Left = 18, Top = 92, Width = 140, Height = 34 };
+            SetupSmoothContainer(pnlAmount, 8, CardBackColor);
+            TextBox txtAmount = new TextBox
+            {
+                Left = 8,
+                Top = 7,
+                Width = 124,
+                Font = new Font("Segoe UI", 10F),
+                BorderStyle = BorderStyle.None,
+                BackColor = CardBackColor,
+                ForeColor = TextLight
+            };
+            pnlAmount.Controls.Add(txtAmount);
+
+            Button btnAdd = new Button { Text = "Ekle", Left = 166, Top = 92, Width = CardWidth - 166 - 18, Height = 34, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F) };
+            SetupRoundedButton(btnAdd, AccentColor, Color.White);
+
+            Label lblStatus = new Label
+            {
+                Left = 18,
+                Top = 134,
+                Width = CardWidth - 36,
+                Height = 40,
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = TextMuted,
+                BackColor = Color.Transparent
+            };
+
+            // Türkçe binlik ayraçlı, sadece rakam kabul eden anlık biçimlendirme (bkz. TransactionControl.SmartFormatAmount).
+            bool suppressFormat = false;
+            txtAmount.TextChanged += (s, e) =>
+            {
+                if (suppressFormat || string.IsNullOrWhiteSpace(txtAmount.Text)) return;
+                string digits = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+                if (string.IsNullOrEmpty(digits)) return;
+                if (decimal.TryParse(digits, out decimal amt))
+                {
+                    string formatted = amt.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+                    if (txtAmount.Text == formatted) return;
+                    suppressFormat = true;
+                    txtAmount.Text = formatted;
+                    txtAmount.SelectionStart = txtAmount.Text.Length;
+                    suppressFormat = false;
+                }
+            };
+
+            void LoadCategoriesForType()
+            {
+                string type = cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
+                var categories = _categoryService.GetUserCategoriesByType(_user.Id, type);
+                cmbCategory.Items.Clear();
+                foreach (var c in categories) cmbCategory.Items.Add(c.Name);
+                if (cmbCategory.Items.Count > 0) cmbCategory.SelectedIndex = 0;
+            }
+            cmbType.SelectedIndexChanged += (s, e) => LoadCategoriesForType();
+            LoadCategoriesForType();
+
+            btnAdd.Click += (s, e) =>
+            {
+                if (cmbCategory.SelectedIndex < 0)
+                {
+                    lblStatus.ForeColor = AppTheme.DangerColor;
+                    lblStatus.Text = "Bu tipte kategori yok.";
+                    return;
+                }
+
+                string rawAmount = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+                if (!decimal.TryParse(rawAmount, out decimal amount) || amount <= 0)
+                {
+                    lblStatus.ForeColor = AppTheme.DangerColor;
+                    lblStatus.Text = "Geçersiz tutar.";
+                    return;
+                }
+
+                string type = cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
+                string categoryName = cmbCategory.SelectedItem?.ToString() ?? string.Empty;
+                var category = _categoryService.GetOrCreateCategory(_user.Id, categoryName, type);
+                bool success = _transactionService.AddTransaction(_user.Id, category.Id, amount, type, null, out string errorMessage);
+
+                if (success)
+                {
+                    lblStatus.ForeColor = AppTheme.SuccessColor;
+                    lblStatus.Text = "İşlem eklendi.";
+                    txtAmount.Clear();
+
+                    RefreshBalances();
+                    if (_placedWidgets.ContainsKey("transactions")) LoadRecentTransactionsWidget();
+                    if (_placedWidgets.ContainsKey("report")) LoadMiniReportWidget();
+                    if (_placedWidgets.ContainsKey("cashflow")) LoadCashflowWidget();
+                }
+                else
+                {
+                    lblStatus.ForeColor = AppTheme.DangerColor;
+                    lblStatus.Text = errorMessage;
+                }
+            };
+
+            pnlQuickAddWidget.Controls.Add(pnlType);
+            pnlQuickAddWidget.Controls.Add(pnlCategory);
+            pnlQuickAddWidget.Controls.Add(pnlAmount);
+            pnlQuickAddWidget.Controls.Add(btnAdd);
+            pnlQuickAddWidget.Controls.Add(lblStatus);
+        }
+
+        // TransactionControl.SetupCustomComboBox'ın sade sürümü: mavi native seçim arka planını
+        // engellemek için owner-draw + rounded container. Burada sadece DropDownList kullanılıyor,
+        // bu yüzden editable kutulardaki metin kaydırma hack'ine (ShiftEditTextUp) gerek yok.
+        private void SetupHomeComboBox(Panel pnl, ComboBox cmb)
+        {
+            SetupSmoothContainer(pnl, 8, CardBackColor);
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 20;
+            cmb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            };
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+        }
+
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
         // SONRA eklendiği için o ilk MakeClickable taramasına dahil değil — burada ayrıca sarmalıyoruz.
         private Label AddWidgetLine(Panel parent, string text, int top, Color color, int left, Action onClick)
@@ -1299,6 +1555,8 @@ namespace PersonalFinanceApp
             if (_placedWidgets.ContainsKey("report")) LoadMiniReportWidget();
             if (_placedWidgets.ContainsKey("transactions")) LoadRecentTransactionsWidget();
             if (_placedWidgets.ContainsKey("goals")) LoadGoalsWidget();
+            if (_placedWidgets.ContainsKey("cashflow")) LoadCashflowWidget();
+            if (_placedWidgets.ContainsKey("quickadd")) LoadQuickAddWidget();
         }
 
         // Varlıklarım'daki pozisyonların anlık kâr/zararını "bildirim" tarzında listeler; en çok
