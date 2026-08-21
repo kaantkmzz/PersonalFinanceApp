@@ -88,7 +88,7 @@ namespace PersonalFinanceApp
             dgvTransactions.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
             dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
-            dgvTransactions.EnableHeadersVisualStyles = false;
+            dgvTransactions.EnableHeadersVisualStyles = false; dgvTransactions.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
 
             pnlGridWrapper.Controls.Add(dgvTransactions);
             this.Controls.Add(pnlGridWrapper);

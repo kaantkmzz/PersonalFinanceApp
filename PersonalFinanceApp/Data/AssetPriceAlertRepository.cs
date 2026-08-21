@@ -82,12 +82,16 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        // Alarm tetiklenince pasif hale getirilir (tek seferlik bildirim) — eskiden yalnızca
+        // last_triggered_at güncelleniyordu, bu da eşiği aşan bir varlığın fiyatı orada kalırsa
+        // (ör. sürekli üzerinde) alarmın HER GÜN yeniden tetiklenip kullanıcıyı rahatsız etmesine
+        // yol açıyordu (bkz. kullanıcı geri bildirimi). Tekrar izlemek isterse alarmı yeniden kurar.
         public void MarkTriggered(int alertId)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "UPDATE asset_price_alerts SET last_triggered_at = @now WHERE alert_id = @alertId";
+                string query = "UPDATE asset_price_alerts SET last_triggered_at = @now, is_active = FALSE WHERE alert_id = @alertId";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {

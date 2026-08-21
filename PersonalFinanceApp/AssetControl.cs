@@ -172,7 +172,7 @@ namespace PersonalFinanceApp
 
             dgvHoldings.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvHoldings.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
             dgvHoldings.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvHoldings.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
-            dgvHoldings.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvHoldings.EnableHeadersVisualStyles = false; dgvHoldings.ColumnHeadersHeight = 40;
+            dgvHoldings.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvHoldings.EnableHeadersVisualStyles = false; dgvHoldings.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None; dgvHoldings.ColumnHeadersHeight = 40;
 
             dgvHoldings.CellFormatting += DgvHoldings_CellFormatting;
             dgvHoldings.CellDoubleClick += DgvHoldings_CellDoubleClick;

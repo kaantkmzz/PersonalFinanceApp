@@ -51,7 +51,7 @@ namespace PersonalFinanceApp
             foreach (var c in _categories) cmbCategory.Items.Add(c.Name);
             if (cmbCategory.Items.Count > 0) cmbCategory.SelectedIndex = 0;
             pnlCombo.Controls.Add(cmbCategory);
-            SetupCustomComboBox(cmbCategory);
+            SetupCustomComboBox(pnlCombo, cmbCategory);
 
             Button btnOk = new Button { Text = "Uygula", Left = 20, Top = 130, Width = 140, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnOk, AccentColor, Color.White);
@@ -84,7 +84,7 @@ namespace PersonalFinanceApp
         // sürümle değiştirir (bkz. TransactionControl.SetupCustomComboBox). Bu dialogda çevreleyen
         // panel zaten SetupSmoothContainer ile boyanmış olduğundan burada sadece ComboBox'ın
         // kendisini (arka plan + açılır liste + kırpma bölgesi) ele alıyoruz.
-        private void SetupCustomComboBox(ComboBox cmb)
+        private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
         {
             cmb.FlatStyle = FlatStyle.Flat;
             cmb.BackColor = CardBackColor;
@@ -99,7 +99,26 @@ namespace PersonalFinanceApp
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
-            cmb.HandleCreated += (s, e) => cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+
+            // OwnerDrawFixed açılır ok düğmesini kapsamıyor — Windows'un kendi (beyaz) temasıyla
+            // çizilen o düğmeyi kartla aynı renkte bir panelle kapatıp kendi okumuzu çiziyoruz.
+            Panel pnlArrow = new Panel { Width = 28, BackColor = CardBackColor, Cursor = Cursors.Hand };
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 4;
+                int ay = pnlArrow.Height / 2 - 2;
+                using var brush = new SolidBrush(TextMuted);
+                e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 8, ay), new Point(ax + 4, ay + 5) });
+            };
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; }

@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -22,7 +21,7 @@ namespace PersonalFinanceApp
         private DataGridView dgvHistory = new DataGridView();
 
         private CheckBox chkHasDeadline = new CheckBox();
-        private DateTimePicker dtpDeadline = new DateTimePicker();
+        private DarkDatePicker dtpDeadline = new DarkDatePicker();
         private Button btnFreqNone = new Button();
         private Button btnFreqDaily = new Button();
         private Button btnFreqWeekly = new Button();
@@ -137,21 +136,9 @@ namespace PersonalFinanceApp
             chkHasDeadline.Text = "Hedef tarihi belirle"; chkHasDeadline.ForeColor = TextMuted; chkHasDeadline.Left = 20; chkHasDeadline.Top = 685; chkHasDeadline.AutoSize = true;
             chkHasDeadline.CheckedChanged += (s, e) => dtpDeadline.Enabled = chkHasDeadline.Checked;
 
-            dtpDeadline.Left = 20; dtpDeadline.Top = 712; dtpDeadline.Width = 200; dtpDeadline.Format = DateTimePickerFormat.Short;
+            dtpDeadline.Left = 20; dtpDeadline.Top = 712; dtpDeadline.Width = 200;
             dtpDeadline.MinDate = DateTime.Today;
             dtpDeadline.Enabled = false;
-            dtpDeadline.CalendarForeColor = TextLight;
-            dtpDeadline.CalendarMonthBackground = CardBackColor;
-            dtpDeadline.CalendarTitleBackColor = AppTheme.HeaderBackColor;
-            dtpDeadline.CalendarTitleForeColor = TextLight;
-            dtpDeadline.CalendarTrailingForeColor = TextMuted;
-            dtpDeadline.HandleCreated += (s, e) =>
-            {
-                DarkTitleBarHelper.DisableVisualStyle(dtpDeadline);
-                dtpDeadline.BackColor = CardBackColor;
-                dtpDeadline.ForeColor = TextLight;
-            };
-            DarkTitleBarHelper.EnableDarkCalendarPopup(dtpDeadline);
 
             Label lblRecurring = new Label { Text = "Otomatik Katkı Sıklığı:", ForeColor = TextMuted, Left = 20, Top = 752, AutoSize = true };
 

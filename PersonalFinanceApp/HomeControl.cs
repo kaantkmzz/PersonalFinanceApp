@@ -92,9 +92,10 @@ namespace PersonalFinanceApp
         // onu durdurmak için (bkz. AnimateLabelValue, ClearWidgetContent).
         private readonly Dictionary<Control, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Control, System.Windows.Forms.Timer>();
 
-        // Durum satırının (lblStatus) hemen altına çekildi — kullanıcı geri bildirimi, aradaki boşluk
-        // widget'lar için kullanılabilir alanı gereksiz daraltıyordu.
-        private const int MiniRowTop = 386;
+        // Transfer Et/Geçmişi butonlarının hemen altına çekildi — lblStatus artık kendi satırını
+        // kaplamıyor (bkz. SetupUI, Transfer Geçmişi'nin sağına taşındı), bu yüzden araya eskiden
+        // giren boşluğa gerek kalmadı.
+        private const int MiniRowTop = 348;
         private const int MiniRowHeight = 210;
 
         // "Bu Ayın Özeti" kutusundaki iki sayfa arası geçiş: 0 = genel dağılım, 1 = varlık dağılımı.
@@ -243,8 +244,10 @@ namespace PersonalFinanceApp
                 }
             };
 
-            lblStatus.Left = CardLeft1;
-            lblStatus.Top = buttonsTop + 55;
+            // Kendi satırında değil, "Transfer Geçmişi" butonunun sağında — widget ızgarasının
+            // altına çekilebilmesi için bu satırın kendi başına bir boşluk açmasına gerek yok.
+            lblStatus.Left = btnHistory.Right + 20;
+            lblStatus.Top = buttonsTop + (42 - 25) / 2;
             lblStatus.Width = 500;
             lblStatus.Height = 25;
             lblStatus.Font = new Font("Segoe UI", 9F);
@@ -1441,7 +1444,28 @@ namespace PersonalFinanceApp
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
-            cmb.HandleCreated += (s, e) => cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+
+            // OwnerDrawFixed yalnızca metin/liste kısmını boyuyor — açılır ok DÜĞMESİ hâlâ Windows'un
+            // kendi (açık/beyaz) temasıyla çiziliyor, kutunun sağ kenarında beyaz bir çizgi/köşe gibi
+            // görünüyordu. Üzerini kartla aynı renkte bir panelle kapatıp kendi ok işaretimizi çiziyoruz
+            // (bkz. AssetControl.SetupCustomComboBox — aynı desen).
+            Panel pnlArrow = new Panel { Width = 28, BackColor = CardBackColor, Cursor = Cursors.Hand };
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 4;
+                int ay = pnlArrow.Height / 2 - 2;
+                using var brush = new SolidBrush(TextMuted);
+                e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 8, ay), new Point(ax + 4, ay + 5) });
+            };
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
         }
 
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten

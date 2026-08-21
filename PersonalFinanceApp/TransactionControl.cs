@@ -45,8 +45,8 @@ namespace PersonalFinanceApp
         private List<Transaction> _cachedTransactions = new List<Transaction>();
 
         private CheckBox chkDateFilter = new CheckBox();
-        private DateTimePicker dtpStart = new DateTimePicker();
-        private DateTimePicker dtpEnd = new DateTimePicker();
+        private DarkDatePicker dtpStart = new DarkDatePicker();
+        private DarkDatePicker dtpEnd = new DarkDatePicker();
 
         private Button btnBulkMode = new Button();
         private Button btnBulkDelete = new Button();
@@ -130,17 +130,15 @@ namespace PersonalFinanceApp
                 RefreshGrid();
             };
 
-            dtpStart.Left = 540; dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Format = DateTimePickerFormat.Short; dtpStart.Enabled = false;
+            dtpStart.Left = 540; dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Enabled = false;
             dtpStart.Value = DateTime.Today.AddMonths(-1);
             dtpStart.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
-            SetupDarkDateTimePicker(dtpStart);
 
             Label lblDateSep = new Label { Text = "—", Left = 690, Top = 106, ForeColor = TextMuted, AutoSize = true };
 
-            dtpEnd.Left = 705; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Format = DateTimePickerFormat.Short; dtpEnd.Enabled = false;
+            dtpEnd.Left = 705; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
             dtpEnd.Value = DateTime.Today;
             dtpEnd.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
-            SetupDarkDateTimePicker(dtpEnd);
 
             btnAdd.Text = "➕ İşlem Ekle";
             btnAdd.Left = 540;
@@ -222,7 +220,7 @@ namespace PersonalFinanceApp
 
             dgvTransactions.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvTransactions.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
             dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvTransactions.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
-            dgvTransactions.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvTransactions.EnableHeadersVisualStyles = false; dgvTransactions.ColumnHeadersHeight = 40;
+            dgvTransactions.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvTransactions.EnableHeadersVisualStyles = false; dgvTransactions.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None; dgvTransactions.ColumnHeadersHeight = 40;
 
             dgvTransactions.CellPainting += DgvTransactions_CellPainting;
 
@@ -589,27 +587,6 @@ namespace PersonalFinanceApp
             if (!GetClientRect(info.hwndItem, out RECT rect)) return;
             rect.Top -= pixels;
             SendMessage(info.hwndItem, EM_SETRECT, IntPtr.Zero, ref rect);
-        }
-
-        // DateTimePicker'ın kapalı kutusunun beyaz zemini WinForms/.NET 10'da denenen hiçbir yöntemle
-        // (DisableVisualStyle+BackColor, ShowUpDown modu, Application.SetColorMode(Dark)) düzelmedi —
-        // bu, bu comctl32 denetiminin kapalı-kutu çizimine has bilinen bir platform sınırlaması.
-        // Açılır TAKVİM kısmı (aşağıdaki Calendar* özellikleri + EnableDarkCalendarPopup) gerçekten
-        // koyulaşıyor, o yüzden en azından o kısmı uyguluyoruz.
-        private void SetupDarkDateTimePicker(DateTimePicker dtp)
-        {
-            dtp.CalendarForeColor = TextLight;
-            dtp.CalendarMonthBackground = CardBackColor;
-            dtp.CalendarTitleBackColor = AppTheme.HeaderBackColor;
-            dtp.CalendarTitleForeColor = TextLight;
-            dtp.CalendarTrailingForeColor = TextMuted;
-            dtp.HandleCreated += (s, e) =>
-            {
-                DarkTitleBarHelper.DisableVisualStyle(dtp);
-                dtp.BackColor = CardBackColor;
-                dtp.ForeColor = TextLight;
-            };
-            DarkTitleBarHelper.EnableDarkCalendarPopup(dtp);
         }
 
         private void SetupCustomComboBox(Panel pnl, ComboBox cmb)

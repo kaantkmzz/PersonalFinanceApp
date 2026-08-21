@@ -21,7 +21,6 @@ namespace PersonalFinanceApp
         private bool _backgroundCheckRunning = false;
         private bool _isLoggingOut = false;
         private readonly NotifyIcon _trayIcon = new NotifyIcon();
-        private bool _trayHintShown = false;
         private FormWindowState _preTrayWindowState = FormWindowState.Maximized;
 
         public bool ExitRequested { get; private set; }
@@ -177,15 +176,6 @@ namespace PersonalFinanceApp
             }
             this.WindowState = FormWindowState.Minimized;
             this.ShowInTaskbar = false;
-
-            if (!_trayHintShown)
-            {
-                _trayHintShown = true;
-                _trayIcon.BalloonTipTitle = "Finans Takip";
-                _trayIcon.BalloonTipText = "Uygulama simge alanında (gizli simgeler) çalışmaya devam ediyor. Geri açmak için simgeye sol tıklayın, çıkış seçenekleri için sağ tıklayın.";
-                _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
-                _trayIcon.ShowBalloonTip(4000);
-            }
         }
 
         private void RestoreFromTray()

@@ -181,7 +181,7 @@ namespace PersonalFinanceApp
             dgvReminders.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvReminders.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvReminders.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            dgvReminders.EnableHeadersVisualStyles = false;
+            dgvReminders.EnableHeadersVisualStyles = false; dgvReminders.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             dgvReminders.ColumnHeadersHeight = 38;
 
             dgvReminders.CellPainting += DgvReminders_CellPainting;

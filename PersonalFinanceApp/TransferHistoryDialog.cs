@@ -68,7 +68,7 @@ namespace PersonalFinanceApp
             dgvHistory.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvHistory.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvHistory.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            dgvHistory.EnableHeadersVisualStyles = false;
+            dgvHistory.EnableHeadersVisualStyles = false; dgvHistory.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             dgvHistory.ColumnHeadersHeight = 36;
             dgvHistory.RowTemplate.Height = 34;
             dgvHistory.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;

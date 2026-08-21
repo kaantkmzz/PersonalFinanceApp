@@ -157,8 +157,29 @@ namespace PersonalFinanceApp
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
+            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
 
             pnl.Controls.Add(cmb);
+
+            // OwnerDrawFixed açılır ok düğmesini kapsamıyor — Windows'un kendi (beyaz) temasıyla
+            // çizilen o düğmeyi kartla aynı renkte bir panelle kapatıp kendi okumuzu çiziyoruz
+            // (bkz. AssetControl.SetupCustomComboBox — aynı desen).
+            Panel pnlArrow = new Panel { Width = 28, BackColor = CardBackColor, Cursor = Cursors.Hand };
+            pnlArrow.Height = cmb.Height - 2;
+            pnlArrow.Left = cmb.Right - pnlArrow.Width;
+            pnlArrow.Top = cmb.Top + 1;
+            pnlArrow.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int ax = pnlArrow.Width / 2 - 4;
+                int ay = pnlArrow.Height / 2 - 2;
+                using var brush = new SolidBrush(TextMuted);
+                e.Graphics.FillPolygon(brush, new Point[] { new Point(ax, ay), new Point(ax + 8, ay), new Point(ax + 4, ay + 5) });
+            };
+            pnlArrow.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
+            pnl.Controls.Add(pnlArrow);
+            pnlArrow.BringToFront();
         }
 
         private bool _suppressAmountFormatting = false;
