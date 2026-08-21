@@ -78,11 +78,11 @@ namespace PersonalFinanceApp
         // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget).
         private readonly HashSet<int> _highlightedCells = new HashSet<int>();
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
-        // Izgara 8 hücrelik (2 satır × 4 sütun, bkz. MiniRowTop) — katalogdaki widget sayısı bunu
-        // aşabilir (kullanıcı hepsini aynı anda yerleştirmek zorunda değil, + panelinden istediği
-        // kadarını sürükleyip bırakır, bkz. BuildWidgetPickerRows). Üçüncü bir satır eskiden vardı;
-        // butonların altındaki kullanılmayan boşluk ilk satır olarak da widget alabildiğinden kaldırıldı.
-        private readonly Panel[] _cellPanels = new Panel[8];
+        // Izgara 12 hücrelik (3 satır × 4 sütun, bkz. MiniRowTop) — katalog artık 8 widget içeriyor
+        // (toplamda 3+1×7=10 hücre gerektiriyor), kullanıcı geri bildirimiyle üçüncü satır geri eklendi
+        // ki hepsi aynı anda yerleştirilebilsin; + panelinden istenildiği kadarı da sürükleyip bırakılabilir
+        // (bkz. BuildWidgetPickerRows).
+        private readonly Panel[] _cellPanels = new Panel[12];
         private Button btnAddWidget = new Button();
         private Panel pnlWidgetPicker = new Panel();
         private Label lblEmptyGridHint = new Label();
@@ -92,9 +92,9 @@ namespace PersonalFinanceApp
         // onu durdurmak için (bkz. AnimateLabelValue, ClearWidgetContent).
         private readonly Dictionary<Control, System.Windows.Forms.Timer> _cardAnimTimers = new Dictionary<Control, System.Windows.Forms.Timer>();
 
-        // Eskiden 630'du; butonların/durum satırının hemen altında kullanılmayan büyük bir boşluk
-        // bırakıyordu (bkz. yukarıdaki not) — ızgara artık o boşluğu da kapsayacak şekilde yukarı çekildi.
-        private const int MiniRowTop = 400;
+        // Durum satırının (lblStatus) hemen altına çekildi — kullanıcı geri bildirimi, aradaki boşluk
+        // widget'lar için kullanılabilir alanı gereksiz daraltıyordu.
+        private const int MiniRowTop = 386;
         private const int MiniRowHeight = 210;
 
         // "Bu Ayın Özeti" kutusundaki iki sayfa arası geçiş: 0 = genel dağılım, 1 = varlık dağılımı.
@@ -134,9 +134,9 @@ namespace PersonalFinanceApp
             // Sabit piksel konumlu dört sütun (bkz. CardLeft4/CardWidth) ve mini-widget satırı (bkz.
             // MiniRowTop/MiniRowHeight) esnek değil — Dock=Fill bunu MainForm.pnlContent'in AutoScroll'u
             // sayesinde bu boyutun altına küçültmüyor, aksi halde sağdaki/alttaki kartlar sessizce kırpılırdı.
-            // Widget ızgarası 2 satır (bkz. SetupWidgetGrid, GridCols, _cellPanels) — yükseklik hesabı
+            // Widget ızgarası 3 satır (bkz. SetupWidgetGrid, GridCols, _cellPanels) — yükseklik hesabı
             // eksik kalırsa alt satıra yerleştirilen widget'lar kırpılabilirdi.
-            const int gridRows = 2;
+            const int gridRows = 3;
             this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20));
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
@@ -1214,7 +1214,7 @@ namespace PersonalFinanceApp
 
             Label lblHeader = new Label
             {
-                Text = "📅 Nakit Akışı Tahmini",
+                Text = "Nakit Akışı Tahmini",
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = TextLight,
                 Left = 18,
@@ -1293,7 +1293,7 @@ namespace PersonalFinanceApp
 
             Label lblHeader = new Label
             {
-                Text = "⚡ Hızlı İşlem Ekle",
+                Text = "Hızlı İşlem Ekle",
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = TextLight,
                 Left = 18,
@@ -1430,7 +1430,9 @@ namespace PersonalFinanceApp
             cmb.BackColor = CardBackColor;
             cmb.ForeColor = TextLight;
             cmb.DrawMode = DrawMode.OwnerDrawFixed;
-            cmb.ItemHeight = 20;
+            // 20px'te "g" gibi alt uzantılı (descender) harfler kesiliyor, "geri ödeme" "aeri ödeme"
+            // gibi görünüyordu (bkz. bu dosyadaki diğer 20px→24px notları) — 24'e çıkarıldı.
+            cmb.ItemHeight = 24;
             cmb.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;
@@ -1439,7 +1441,7 @@ namespace PersonalFinanceApp
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
                 TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
-            cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
+            cmb.HandleCreated += (s, e) => cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
         }
 
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
@@ -1574,7 +1576,7 @@ namespace PersonalFinanceApp
 
             Label lblHeader = new Label
             {
-                Text = "🔔 Varlık Bildirimleri",
+                Text = "Varlık Bildirimleri",
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 ForeColor = TextLight,
                 Left = 20,

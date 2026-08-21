@@ -133,12 +133,14 @@ namespace PersonalFinanceApp
             dtpStart.Left = 540; dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Format = DateTimePickerFormat.Short; dtpStart.Enabled = false;
             dtpStart.Value = DateTime.Today.AddMonths(-1);
             dtpStart.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
+            SetupDarkDateTimePicker(dtpStart);
 
             Label lblDateSep = new Label { Text = "—", Left = 690, Top = 106, ForeColor = TextMuted, AutoSize = true };
 
             dtpEnd.Left = 705; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Format = DateTimePickerFormat.Short; dtpEnd.Enabled = false;
             dtpEnd.Value = DateTime.Today;
             dtpEnd.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
+            SetupDarkDateTimePicker(dtpEnd);
 
             btnAdd.Text = "➕ İşlem Ekle";
             btnAdd.Left = 540;
@@ -589,6 +591,27 @@ namespace PersonalFinanceApp
             SendMessage(info.hwndItem, EM_SETRECT, IntPtr.Zero, ref rect);
         }
 
+        // DateTimePicker'ın kapalı kutusunun beyaz zemini WinForms/.NET 10'da denenen hiçbir yöntemle
+        // (DisableVisualStyle+BackColor, ShowUpDown modu, Application.SetColorMode(Dark)) düzelmedi —
+        // bu, bu comctl32 denetiminin kapalı-kutu çizimine has bilinen bir platform sınırlaması.
+        // Açılır TAKVİM kısmı (aşağıdaki Calendar* özellikleri + EnableDarkCalendarPopup) gerçekten
+        // koyulaşıyor, o yüzden en azından o kısmı uyguluyoruz.
+        private void SetupDarkDateTimePicker(DateTimePicker dtp)
+        {
+            dtp.CalendarForeColor = TextLight;
+            dtp.CalendarMonthBackground = CardBackColor;
+            dtp.CalendarTitleBackColor = AppTheme.HeaderBackColor;
+            dtp.CalendarTitleForeColor = TextLight;
+            dtp.CalendarTrailingForeColor = TextMuted;
+            dtp.HandleCreated += (s, e) =>
+            {
+                DarkTitleBarHelper.DisableVisualStyle(dtp);
+                dtp.BackColor = CardBackColor;
+                dtp.ForeColor = TextLight;
+            };
+            DarkTitleBarHelper.EnableDarkCalendarPopup(dtp);
+        }
+
         private void SetupCustomComboBox(Panel pnl, ComboBox cmb)
         {
             SetupSmoothContainer(pnl, 8, CardBackColor);
@@ -605,7 +628,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
 
             // 2. Dıştaki ince beyaz çerçeveyi tıraşlıyoruz

@@ -51,6 +51,7 @@ namespace PersonalFinanceApp
             foreach (var c in _categories) cmbCategory.Items.Add(c.Name);
             if (cmbCategory.Items.Count > 0) cmbCategory.SelectedIndex = 0;
             pnlCombo.Controls.Add(cmbCategory);
+            SetupCustomComboBox(cmbCategory);
 
             Button btnOk = new Button { Text = "Uygula", Left = 20, Top = 130, Width = 140, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnOk, AccentColor, Color.White);
@@ -77,6 +78,28 @@ namespace PersonalFinanceApp
                 this.Controls.Add(lblEmpty);
                 btnOk.Enabled = false;
             }
+        }
+
+        // ComboBox'ın varsayılan beyaz sistem çizimini tema renklerine göre kendi çizdiğimiz
+        // sürümle değiştirir (bkz. TransactionControl.SetupCustomComboBox). Bu dialogda çevreleyen
+        // panel zaten SetupSmoothContainer ile boyanmış olduğundan burada sadece ComboBox'ın
+        // kendisini (arka plan + açılır liste + kırpma bölgesi) ele alıyoruz.
+        private void SetupCustomComboBox(ComboBox cmb)
+        {
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 24;
+            cmb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            };
+            cmb.HandleCreated += (s, e) => cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(AppBackColor); using (var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; }

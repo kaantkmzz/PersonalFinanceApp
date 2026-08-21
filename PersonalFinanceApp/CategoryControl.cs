@@ -230,7 +230,6 @@ namespace PersonalFinanceApp
             if (isAdColumn)
             {
                 string renkHex = dgvCategories.Rows[e.RowIndex].Cells["RenkHex"]?.Value?.ToString() ?? "";
-                string ikon = dgvCategories.Rows[e.RowIndex].Cells["IkonEmoji"]?.Value?.ToString() ?? "";
 
                 e.PaintBackground(e.CellBounds, true);
                 e.Graphics!.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
@@ -245,13 +244,6 @@ namespace PersonalFinanceApp
                     using (var brush = new SolidBrush(dotColor))
                         e.Graphics.FillEllipse(brush, textLeft, dotTop, dotSize, dotSize);
                     textLeft += dotSize + 6;
-                }
-
-                if (!string.IsNullOrEmpty(ikon))
-                {
-                    var iconRect = new Rectangle(textLeft, e.CellBounds.Top, 24, e.CellBounds.Height);
-                    TextRenderer.DrawText(e.Graphics, ikon, new Font("Segoe UI Emoji", 9.5F), iconRect, TextLight, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                    textLeft += 22;
                 }
 
                 var textRect = new Rectangle(textLeft, e.CellBounds.Top, e.CellBounds.Right - textLeft, e.CellBounds.Height);
@@ -315,8 +307,7 @@ namespace PersonalFinanceApp
                     : _user.HideAmountsEnabled
                         ? "••• / •••"
                         : $"{(monthlyExpense.TryGetValue(c.Id, out decimal spent) ? spent : 0).ToString("#,##0", tr)} / {c.BudgetLimit.Value.ToString("#,##0", tr)} ₺",
-                RenkHex = c.Color ?? "",
-                IkonEmoji = c.Icon ?? ""
+                RenkHex = c.Color ?? ""
             }).ToList();
 
             dgvCategories.DataSource = displayList;
@@ -329,7 +320,6 @@ namespace PersonalFinanceApp
                 dgvCategories.Columns["Butce"]!.FillWeight = 70;
                 dgvCategories.Columns["Butce"]!.HeaderText = "Bu Ayki Bütçe";
                 dgvCategories.Columns["RenkHex"]!.Visible = false;
-                dgvCategories.Columns["IkonEmoji"]!.Visible = false;
             }
         }
 
@@ -368,7 +358,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
 
             // 2. BEYAZ ÇERÇEVE ÇÖZÜMÜ: Sadece dıştaki 1 piksellik beyaz çizgiyi tıraşlıyoruz

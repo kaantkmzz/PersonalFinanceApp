@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
 
@@ -139,6 +140,18 @@ namespace PersonalFinanceApp
             dtpDeadline.Left = 20; dtpDeadline.Top = 712; dtpDeadline.Width = 200; dtpDeadline.Format = DateTimePickerFormat.Short;
             dtpDeadline.MinDate = DateTime.Today;
             dtpDeadline.Enabled = false;
+            dtpDeadline.CalendarForeColor = TextLight;
+            dtpDeadline.CalendarMonthBackground = CardBackColor;
+            dtpDeadline.CalendarTitleBackColor = AppTheme.HeaderBackColor;
+            dtpDeadline.CalendarTitleForeColor = TextLight;
+            dtpDeadline.CalendarTrailingForeColor = TextMuted;
+            dtpDeadline.HandleCreated += (s, e) =>
+            {
+                DarkTitleBarHelper.DisableVisualStyle(dtpDeadline);
+                dtpDeadline.BackColor = CardBackColor;
+                dtpDeadline.ForeColor = TextLight;
+            };
+            DarkTitleBarHelper.EnableDarkCalendarPopup(dtpDeadline);
 
             Label lblRecurring = new Label { Text = "Otomatik Katkı Sıklığı:", ForeColor = TextMuted, Left = 20, Top = 752, AutoSize = true };
 

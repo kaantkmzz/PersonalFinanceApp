@@ -441,8 +441,13 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
+            // Bu liste (AssetCatalog.Items, 20+ satır) uzun olduğundan açılır listede yerleşik bir
+            // kaydırma çubuğu çıkıyor — Windows görsel stili açıkken bu çubuğun kendisi ve listenin
+            // native kenarlığı DrawItem'ın boyadığı koyu satırların üzerine beyaz sızabiliyor.
+            // DisableVisualStyle bunu (DateTimePicker'da da kullanılan aynı teknikle) engelliyor.
+            cmb.HandleCreated += (s, e) => Helpers.DarkTitleBarHelper.DisableVisualStyle(cmb);
 
             cmb.Left = 10; cmb.Top = 7; cmb.Width = pnl.Width - 20;
             cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));

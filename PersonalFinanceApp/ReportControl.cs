@@ -462,7 +462,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
 
             cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));

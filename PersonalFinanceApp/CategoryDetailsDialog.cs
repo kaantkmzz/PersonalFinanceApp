@@ -33,7 +33,6 @@ namespace PersonalFinanceApp
         private Label lblStatus = new Label();
         private Category? _category;
         private string? _selectedColor;
-        private ComboBox cmbIcon = new ComboBox();
         private readonly List<Panel> _colorSwatches = new List<Panel>();
 
         public CategoryDetailsDialog(User user, int categoryId, string categoryName)
@@ -45,6 +44,7 @@ namespace PersonalFinanceApp
             SetupDialog();
             LoadCategoryTransactions();
             LoadCategoryInfo();
+            this.Load += (s, e) => DarkTitleBarHelper.EnableDarkTitleBar(this);
         }
 
         private void SetupDialog()
@@ -115,8 +115,8 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnSaveBudget);
             _budgetControls = new Control[] { lblBudget, pnlBudget, btnSaveBudget };
 
-            // Renk + ikon seçimi, bütçe satırının sağında aynı yükseklikte.
-            Label lblColorIcon = new Label { Text = "Renk / İkon:", Left = 400, Top = 332, ForeColor = TextMuted, AutoSize = true };
+            // Renk seçimi, bütçe satırının sağında aynı yükseklikte.
+            Label lblColorIcon = new Label { Text = "Renk:", Left = 400, Top = 332, ForeColor = TextMuted, AutoSize = true };
             this.Controls.Add(lblColorIcon);
 
             const int swatchSize = 20, swatchGap = 4;
@@ -156,14 +156,6 @@ namespace PersonalFinanceApp
                 _colorSwatches.Add(swatch);
                 this.Controls.Add(swatch);
             }
-
-            cmbIcon.Left = 545; cmbIcon.Top = 355; cmbIcon.Width = 115; cmbIcon.Height = 36;
-            cmbIcon.Font = new Font("Segoe UI Emoji", 11F); cmbIcon.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbIcon.Items.Add("(yok)");
-            foreach (var icon in CategoryService.IconOptions) cmbIcon.Items.Add(icon);
-            cmbIcon.SelectedIndex = 0;
-            cmbIcon.SelectedIndexChanged += (s, e) => SaveColorIcon();
-            this.Controls.Add(cmbIcon);
 
             // Alt Kısım: Yeniden Adlandırma ve Silme (Eski Kategoriler ekranından taşındı)
             Panel pnlRename = new Panel { Left = 20, Top = 410, Width = 200, Height = 36 };
@@ -213,22 +205,13 @@ namespace PersonalFinanceApp
             _selectedColor = _category?.Color;
             foreach (var sw in _colorSwatches) sw.Invalidate();
 
-            int iconIndex = 0;
-            if (!string.IsNullOrEmpty(_category?.Icon))
-            {
-                int found = Array.IndexOf(CategoryService.IconOptions, _category.Icon);
-                if (found >= 0) iconIndex = found + 1; // "(yok)" ilk sırada
-            }
-            cmbIcon.SelectedIndex = iconIndex;
-
             _loadingCategoryInfo = false;
         }
 
         private void SaveColorIcon()
         {
             if (_loadingCategoryInfo) return;
-            string? icon = cmbIcon.SelectedIndex > 0 ? cmbIcon.SelectedItem?.ToString() : null;
-            _categoryService.SetColorIcon(_categoryId, _user.Id, _selectedColor, icon);
+            _categoryService.SetColorIcon(_categoryId, _user.Id, _selectedColor, null);
         }
 
         private void BtnSaveBudget_Click(object? sender, EventArgs e)

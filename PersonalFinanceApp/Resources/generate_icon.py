@@ -4,14 +4,15 @@ import os, math, random
 SIZE = 512
 CENTER = SIZE / 2
 
-METAL_LIGHT = (222, 222, 230)
-METAL_MID = (168, 168, 180)
-METAL_DARK = (108, 108, 120)
-PURPLE = (139, 122, 255)
-# "FT" harfleri gri metal zeminle yeterince kontrast oluşturmuyordu — daha koyu, doygun bir mor
-# (eskisi 99,102,241'e göre belirgin şekilde koyulaştırıldı).
-PURPLE_DEEP = (40, 28, 128)
-PURPLE_GLOW = (180, 155, 255)
+# Kullanıcı tercihiyle (2026-08-21) ikon renk şeması tersine çevrildi: eskiden gri olan metal
+# zemin artık beyaza, eskiden mor olan halka/"FT" yazısı artık siyaha çekildi. Değişken adları
+# (METAL_*, PURPLE_*) tarihsel — sadece değerleri değişti, aşağıdaki tüm çizim mantığı aynı kaldı.
+METAL_LIGHT = (255, 255, 255)
+METAL_MID = (236, 236, 240)
+METAL_DARK = (206, 206, 212)
+PURPLE = (20, 20, 26)
+PURPLE_DEEP = (0, 0, 0)
+PURPLE_GLOW = (58, 58, 66)
 
 def find_font(size, bold=True):
     candidates = [
@@ -137,7 +138,9 @@ def build_simple_icon():
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     pad = 10
-    draw.ellipse([pad, pad, SIZE - pad, SIZE - pad], fill=(46, 46, 56, 255))
+    # Eskiden koyu gri zemin + beyaz yazıydı; renk şeması tersine çevrilince (bkz. yukarıdaki not)
+    # zemin beyaza döndü, yazı da kontrast için siyaha çekildi.
+    draw.ellipse([pad, pad, SIZE - pad, SIZE - pad], fill=(255, 255, 255, 255))
     ring_pad = pad + 6
     draw.ellipse([ring_pad, ring_pad, SIZE - ring_pad, SIZE - ring_pad], outline=PURPLE_GLOW, width=16)
 
@@ -147,7 +150,7 @@ def build_simple_icon():
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     tx = (SIZE - tw) / 2 - bbox[0]
     ty = (SIZE - th) / 2 - bbox[1] - 4
-    draw.text((tx, ty), text, font=font, fill=(255, 255, 255, 255))
+    draw.text((tx, ty), text, font=font, fill=(0, 0, 0, 255))
     return img
 
 icon_img = build_icon()

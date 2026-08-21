@@ -102,6 +102,11 @@ namespace PersonalFinanceApp
             dtpDate.Format = DateTimePickerFormat.Custom;
             dtpDate.CustomFormat = "dd.MM.yyyy HH:mm";
             dtpDate.Value = _transaction.TransactionDate;
+            // Not: aşağıdaki DisableVisualStyle+BackColor denemesi kapalı kutunun beyaz zeminini
+            // düzeltmiyor (comctl32'nin DateTimePicker'ına özgü bilinen bir sınırlama — ShowUpDown
+            // modu ve Application.SetColorMode(Dark) de denendi, ikisi de etkisiz kaldı, bkz.
+            // TransactionControl.SetupDarkDateTimePicker). Yalnızca açılır TAKVİM (Calendar* +
+            // EnableDarkCalendarPopup) gerçekten koyulaşıyor.
             dtpDate.CalendarForeColor = TextLight;
             dtpDate.CalendarMonthBackground = CardBackColor;
             dtpDate.CalendarTitleBackColor = AppTheme.HeaderBackColor;
@@ -248,7 +253,7 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
 
             cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));

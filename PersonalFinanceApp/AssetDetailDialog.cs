@@ -132,12 +132,16 @@ namespace PersonalFinanceApp
             Panel divider4 = new Panel { Left = 20, Top = 750, Width = 420, Height = 1, BackColor = AppTheme.HoverBackColor };
             Label lblAlertTitle = new Label { Text = "Fiyat Alarmı", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 765, AutoSize = true };
 
-            cmbAlertDirection.Left = 20; cmbAlertDirection.Top = 800; cmbAlertDirection.Width = 170; cmbAlertDirection.Height = 32;
+            Panel pnlAlertDirection = new Panel { Left = 20, Top = 800, Width = 170, Height = 32 };
+            SetupSmoothContainer(pnlAlertDirection, 8, CardBackColor);
+            cmbAlertDirection.Left = 6; cmbAlertDirection.Top = 5; cmbAlertDirection.Width = 158;
             cmbAlertDirection.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbAlertDirection.Font = new Font("Segoe UI", 9.5F);
             cmbAlertDirection.Items.Add("Üstüne çıkarsa");
             cmbAlertDirection.Items.Add("Altına inerse");
             cmbAlertDirection.SelectedIndex = 0;
+            SetupCustomComboBox(cmbAlertDirection);
+            pnlAlertDirection.Controls.Add(cmbAlertDirection);
 
             Panel pnlThreshold = new Panel { Left = 200, Top = 800, Width = 140, Height = 32 };
             SetupSmoothContainer(pnlThreshold, 8, CardBackColor);
@@ -164,7 +168,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblStatus);
             this.Controls.Add(divider3); this.Controls.Add(lblHistoryTitle); this.Controls.Add(pnlHistoryWrapper);
             this.Controls.Add(divider4); this.Controls.Add(lblAlertTitle);
-            this.Controls.Add(cmbAlertDirection); this.Controls.Add(pnlThreshold); this.Controls.Add(btnAddAlert);
+            this.Controls.Add(pnlAlertDirection); this.Controls.Add(pnlThreshold); this.Controls.Add(btnAddAlert);
             this.Controls.Add(lblAlertStatus); this.Controls.Add(pnlAlertList);
         }
 
@@ -331,6 +335,26 @@ namespace PersonalFinanceApp
             {
                 lblStatus.ForeColor = Color.Salmon; lblStatus.Text = error;
             }
+        }
+
+        // ComboBox'ın varsayılan beyaz sistem çizimini tema renklerine göre kendi çizdiğimiz
+        // sürümle değiştirir (bkz. TransactionControl.SetupCustomComboBox).
+        private void SetupCustomComboBox(ComboBox cmb)
+        {
+            cmb.FlatStyle = FlatStyle.Flat;
+            cmb.BackColor = CardBackColor;
+            cmb.ForeColor = TextLight;
+            cmb.DrawMode = DrawMode.OwnerDrawFixed;
+            cmb.ItemHeight = 24;
+            cmb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
+                e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            };
+            cmb.HandleCreated += (s, e) => cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
         }
 
         private void SetupSmoothContainer(Panel pnl, int radius, Color bgColor) { pnl.BackColor = AppBackColor; pnl.Paint += (s, e) => { e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.Clear(AppBackColor); using (var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius)) { using (var brush = new SolidBrush(bgColor)) { e.Graphics.FillPath(brush, path); } } }; }
