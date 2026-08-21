@@ -12,6 +12,7 @@ namespace PersonalFinanceApp.Models
         public decimal Quantity { get; set; }
         public decimal PriceTry { get; set; }
         public decimal TotalTry { get; set; }
+        public decimal? RealizedPlTry { get; set; } // Sadece "sell" işlemlerinde dolu
         public DateTime CreatedAt { get; set; }
     }
 }

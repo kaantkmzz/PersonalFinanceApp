@@ -112,8 +112,9 @@ namespace PersonalFinanceApp
             dgvHistory.RowHeadersVisible = false;
             dgvHistory.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvHistory.MultiSelect = false;
-            dgvHistory.Font = new Font("Segoe UI", 9F);
-            dgvHistory.RowTemplate.Height = 30;
+            dgvHistory.Font = new Font("Segoe UI", 8.5F);
+            dgvHistory.RowTemplate.Height = 42;
+            dgvHistory.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             dgvHistory.BorderStyle = BorderStyle.None;
             dgvHistory.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             dgvHistory.GridColor = AppTheme.HoverBackColor;
@@ -271,17 +272,18 @@ namespace PersonalFinanceApp
                 Tarih = h.CreatedAt.ToString("dd.MM.yyyy HH:mm"),
                 Yön = h.Direction == "buy" ? "Alım" : "Satım",
                 YönRaw = h.Direction,
-                Detay = $"{h.Quantity:0.####} adet · {h.PriceTry.ToString("#,##0.00", tr)} ₺/adet"
+                Detay = $"{h.Quantity:0.####} ad. · {h.PriceTry.ToString("#,##0.00", tr)}₺"
+                    + (h.RealizedPlTry.HasValue ? $" · K/Z:{h.RealizedPlTry.Value:+#,##0.00;-#,##0.00}₺" : "")
             }).ToList();
 
             dgvHistory.DataSource = displayList;
 
             if (dgvHistory.Columns["Tarih"] != null)
             {
-                dgvHistory.Columns["Tarih"]!.FillWeight = 45;
-                dgvHistory.Columns["Yön"]!.FillWeight = 20;
+                dgvHistory.Columns["Tarih"]!.FillWeight = 35;
+                dgvHistory.Columns["Yön"]!.FillWeight = 18;
                 dgvHistory.Columns["YönRaw"]!.Visible = false;
-                dgvHistory.Columns["Detay"]!.FillWeight = 35;
+                dgvHistory.Columns["Detay"]!.FillWeight = 47;
             }
 
             if (history.Count == 0) dgvHistory.DataSource = null;

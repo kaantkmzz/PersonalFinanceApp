@@ -150,6 +150,9 @@ namespace PersonalFinanceApp.Services
             decimal totalTry = quantity * price.Value;
             decimal newQuantity = existing.Quantity - quantity;
 
+            // Gerçekleşen kâr/zarar, satış anındaki (henüz güncellenmemiş) ortalama maliyete göre hesaplanır.
+            decimal realizedPl = (price.Value - existing.AvgCostTry) * quantity;
+
             if (newQuantity <= 0)
                 _repository.DeleteHolding(userId, symbol);
             else
@@ -165,7 +168,8 @@ namespace PersonalFinanceApp.Services
                 Direction = "sell",
                 Quantity = quantity,
                 PriceTry = price.Value,
-                TotalTry = totalTry
+                TotalTry = totalTry,
+                RealizedPlTry = realizedPl
             });
 
             LogInvestTransaction(userId, catalogItem.Name, $"Satış · {quantity:0.########} adet", totalTry);

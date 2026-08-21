@@ -130,8 +130,8 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                    INSERT INTO asset_transactions (user_id, symbol, asset_type, direction, quantity, price_try, total_try, created_at)
-                    VALUES (@userId, @symbol, @assetType, @direction, @quantity, @priceTry, @totalTry, @createdAt)";
+                    INSERT INTO asset_transactions (user_id, symbol, asset_type, direction, quantity, price_try, total_try, realized_pl_try, created_at)
+                    VALUES (@userId, @symbol, @assetType, @direction, @quantity, @priceTry, @totalTry, @realizedPl, @createdAt)";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
@@ -142,6 +142,7 @@ namespace PersonalFinanceApp.Data
                     cmd.Parameters.AddWithValue("@quantity", tx.Quantity);
                     cmd.Parameters.AddWithValue("@priceTry", tx.PriceTry);
                     cmd.Parameters.AddWithValue("@totalTry", tx.TotalTry);
+                    cmd.Parameters.AddWithValue("@realizedPl", (object?)tx.RealizedPlTry ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@createdAt", DateTime.Now);
                     cmd.ExecuteNonQuery();
                 }
@@ -156,7 +157,7 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                    SELECT asset_tx_id, user_id, symbol, asset_type, direction, quantity, price_try, total_try, created_at
+                    SELECT asset_tx_id, user_id, symbol, asset_type, direction, quantity, price_try, total_try, realized_pl_try, created_at
                     FROM asset_transactions
                     WHERE user_id = @userId AND symbol = @symbol
                     ORDER BY created_at DESC";
@@ -170,6 +171,7 @@ namespace PersonalFinanceApp.Data
                     {
                         while (reader.Read())
                         {
+                            int realizedPlOrdinal = reader.GetOrdinal("realized_pl_try");
                             list.Add(new AssetTransaction
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("asset_tx_id")),
@@ -180,6 +182,7 @@ namespace PersonalFinanceApp.Data
                                 Quantity = reader.GetDecimal(reader.GetOrdinal("quantity")),
                                 PriceTry = reader.GetDecimal(reader.GetOrdinal("price_try")),
                                 TotalTry = reader.GetDecimal(reader.GetOrdinal("total_try")),
+                                RealizedPlTry = reader.IsDBNull(realizedPlOrdinal) ? null : reader.GetDecimal(realizedPlOrdinal),
                                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
                             });
                         }

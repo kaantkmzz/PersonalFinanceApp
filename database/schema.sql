@@ -10,6 +10,7 @@
 --   2026-08-21  categories.budget_limit eklendi (Faz 2 — kategori bütçe limiti)
 --   2026-08-21  categories.color, categories.icon eklendi (Faz 3 — kategori renk/ikon)
 --   2026-08-21  asset_price_alerts tablosu eklendi (Faz 4 — varlık fiyat alarmı)
+--   2026-08-21  asset_transactions.realized_pl_try eklendi (Faz 5 — gerçekleşen kâr/zarar)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -153,6 +154,8 @@ CREATE TABLE asset_transactions (
     quantity     NUMERIC(20,8) NOT NULL,
     price_try    NUMERIC(14,4) NOT NULL,
     total_try    NUMERIC(14,2) NOT NULL,
+    -- Sadece 'sell' işlemlerinde dolu: (satış fiyatı - o anki ortalama maliyet) × miktar
+    realized_pl_try NUMERIC(18,4),
     created_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
