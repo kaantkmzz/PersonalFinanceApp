@@ -1,11 +1,17 @@
 using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Models;
 using PersonalFinanceApp.Services;
+using System.Runtime.InteropServices;
 
 namespace PersonalFinanceApp
 {
     public partial class MainForm : Form
     {
+        private const int WM_SETREDRAW = 0x000B;
+
+        [DllImport("user32.dll")]
+        private static extern int SendMessage(IntPtr hWnd, int msg, bool wParam, int lParam);
+
         private readonly User _user;
         private readonly AccountService _accountService = new AccountService();
         private Button? _activeButton;
@@ -677,35 +683,58 @@ namespace PersonalFinanceApp
         // Bir ekranı ilk kez ziyaret ediyorsak oluşturup önbelleğe alıyoruz; sonraki ziyaretlerde sadece gösteriyoruz
         private void ShowCachedContent(string key, Func<UserControl> factory)
         {
-            this.SuspendLayout();
-            pnlContent.SuspendLayout();
-
-            _activeContentKey = key;
-            _activeContentFactory = factory;
-
-            if (!_screenCache.TryGetValue(key, out var control))
+            // Yeni ekran ilk kez kuruluyorsa (ör. Hatırlatıcılar'ın 12 aylık takvimi, İşlemler/
+            // Kategoriler'in geniş tablosu) factory() çağrısı fark edilir sürede kontrol ekleyip
+            // yerleştiriyor; bu sırada Windows arada bir WM_PAINT işleyip eski ekranla yarı
+            // kurulmuş yeni ekranı üst üste (yırtık halde) çiziyordu. WM_SETREDRAW ile bu geçiş
+            // boyunca yeniden çizimi kapatıp tek seferde temiz bir kare çiziyoruz.
+            bool redrawSuspended = pnlContent.IsHandleCreated;
+            if (redrawSuspended)
             {
-                control = factory();
-                control.Dock = DockStyle.Fill;
-                EnableDoubleBuffering(control);
-                _screenCache[key] = control;
-                pnlContent.Controls.Add(control);
-            }
-            else if (control is IRefreshable refreshable)
-            {
-                // Önbellekten geliyorsa (yani sayfa daha önce açılmışsa), göstermeden önce verisini tazeliyoruz
-                refreshable.RefreshData();
+                SendMessage(pnlContent.Handle, WM_SETREDRAW, false, 0);
             }
 
-            foreach (Control c in pnlContent.Controls)
+            try
             {
-                c.Visible = (c == control);
-            }
-            control.BringToFront();
-            _visibleControl = control;
+                this.SuspendLayout();
+                pnlContent.SuspendLayout();
 
-            pnlContent.ResumeLayout(true);
-            this.ResumeLayout(true);
+                _activeContentKey = key;
+                _activeContentFactory = factory;
+
+                if (!_screenCache.TryGetValue(key, out var control))
+                {
+                    control = factory();
+                    control.Dock = DockStyle.Fill;
+                    EnableDoubleBuffering(control);
+                    _screenCache[key] = control;
+                    pnlContent.Controls.Add(control);
+                }
+                else if (control is IRefreshable refreshable)
+                {
+                    // Önbellekten geliyorsa (yani sayfa daha önce açılmışsa), göstermeden önce verisini tazeliyoruz
+                    refreshable.RefreshData();
+                }
+
+                foreach (Control c in pnlContent.Controls)
+                {
+                    c.Visible = (c == control);
+                }
+                control.BringToFront();
+                _visibleControl = control;
+
+                pnlContent.ResumeLayout(true);
+                this.ResumeLayout(true);
+            }
+            finally
+            {
+                if (redrawSuspended)
+                {
+                    SendMessage(pnlContent.Handle, WM_SETREDRAW, true, 0);
+                    pnlContent.Invalidate(true);
+                    pnlContent.Update();
+                }
+            }
         }
 
         private Button CreateSidebarButton(string text, int top)
