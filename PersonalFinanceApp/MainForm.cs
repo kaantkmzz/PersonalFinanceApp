@@ -12,6 +12,9 @@ namespace PersonalFinanceApp
         private string? _activeMenuLabel;
         private System.Windows.Forms.Timer _reminderTimer = new System.Windows.Forms.Timer();
         private bool _isLoggingOut = false;
+        private readonly NotifyIcon _trayIcon = new NotifyIcon();
+        private bool _trayHintShown = false;
+        private FormWindowState _preTrayWindowState = FormWindowState.Maximized;
 
         public bool ExitRequested { get; private set; }
 
@@ -98,6 +101,76 @@ namespace PersonalFinanceApp
             _reminderTimer.Start();
 
             this.FormClosing += MainForm_FormClosing;
+
+            SetupTrayIcon();
+        }
+
+        // Teams tarzı sistem tepsisi davranışı: pencere sağ üstten kapatılınca (X) uygulama
+        // tamamen çıkmaz, görev çubuğundaki gizli simgeler alanında çalışmaya devam eder.
+        // Böylece hatırlatıcı zamanlayıcısı arka planda çalışmaya devam edip zamanı gelince
+        // toast bildirimi gösterebilir. Sol tık pencereyi geri açar; sağ tık "Oturumu Kapat"
+        // ve "Çıkış Yap" seçeneklerini gösterir.
+        private void SetupTrayIcon()
+        {
+            _trayIcon.Icon = this.Icon;
+            _trayIcon.Text = "Finans Takip";
+            _trayIcon.Visible = true;
+
+            var openItem = CreateMenuItem("Aç", SidebarTextColor, (s, e) => RestoreFromTray());
+            var logoutItem = CreateMenuItem("Oturumu Kapat", LogoutColor, (s, e) => DoLogout());
+            var exitItem = CreateMenuItem("Çıkış Yap", ExitColor, (s, e) => DoExit());
+            _trayIcon.ContextMenuStrip = BuildStyledMenu(openItem, logoutItem, exitItem);
+
+            _trayIcon.MouseClick += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left) RestoreFromTray();
+            };
+            _trayIcon.BalloonTipClicked += (s, e) => RestoreFromTray();
+        }
+
+        private void HideToTray()
+        {
+            // Not: MainForm ShowDialog() ile modal olarak açık; bu durumda Hide() çağırmak
+            // WinForms'un modal döngüsünü kapanış gibi yorumlayıp ShowDialog'un erken dönmesine
+            // yol açıyor (bilinen bir WinForms davranışı). Bunun yerine formu simge durumuna
+            // küçültüp görev çubuğundan gizliyoruz — Visible=false hiç set edilmiyor, modal döngü bozulmuyor.
+            if (this.WindowState != FormWindowState.Minimized)
+            {
+                _preTrayWindowState = this.WindowState;
+            }
+            this.WindowState = FormWindowState.Minimized;
+            this.ShowInTaskbar = false;
+
+            if (!_trayHintShown)
+            {
+                _trayHintShown = true;
+                _trayIcon.BalloonTipTitle = "Finans Takip";
+                _trayIcon.BalloonTipText = "Uygulama simge alanında (gizli simgeler) çalışmaya devam ediyor. Geri açmak için simgeye sol tıklayın, çıkış seçenekleri için sağ tıklayın.";
+                _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                _trayIcon.ShowBalloonTip(4000);
+            }
+        }
+
+        private void RestoreFromTray()
+        {
+            this.ShowInTaskbar = true;
+            this.WindowState = _preTrayWindowState;
+            this.Activate();
+            this.BringToFront();
+        }
+
+        private void DoLogout()
+        {
+            _isLoggingOut = true;
+            RememberMeHelper.Clear();
+            this.Close();
+        }
+
+        private void DoExit()
+        {
+            _isLoggingOut = true;
+            ExitRequested = true;
+            this.Close();
         }
 
         // Kenar çubuğunu kurar; tema değiştirildiğinde de (verileri koruyarak) yeniden çağrılır.
@@ -355,39 +428,29 @@ namespace PersonalFinanceApp
 
         private void ShowPowerMenu(Button anchor)
         {
+            var exitItem = CreateMenuItem("Çıkış Yap", ExitColor, (s, e) => DoExit());
+            var logoutItem = CreateMenuItem("Oturumu Kapat", LogoutColor, (s, e) => DoLogout());
+            var menu = BuildStyledMenu(exitItem, logoutItem);
+            menu.Show(anchor, new Point(0, 0), ToolStripDropDownDirection.AboveRight);
+        }
+
+        private ToolStripMenuItem CreateMenuItem(string text, Color color, EventHandler onClick)
+        {
+            var item = new ToolStripMenuItem(text) { ForeColor = color, Font = new Font("Segoe UI", 10F) };
+            item.Click += onClick;
+            return item;
+        }
+
+        // Güç menüsü ve sistem tepsisi sağ tık menüsü aynı kapsül stilini paylaşır.
+        private ContextMenuStrip BuildStyledMenu(params ToolStripItem[] items)
+        {
             var menu = new ContextMenuStrip
             {
                 ShowImageMargin = false,
                 BackColor = AppTheme.CardBackColor,
                 Renderer = new ToolStripProfessionalRenderer(new FlyoutColorTable())
             };
-
-            var logoutItem = new ToolStripMenuItem("Oturumu Kapat")
-            {
-                ForeColor = LogoutColor,
-                Font = new Font("Segoe UI", 10F)
-            };
-            logoutItem.Click += (s, e) =>
-            {
-                _isLoggingOut = true;
-                RememberMeHelper.Clear();
-                this.Close();
-            };
-
-            var exitItem = new ToolStripMenuItem("Çıkış Yap")
-            {
-                ForeColor = ExitColor,
-                Font = new Font("Segoe UI", 10F)
-            };
-            exitItem.Click += (s, e) =>
-            {
-                _isLoggingOut = true;
-                ExitRequested = true;
-                this.Close();
-            };
-
-            menu.Items.Add(exitItem);
-            menu.Items.Add(logoutItem);
+            menu.Items.AddRange(items);
 
             // Kapsül köşelerini yumuşatır: boyut kesinleşince Region'ı yuvarlatılmış dikdörtgene kırpar.
             menu.Paint += (s, e) =>
@@ -399,7 +462,7 @@ namespace PersonalFinanceApp
                 e.Graphics.DrawPath(pen, path);
             };
 
-            menu.Show(anchor, new Point(0, 0), ToolStripDropDownDirection.AboveRight);
+            return menu;
         }
 
         private class FlyoutColorTable : ProfessionalColorTable
@@ -550,29 +613,33 @@ namespace PersonalFinanceApp
 
         private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            _reminderTimer.Stop();
-
-            if (_isLoggingOut)
+            // "Oturumu Kapat" veya "Çıkış Yap" ile gerçekten kapatılıyorsa: zamanlayıcıyı durdur,
+            // tepsi simgesini kaldır ve kapanışa izin ver.
+            if (_isLoggingOut || ExitRequested)
             {
+                _reminderTimer.Stop();
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
                 return;
             }
 
-            var result = MessageBox.Show(
-                "Pencereyi kapatırsanız oturumunuz sonlanır ve uygulamadan tamamen çıkılır. Devam etmek istiyor musunuz?",
-                "Çıkış Onayı",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (result == DialogResult.No)
+            // Kullanıcı sağ üstteki X'e (ya da Alt+F4) bastıysa uygulamayı tamamen kapatmak yerine
+            // sistem tepsisine gizle; hatırlatıcı zamanlayıcısı arka planda çalışmaya devam etsin.
+            // Not: HideToTray, ShowInTaskbar'ı değiştirdiği için formun native pencere tanıtıcısını
+            // (hwnd) yeniden oluşturur (RecreateHandle). Bunu burada senkron çağırmak, tam da o hwnd'nin
+            // WM_CLOSE mesajını işlediği sırada kendi tanıtıcısını yok etmesine yol açıp kapanışı iptal
+            // etme mantığını bozuyordu — bu yüzden geçerli mesaj işlemesi bitene kadar erteliyoruz.
+            if (e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
-                _reminderTimer.Start();
+                this.BeginInvoke(new Action(HideToTray));
+                return;
             }
-            else
-            {
-                ExitRequested = true;
-                _isLoggingOut = true;
-            }
+
+            // Windows kapanıyor/oturum kapanıyor gibi diğer durumlarda normal şekilde kapan.
+            _reminderTimer.Stop();
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
         }
 
         private void ReminderTimer_Tick(object? sender, EventArgs e)
@@ -582,13 +649,15 @@ namespace PersonalFinanceApp
 
             foreach (var reminder in dueReminders)
             {
-
                 if (reminder.IsCompleted)
                 {
                     continue;
                 }
 
-                MessageBox.Show($"⏰ {reminder.Title}", "Hatırlatıcı", MessageBoxButtons.OK);
+                _trayIcon.BalloonTipTitle = "Hatırlatıcı";
+                _trayIcon.BalloonTipText = reminder.Title;
+                _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                _trayIcon.ShowBalloonTip(6000);
                 reminderService.MarkAsNotified(reminder.Id, _user.Id);
             }
         }

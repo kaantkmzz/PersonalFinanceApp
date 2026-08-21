@@ -89,7 +89,7 @@ namespace PersonalFinanceApp
         // --- Görünüm: tema aç/kapa ---
         private void BuildAppearanceBody(Panel body, int width)
         {
-            Label lblRow = new Label { Text = "Koyu Tema", Left = 24, Top = 12, Width = width - 120, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
+            Label lblRow = new Label { Text = "Tema", Left = 24, Top = 12, Width = width - 120, Height = 24, ForeColor = TextLight, BackColor = Color.Transparent };
             Label lblHint1 = MakeHintLine("Kenar çubuğundaki güneş simgesiyle", 24, 46, width - 48);
             Label lblHint2 = MakeHintLine("aynı ayardır.", 24, 64, width - 48);
 

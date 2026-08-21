@@ -305,7 +305,7 @@ namespace PersonalFinanceApp
 
             Label lblNote = new Label
             {
-                Text = "Bu ayar yalnızca İşlemler ve Kategoriler verilerinizi etkiler. Tekrarlanan işlem tanımlarınız, hedefleriniz, notlarınız ve hatırlatıcılarınız asla otomatik olarak silinmez.",
+                Text = "Bu ayar yalnızca gelir ve gider işlemlerinizi (ve bunlara ait kategorileri) etkiler. Tekrarlanan işlem tanımlarınız, yatırımlarınız, hedefleriniz, notlarınız ve hatırlatıcılarınız asla otomatik olarak silinmez.",
                 Left = 24,
                 Top = 248,
                 Width = width - 48,
@@ -392,9 +392,9 @@ namespace PersonalFinanceApp
         {
             lblExplanation.Text = _user.CleanupFrequency switch
             {
-                DataCleanupService.Weekly => "(Haftada bir kez, işlemleriniz ve kategorileriniz otomatik olarak temizlenir.)",
-                DataCleanupService.Monthly => "(Ayda bir kez, işlemleriniz ve kategorileriniz otomatik olarak temizlenir.)",
-                _ => "(İşlemleriniz ve kategorileriniz asla otomatik olarak temizlenmez.)"
+                DataCleanupService.Weekly => $"(Haftada bir kez, gelir ve gider işlemleriniz otomatik olarak temizlenir. Sonraki temizlenme tarihi: {_user.CleanupPeriodStart.AddDays(7):dd.MM.yyyy})",
+                DataCleanupService.Monthly => $"(Ayda bir kez, gelir ve gider işlemleriniz otomatik olarak temizlenir. Sonraki temizlenme tarihi: {_user.CleanupPeriodStart.AddMonths(1):dd.MM.yyyy})",
+                _ => "(Gelir ve gider işlemleriniz asla otomatik olarak temizlenmez.)"
             };
         }
 

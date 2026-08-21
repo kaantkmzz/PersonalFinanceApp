@@ -64,13 +64,14 @@ namespace PersonalFinanceApp.Data
             }
         }
 
-        // Kullanıcının tüm işlem geçmişini siler (temizleme sıklığı ayarı tarafından kullanılır)
+        // Kullanıcının gelir/gider işlem geçmişini siler (temizleme sıklığı ayarı tarafından kullanılır).
+        // "goal" ve "invest" tipindeki işlemler hedef/yatırım geçmişine ait olduğundan kasıtlı olarak hariç tutulur.
         public void DeleteAllForUser(int userId)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "DELETE FROM transactions WHERE user_id = @userId";
+                string query = "DELETE FROM transactions WHERE user_id = @userId AND type IN ('income', 'expense')";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
