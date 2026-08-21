@@ -15,7 +15,8 @@ namespace PersonalFinanceApp.Data
             {
                 conn.Open();
                 string query = @"
-                    SELECT goal_id, user_id, goal_name, target_amount, current_amount, is_achieved, created_at
+                    SELECT goal_id, user_id, goal_name, target_amount, current_amount, is_achieved, created_at,
+                           due_date, recurring_frequency, recurring_amount, last_contribution_date
                     FROM savings_goals
                     WHERE user_id = @userId
                     ORDER BY created_at DESC";
@@ -28,6 +29,11 @@ namespace PersonalFinanceApp.Data
                     {
                         while (reader.Read())
                         {
+                            int dueDateOrdinal = reader.GetOrdinal("due_date");
+                            int freqOrdinal = reader.GetOrdinal("recurring_frequency");
+                            int recAmountOrdinal = reader.GetOrdinal("recurring_amount");
+                            int lastContribOrdinal = reader.GetOrdinal("last_contribution_date");
+
                             goals.Add(new SavingsGoal
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("goal_id")),
@@ -36,7 +42,11 @@ namespace PersonalFinanceApp.Data
                                 TargetAmount = reader.GetDecimal(reader.GetOrdinal("target_amount")),
                                 CurrentAmount = reader.GetDecimal(reader.GetOrdinal("current_amount")), // YENİ
                                 IsAchieved = reader.GetBoolean(reader.GetOrdinal("is_achieved")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                DueDate = reader.IsDBNull(dueDateOrdinal) ? null : reader.GetDateTime(dueDateOrdinal),
+                                RecurringFrequency = reader.IsDBNull(freqOrdinal) ? null : reader.GetString(freqOrdinal),
+                                RecurringAmount = reader.IsDBNull(recAmountOrdinal) ? null : reader.GetDecimal(recAmountOrdinal),
+                                LastContributionDate = reader.IsDBNull(lastContribOrdinal) ? null : reader.GetDateTime(lastContribOrdinal)
                             });
                         }
                     }
@@ -90,6 +100,45 @@ namespace PersonalFinanceApp.Data
                     cmd.Parameters.AddWithValue("@goalId", goal.Id);
                     cmd.Parameters.AddWithValue("@userId", goal.UserId);
 
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void SetRecurringSettings(int goalId, int userId, DateTime? dueDate, string? frequency, decimal? amount)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+                    UPDATE savings_goals
+                    SET due_date = @dueDate, recurring_frequency = @frequency, recurring_amount = @amount
+                    WHERE goal_id = @goalId AND user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@dueDate", (object?)dueDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@frequency", (object?)frequency ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@amount", (object?)amount ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@goalId", goalId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void UpdateLastContributionDate(int goalId, int userId, DateTime date)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE savings_goals SET last_contribution_date = @date WHERE goal_id = @goalId AND user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@date", date);
+                    cmd.Parameters.AddWithValue("@goalId", goalId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.ExecuteNonQuery();
                 }
             }

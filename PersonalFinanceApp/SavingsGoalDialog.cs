@@ -20,6 +20,16 @@ namespace PersonalFinanceApp
         private Label lblProgress = new Label();
         private DataGridView dgvHistory = new DataGridView();
 
+        private CheckBox chkHasDeadline = new CheckBox();
+        private DateTimePicker dtpDeadline = new DateTimePicker();
+        private Button btnFreqNone = new Button();
+        private Button btnFreqDaily = new Button();
+        private Button btnFreqWeekly = new Button();
+        private Button btnFreqMonthly = new Button();
+        private TextBox txtRecurringAmount = new TextBox();
+        private Label lblAutoStatus = new Label();
+        private string _selectedFrequency = "none"; // "none"|"daily"|"weekly"|"monthly"
+
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
         private static Color TextLight => AppTheme.TextLight;
@@ -42,7 +52,7 @@ namespace PersonalFinanceApp
         {
             this.AutoScaleMode = AutoScaleMode.None;
             this.Text = "Hedef Detayı ve Yatırım";
-            this.Size = new Size(420, 660);
+            this.Size = new Size(420, 970);
             this.BackColor = AppBackColor;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -119,9 +129,113 @@ namespace PersonalFinanceApp
 
             pnlHistoryWrapper.Controls.Add(dgvHistory);
 
+            // --- HEDEF TARİHİ VE OTOMATİK KATKI ---
+            Panel divider3 = new Panel { Left = 20, Top = 635, Width = 360, Height = 1, BackColor = AppTheme.HoverBackColor };
+            Label lblAutoTitle = new Label { Text = "Hedef Tarihi ve Otomatik Katkı", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 650, AutoSize = true };
+
+            chkHasDeadline.Text = "Hedef tarihi belirle"; chkHasDeadline.ForeColor = TextMuted; chkHasDeadline.Left = 20; chkHasDeadline.Top = 685; chkHasDeadline.AutoSize = true;
+            chkHasDeadline.CheckedChanged += (s, e) => dtpDeadline.Enabled = chkHasDeadline.Checked;
+
+            dtpDeadline.Left = 20; dtpDeadline.Top = 712; dtpDeadline.Width = 200; dtpDeadline.Format = DateTimePickerFormat.Short;
+            dtpDeadline.MinDate = DateTime.Today;
+            dtpDeadline.Enabled = false;
+
+            Label lblRecurring = new Label { Text = "Otomatik Katkı Sıklığı:", ForeColor = TextMuted, Left = 20, Top = 752, AutoSize = true };
+
+            const int freqBtnW = 82, freqGap = 4;
+            SetupFreqButton(btnFreqNone, "none", "Yok", 20 + 0 * (freqBtnW + freqGap));
+            SetupFreqButton(btnFreqDaily, "daily", "Günlük", 20 + 1 * (freqBtnW + freqGap));
+            SetupFreqButton(btnFreqWeekly, "weekly", "Haftalık", 20 + 2 * (freqBtnW + freqGap));
+            SetupFreqButton(btnFreqMonthly, "monthly", "Aylık", 20 + 3 * (freqBtnW + freqGap));
+            int freqTop = 778;
+            btnFreqNone.Top = btnFreqDaily.Top = btnFreqWeekly.Top = btnFreqMonthly.Top = freqTop;
+            btnFreqNone.Width = btnFreqDaily.Width = btnFreqWeekly.Width = btnFreqMonthly.Width = freqBtnW;
+            btnFreqNone.Height = btnFreqDaily.Height = btnFreqWeekly.Height = btnFreqMonthly.Height = 32;
+
+            Label lblRecurringAmount = new Label { Text = "Katkı Tutarı:", ForeColor = TextMuted, Left = 20, Top = 822, AutoSize = true };
+            Panel pnlRecurringAmount = new Panel { Left = 20, Top = 848, Width = 200, Height = 36 };
+            SetupSmoothContainer(pnlRecurringAmount, 8, CardBackColor);
+            txtRecurringAmount.BorderStyle = BorderStyle.None; txtRecurringAmount.BackColor = CardBackColor; txtRecurringAmount.ForeColor = TextLight; txtRecurringAmount.Font = new Font("Segoe UI", 10F); txtRecurringAmount.Location = new Point(10, 8); txtRecurringAmount.Width = 180;
+            txtRecurringAmount.TextChanged += SmartFormatTextBox;
+            pnlRecurringAmount.Controls.Add(txtRecurringAmount);
+
+            Button btnSaveAuto = new Button { Text = "💾 Kaydet", Left = 230, Top = 848, Width = 150, Height = 36, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnSaveAuto, Color.FromArgb(80, 85, 105), Color.White);
+            btnSaveAuto.Click += BtnSaveAuto_Click;
+
+            lblAutoStatus.Left = 20; lblAutoStatus.Top = 895; lblAutoStatus.Width = 360; lblAutoStatus.Height = 30; lblAutoStatus.TextAlign = ContentAlignment.MiddleCenter;
+
             this.Controls.Add(lblTitle); this.Controls.Add(lblName); this.Controls.Add(pnlName); this.Controls.Add(lblTarget); this.Controls.Add(pnlTarget); this.Controls.Add(btnUpdate);
             this.Controls.Add(divider); this.Controls.Add(lblInvestTitle); this.Controls.Add(lblProgress); this.Controls.Add(pnlInvest); this.Controls.Add(btnInvest); this.Controls.Add(lblStatus);
             this.Controls.Add(divider2); this.Controls.Add(lblHistoryTitle); this.Controls.Add(pnlHistoryWrapper);
+            this.Controls.Add(divider3); this.Controls.Add(lblAutoTitle);
+            this.Controls.Add(chkHasDeadline); this.Controls.Add(dtpDeadline);
+            this.Controls.Add(lblRecurring); this.Controls.Add(btnFreqNone); this.Controls.Add(btnFreqDaily); this.Controls.Add(btnFreqWeekly); this.Controls.Add(btnFreqMonthly);
+            this.Controls.Add(lblRecurringAmount); this.Controls.Add(pnlRecurringAmount); this.Controls.Add(btnSaveAuto);
+            this.Controls.Add(lblAutoStatus);
+        }
+
+        private void SetupFreqButton(Button btn, string freq, string text, int left)
+        {
+            btn.Text = text;
+            btn.Left = left;
+            btn.Cursor = Cursors.Hand;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(this.BackColor);
+                bool active = _selectedFrequency == freq;
+                using var path = Helpers.UIStyleHelper.GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                if (active)
+                {
+                    using var brush = new SolidBrush(AccentColor);
+                    e.Graphics.FillPath(brush, path);
+                }
+                else
+                {
+                    using var pen = new Pen(TextMuted, 1.2f);
+                    e.Graphics.DrawPath(pen, path);
+                }
+                TextRenderer.DrawText(e.Graphics, text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), active ? Color.White : TextMuted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedFrequency = freq;
+                btnFreqNone.Invalidate(); btnFreqDaily.Invalidate(); btnFreqWeekly.Invalidate(); btnFreqMonthly.Invalidate();
+            };
+        }
+
+        private void BtnSaveAuto_Click(object? sender, EventArgs e)
+        {
+            DateTime? dueDate = chkHasDeadline.Checked ? dtpDeadline.Value.Date : null;
+            string? frequency = _selectedFrequency == "none" ? null : _selectedFrequency;
+
+            decimal? recurringAmount = null;
+            if (frequency != null)
+            {
+                string raw = new string(txtRecurringAmount.Text.Where(char.IsDigit).ToArray());
+                if (!decimal.TryParse(raw, out decimal parsed) || parsed <= 0)
+                {
+                    lblAutoStatus.ForeColor = Color.Salmon;
+                    lblAutoStatus.Text = "Otomatik katkı için geçerli bir tutar girin.";
+                    return;
+                }
+                recurringAmount = parsed;
+            }
+
+            if (_goalService.SetRecurringSettings(_goalId, _user.Id, dueDate, frequency, recurringAmount, out string error))
+            {
+                lblAutoStatus.ForeColor = Color.LightGreen;
+                lblAutoStatus.Text = "Ayarlar kaydedildi.";
+            }
+            else
+            {
+                lblAutoStatus.ForeColor = Color.Salmon;
+                lblAutoStatus.Text = error;
+            }
         }
 
         private void LoadGoalData()
@@ -137,6 +251,15 @@ namespace PersonalFinanceApp
                 decimal progressPercent = goal.TargetAmount > 0 ? (goal.CurrentAmount / goal.TargetAmount) * 100 : 0;
                 lblProgress.Text = $"Biriken: {goal.CurrentAmount:N0} ₺   /   Kalan: {Math.Max(0, goal.TargetAmount - goal.CurrentAmount):N0} ₺  (%{progressPercent:N1})";
 
+                chkHasDeadline.Checked = goal.DueDate.HasValue;
+                if (goal.DueDate.HasValue) dtpDeadline.Value = goal.DueDate.Value < DateTime.Today ? DateTime.Today : goal.DueDate.Value;
+                dtpDeadline.Enabled = chkHasDeadline.Checked;
+
+                _selectedFrequency = goal.RecurringFrequency ?? "none";
+                btnFreqNone.Invalidate(); btnFreqDaily.Invalidate(); btnFreqWeekly.Invalidate(); btnFreqMonthly.Invalidate();
+                txtRecurringAmount.TextChanged -= SmartFormatTextBox;
+                txtRecurringAmount.Text = goal.RecurringAmount.HasValue ? goal.RecurringAmount.Value.ToString("#,##0") : "";
+                txtRecurringAmount.TextChanged += SmartFormatTextBox;
             }
 
             LoadInvestmentHistory();

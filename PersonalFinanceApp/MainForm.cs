@@ -119,6 +119,15 @@ namespace PersonalFinanceApp
             this.FormClosing += MainForm_FormClosing;
 
             SetupTrayIcon();
+
+            SavingsGoalService.GoalCompleted += SavingsGoalService_GoalCompleted;
+            this.FormClosed += (s, e) => SavingsGoalService.GoalCompleted -= SavingsGoalService_GoalCompleted;
+        }
+
+        private void SavingsGoalService_GoalCompleted(int userId, string goalName)
+        {
+            if (userId != _user.Id) return;
+            ShowTrayBalloon("🎉 Hedef Tamamlandı", $"'{goalName}' hedefine ulaştınız!");
         }
 
         // Teams tarzı sistem tepsisi davranışı: pencere sağ üstten kapatılınca (X) uygulama
@@ -699,11 +708,22 @@ namespace PersonalFinanceApp
             {
                 CheckCategoryBudgets();
                 await CheckAssetPriceAlertsAsync();
+                ProcessDueGoalContributionsAndRecurring();
             }
             finally
             {
                 _backgroundCheckRunning = false;
             }
+        }
+
+        // Tekrarlanan işlemler (RecurringTransactionService) ve otomatik hedef katkıları
+        // (SavingsGoalService) daha önce yalnızca girişte işleniyordu. Uygulama artık tepsi
+        // sayesinde gün sınırını aşarak açık kalabildiğinden, aynı riski taşıyan bu iki mekanizmayı
+        // tutarlı olsun diye burada da (ayrıca) çalıştırıyoruz.
+        private void ProcessDueGoalContributionsAndRecurring()
+        {
+            new RecurringTransactionService().ProcessDueRecurring(_user.Id);
+            new SavingsGoalService().ProcessDueContributions(_user.Id);
         }
 
         // Aktif fiyat alarmlarını kontrol eder; AssetPriceService zaten 30sn'lik bellek-içi cache

@@ -215,12 +215,16 @@ namespace PersonalFinanceApp
                 var recurringService = new RecurringTransactionService();
                 var (addedRecurring, failedRecurring) = recurringService.ProcessDueRecurring(user.Id);
 
+                var goalService = new SavingsGoalService();
+                var contributedGoals = goalService.ProcessDueContributions(user.Id);
+
                 var cleanupService = new DataCleanupService();
                 var (cleaned, exportedCsvPath) = cleanupService.CheckAndRunCleanup(user);
 
                 var infoMessages = new List<string>();
                 if (addedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklendi:\n- " + string.Join("\n- ", addedRecurring));
                 if (failedRecurring.Count > 0) infoMessages.Add("Şu tekrarlanan işlemler eklenemedi:\n- " + string.Join("\n- ", failedRecurring));
+                if (contributedGoals.Count > 0) infoMessages.Add("Şu hedeflere otomatik katkı yapıldı:\n- " + string.Join("\n- ", contributedGoals));
                 if (cleaned)
                 {
                     string cleanupMsg = "Temizleme sıklığı ayarınıza göre işlemleriniz ve kategorileriniz temizlendi.";

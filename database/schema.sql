@@ -11,6 +11,7 @@
 --   2026-08-21  categories.color, categories.icon eklendi (Faz 3 — kategori renk/ikon)
 --   2026-08-21  asset_price_alerts tablosu eklendi (Faz 4 — varlık fiyat alarmı)
 --   2026-08-21  asset_transactions.realized_pl_try eklendi (Faz 5 — gerçekleşen kâr/zarar)
+--   2026-08-21  savings_goals.due_date/recurring_frequency/recurring_amount/last_contribution_date eklendi (Faz 6 — hedef tarihi + otomatik katkı)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -80,7 +81,11 @@ CREATE TABLE savings_goals (
     target_amount   NUMERIC(14,2) NOT NULL,
     current_amount  NUMERIC(14,2) NOT NULL DEFAULT 0,
     is_achieved     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    due_date                DATE,          -- Hedef tarihi (opsiyonel)
+    recurring_frequency     VARCHAR(10),   -- null, 'daily', 'weekly', 'monthly'
+    recurring_amount        NUMERIC(14,2), -- Otomatik katkı tutarı
+    last_contribution_date  DATE           -- Son otomatik katkının işlendiği tarih
 );
 
 -- Hedeflerim: bir hedefe yapılan tekil yatırım/katkı geçmişi
