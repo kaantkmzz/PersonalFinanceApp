@@ -698,11 +698,43 @@ namespace PersonalFinanceApp
             try
             {
                 CheckCategoryBudgets();
-                await Task.CompletedTask;
+                await CheckAssetPriceAlertsAsync();
             }
             finally
             {
                 _backgroundCheckRunning = false;
+            }
+        }
+
+        // Aktif fiyat alarmlarını kontrol eder; AssetPriceService zaten 30sn'lik bellek-içi cache
+        // kullandığından burada ekstra bir maliyet/istek yükü oluşturmuyoruz (Varlıklarım ekranıyla
+        // aynı cache'i paylaşıyor). Aynı alarm bir günde en fazla bir kez bildirim gönderir.
+        private async Task CheckAssetPriceAlertsAsync()
+        {
+            var alertService = new AssetPriceAlertService();
+            var priceService = new AssetPriceService();
+
+            var alerts = alertService.GetActiveByUser(_user.Id);
+            if (alerts.Count == 0) return;
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            foreach (var alert in alerts)
+            {
+                if (alert.LastTriggeredAt.HasValue && alert.LastTriggeredAt.Value.Date == DateTime.UtcNow.Date) continue;
+
+                decimal? price = await priceService.GetPriceTryAsync(alert.Symbol, alert.AssetType);
+                if (!price.HasValue) continue;
+
+                bool triggered = alert.Direction == "above" ? price.Value >= alert.ThresholdPrice : price.Value <= alert.ThresholdPrice;
+                if (!triggered) continue;
+
+                alertService.MarkTriggered(alert.Id);
+                string catalogName = AssetCatalog.FindBySymbol(alert.Symbol)?.Name ?? alert.Symbol;
+                string directionText = alert.Direction == "above" ? "üzerine çıktı" : "altına indi";
+                ShowTrayBalloon(
+                    "Fiyat Alarmı",
+                    $"{catalogName}, {alert.ThresholdPrice.ToString("#,##0.00", tr)}₺ eşiğinin {directionText} (güncel: {price.Value.ToString("#,##0.00", tr)}₺).");
             }
         }
 

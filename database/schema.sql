@@ -9,6 +9,7 @@
 -- denetlenebilirlik için burada tarihleniyor):
 --   2026-08-21  categories.budget_limit eklendi (Faz 2 — kategori bütçe limiti)
 --   2026-08-21  categories.color, categories.icon eklendi (Faz 3 — kategori renk/ikon)
+--   2026-08-21  asset_price_alerts tablosu eklendi (Faz 4 — varlık fiyat alarmı)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -127,6 +128,19 @@ CREATE TABLE user_holdings (
     avg_cost_try  NUMERIC(14,4) NOT NULL DEFAULT 0,
     created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, symbol)
+);
+
+-- Varlıklarım: fiyat alarmları (eşik geçilince tepsi bildirimi gösterilir, günde en fazla bir kez)
+CREATE TABLE asset_price_alerts (
+    alert_id          SERIAL PRIMARY KEY,
+    user_id           INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    symbol            TEXT NOT NULL,
+    asset_type        TEXT NOT NULL,
+    direction         TEXT NOT NULL CHECK (direction IN ('above','below')),
+    threshold_price   NUMERIC(18,4) NOT NULL,
+    is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+    last_triggered_at TIMESTAMP,
+    created_at        TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Varlıklarım: alım/satım işlem geçmişi

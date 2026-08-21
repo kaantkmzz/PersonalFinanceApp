@@ -11,7 +11,9 @@ namespace PersonalFinanceApp
     {
         private readonly User _user;
         private readonly string _symbol;
+        private readonly string _assetType;
         private readonly AssetService _assetService = new AssetService();
+        private readonly AssetPriceAlertService _alertService = new AssetPriceAlertService();
 
         public bool ChangesMade { get; private set; }
 
@@ -30,11 +32,16 @@ namespace PersonalFinanceApp
         private TextBox txtSellQuantity = new TextBox();
         private Label lblStatus = new Label();
         private DataGridView dgvHistory = new DataGridView();
+        private ComboBox cmbAlertDirection = new ComboBox();
+        private TextBox txtAlertThreshold = new TextBox();
+        private Label lblAlertStatus = new Label();
+        private Panel pnlAlertList = new Panel();
 
         public AssetDetailDialog(User user, string symbol)
         {
             _user = user;
             _symbol = symbol;
+            _assetType = AssetCatalog.FindBySymbol(symbol)?.AssetType ?? "crypto";
             SetupUI();
             this.Load += (s, e) => Helpers.DarkTitleBarHelper.EnableDarkTitleBar(this);
             this.Shown += async (s, e) => await LoadDataAsync();
@@ -44,7 +51,7 @@ namespace PersonalFinanceApp
         {
             this.AutoScaleMode = AutoScaleMode.None;
             this.Text = "Varlık Detayı";
-            this.Size = new Size(480, 780);
+            this.Size = new Size(480, 940);
             this.BackColor = AppBackColor;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -120,12 +127,107 @@ namespace PersonalFinanceApp
 
             pnlHistoryWrapper.Controls.Add(dgvHistory);
 
+            // --- Fiyat Alarmı ---
+            Panel divider4 = new Panel { Left = 20, Top = 750, Width = 420, Height = 1, BackColor = AppTheme.HoverBackColor };
+            Label lblAlertTitle = new Label { Text = "Fiyat Alarmı", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 765, AutoSize = true };
+
+            cmbAlertDirection.Left = 20; cmbAlertDirection.Top = 800; cmbAlertDirection.Width = 170; cmbAlertDirection.Height = 32;
+            cmbAlertDirection.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbAlertDirection.Font = new Font("Segoe UI", 9.5F);
+            cmbAlertDirection.Items.Add("Üstüne çıkarsa");
+            cmbAlertDirection.Items.Add("Altına inerse");
+            cmbAlertDirection.SelectedIndex = 0;
+
+            Panel pnlThreshold = new Panel { Left = 200, Top = 800, Width = 140, Height = 32 };
+            SetupSmoothContainer(pnlThreshold, 8, CardBackColor);
+            txtAlertThreshold.BorderStyle = BorderStyle.None; txtAlertThreshold.BackColor = CardBackColor; txtAlertThreshold.ForeColor = TextLight;
+            txtAlertThreshold.Font = new Font("Segoe UI", 10F); txtAlertThreshold.Location = new Point(10, 6); txtAlertThreshold.Width = 120;
+            txtAlertThreshold.PlaceholderText = "Eşik ₺";
+            pnlThreshold.Controls.Add(txtAlertThreshold);
+
+            Button btnAddAlert = new Button { Text = "Kur", Left = 350, Top = 800, Width = 90, Height = 32, Cursor = Cursors.Hand };
+            SetupRoundedButton(btnAddAlert, AppTheme.AccentColor, Color.White);
+            btnAddAlert.Click += BtnAddAlert_Click;
+
+            lblAlertStatus.Left = 20; lblAlertStatus.Top = 838; lblAlertStatus.Width = 420; lblAlertStatus.Height = 20;
+            lblAlertStatus.Font = new Font("Segoe UI", 8.5F);
+
+            pnlAlertList.Left = 20; pnlAlertList.Top = 862; pnlAlertList.Width = 420; pnlAlertList.Height = 60;
+            pnlAlertList.AutoScroll = true;
+            pnlAlertList.BackColor = AppBackColor;
+
             this.Controls.Add(lblTitle); this.Controls.Add(lblSummary); this.Controls.Add(divider1);
             this.Controls.Add(lblBuyTitle); this.Controls.Add(lblBuyHint); this.Controls.Add(pnlBuy); this.Controls.Add(btnBuy);
             this.Controls.Add(divider2);
             this.Controls.Add(lblSellTitle); this.Controls.Add(lblSellHint); this.Controls.Add(pnlSell); this.Controls.Add(btnSell);
             this.Controls.Add(lblStatus);
             this.Controls.Add(divider3); this.Controls.Add(lblHistoryTitle); this.Controls.Add(pnlHistoryWrapper);
+            this.Controls.Add(divider4); this.Controls.Add(lblAlertTitle);
+            this.Controls.Add(cmbAlertDirection); this.Controls.Add(pnlThreshold); this.Controls.Add(btnAddAlert);
+            this.Controls.Add(lblAlertStatus); this.Controls.Add(pnlAlertList);
+        }
+
+        private void BtnAddAlert_Click(object? sender, EventArgs e)
+        {
+            string raw = new string(txtAlertThreshold.Text.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.');
+            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal threshold) || threshold <= 0)
+            {
+                lblAlertStatus.ForeColor = Color.Salmon;
+                lblAlertStatus.Text = "Geçerli bir eşik fiyat girin.";
+                return;
+            }
+
+            string direction = cmbAlertDirection.SelectedIndex == 0 ? "above" : "below";
+            if (_alertService.AddAlert(_user.Id, _symbol, _assetType, direction, threshold, out string error))
+            {
+                lblAlertStatus.ForeColor = Color.LightGreen;
+                lblAlertStatus.Text = "Alarm kuruldu.";
+                txtAlertThreshold.Clear();
+                LoadAlerts();
+            }
+            else
+            {
+                lblAlertStatus.ForeColor = Color.Salmon;
+                lblAlertStatus.Text = error;
+            }
+        }
+
+        private void LoadAlerts()
+        {
+            pnlAlertList.Controls.Clear();
+            var alerts = _alertService.GetActiveBySymbol(_user.Id, _symbol);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            int top = 0;
+            foreach (var alert in alerts)
+            {
+                string arrow = alert.Direction == "above" ? "↑" : "↓";
+                Label lbl = new Label
+                {
+                    Text = $"{arrow} {alert.ThresholdPrice.ToString("#,##0.00", tr)} ₺",
+                    ForeColor = TextLight,
+                    Left = 0,
+                    Top = top,
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                Button btnRemove = new Button { Text = "✕", Left = 380, Top = top - 4, Width = 26, Height = 24, Cursor = Cursors.Hand };
+                SetupRoundedButton(btnRemove, Color.FromArgb(80, 85, 105), Color.White);
+                int alertId = alert.Id;
+                btnRemove.Click += (s, e) =>
+                {
+                    _alertService.DeleteAlert(alertId, _user.Id);
+                    LoadAlerts();
+                };
+                pnlAlertList.Controls.Add(lbl);
+                pnlAlertList.Controls.Add(btnRemove);
+                top += 30;
+            }
+
+            if (alerts.Count == 0)
+            {
+                pnlAlertList.Controls.Add(new Label { Text = "Aktif alarm yok.", ForeColor = TextMuted, Font = new Font("Segoe UI", 9F, FontStyle.Italic), AutoSize = true, Top = 0, Left = 0 });
+            }
         }
 
         private void DgvHistory_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
@@ -156,6 +258,7 @@ namespace PersonalFinanceApp
             }
 
             LoadHistory();
+            LoadAlerts();
         }
 
         private void LoadHistory()
