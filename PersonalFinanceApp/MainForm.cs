@@ -697,11 +697,52 @@ namespace PersonalFinanceApp
             _backgroundCheckRunning = true;
             try
             {
+                CheckCategoryBudgets();
                 await Task.CompletedTask;
             }
             finally
             {
                 _backgroundCheckRunning = false;
+            }
+        }
+
+        // Ay değişince tekrar uyarılabilsin diye ayı da saklıyoruz; bildirim tekrarını
+        // (aynı ay içinde aynı kategori için) önlemek amaçlı bellek-içi bir küme — DB'de
+        // ayrı bir "bildirildi" sütunu tutmuyoruz, uygulama yeniden başlatılırsa bir kez
+        // daha uyarı gelmesi kabul edilebilir (bkz. plan: kalıcı fiyat-alarmı önlemesinden
+        // kasıtlı olarak farklı, çünkü bütçe aşımı devam eden bir durum, tekrar hatırlatmak zararsız).
+        private readonly HashSet<int> _budgetAlertedCategoryIds = new HashSet<int>();
+        private int _budgetAlertMonth = -1;
+
+        private void CheckCategoryBudgets()
+        {
+            var today = DateTime.Today;
+            if (_budgetAlertMonth != today.Month)
+            {
+                _budgetAlertMonth = today.Month;
+                _budgetAlertedCategoryIds.Clear();
+            }
+
+            var categoryService = new CategoryService();
+            var transactionService = new TransactionService();
+
+            var budgeted = categoryService.GetUserCategories(_user.Id).Where(c => c.BudgetLimit != null).ToList();
+            if (budgeted.Count == 0) return;
+
+            var spentByCategory = transactionService.GetMonthlyExpenseByCategoryId(_user.Id, today.Year, today.Month);
+
+            foreach (var category in budgeted)
+            {
+                if (_budgetAlertedCategoryIds.Contains(category.Id)) continue;
+
+                decimal spent = spentByCategory.TryGetValue(category.Id, out decimal s) ? s : 0;
+                if (spent <= category.BudgetLimit!.Value) continue;
+
+                _budgetAlertedCategoryIds.Add(category.Id);
+                var tr = new System.Globalization.CultureInfo("tr-TR");
+                ShowTrayBalloon(
+                    "Bütçe Aşıldı",
+                    $"{category.Name} kategorisinde bu ay {spent.ToString("#,##0", tr)}₺ / {category.BudgetLimit.Value.ToString("#,##0", tr)}₺ harcadınız.");
             }
         }
 

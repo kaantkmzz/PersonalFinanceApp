@@ -271,5 +271,44 @@ namespace PersonalFinanceApp.Data
 
             return totals;
         }
+
+        // Belirli bir ayda, category_id bazında toplam gider (kategori bütçe limiti kontrolü için).
+        // İsimle değil ID ile grupluyoruz — kategori adlarının benzersizliği DB düzeyinde garanti değil.
+        public Dictionary<int, decimal> GetMonthlyExpenseByCategoryId(int userId, int year, int month)
+        {
+            var totals = new Dictionary<int, decimal>();
+            var start = new DateTime(year, month, 1);
+            var end = start.AddMonths(1);
+
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+            SELECT category_id, SUM(amount) AS total
+            FROM transactions
+            WHERE user_id = @userId AND type = 'expense'
+              AND transaction_date >= @start AND transaction_date < @end
+            GROUP BY category_id";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            int categoryId = reader.GetInt32(reader.GetOrdinal("category_id"));
+                            decimal total = reader.GetDecimal(reader.GetOrdinal("total"));
+                            totals[categoryId] = total;
+                        }
+                    }
+                }
+            }
+
+            return totals;
+        }
     }
 }

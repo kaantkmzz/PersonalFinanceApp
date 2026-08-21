@@ -3,6 +3,11 @@
 --   1. Boş bir veritabanı oluşturun (örn. `createdb PersonalFinanceDb`)
 --   2. Bu dosyayı çalıştırın: `psql -h <host> -p <port> -U <kullanıcı> -d PersonalFinanceDb -f schema.sql`
 --   3. PersonalFinanceApp/config.json içindeki ConnectionString'i buna göre ayarlayın.
+--
+-- Manuel ALTER TABLE geçmişi (bu dosya otomatik uygulanmıyor; canlı veritabanına elle
+-- ALTER TABLE ile uygulanan her değişiklik burada da CREATE TABLE'a yansıtılır ve
+-- denetlenebilirlik için burada tarihleniyor):
+--   2026-08-21  categories.budget_limit eklendi (Faz 2 — kategori bütçe limiti)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -31,7 +36,10 @@ CREATE TABLE categories (
     category_id  SERIAL PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
-    type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal', 'invest'))
+    type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal', 'invest')),
+    -- Aylık harcama limiti; sadece 'expense' tipi kategorilerde anlamlı, aşılınca tepsi bildirimi gösterilir.
+    budget_limit NUMERIC(14,2),
+    CONSTRAINT chk_budget_limit CHECK (budget_limit IS NULL OR (type = 'expense' AND budget_limit > 0))
 );
 
 CREATE TABLE transactions (

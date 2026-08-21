@@ -112,6 +112,11 @@ namespace PersonalFinanceApp.Services
             return _repository.GetTotalsByCategory(userId);
         }
 
+        public Dictionary<int, decimal> GetMonthlyExpenseByCategoryId(int userId, int year, int month)
+        {
+            return _repository.GetMonthlyExpenseByCategoryId(userId, year, month);
+        }
+
         public bool UpdateTransaction(int transactionId, int userId, int categoryId, decimal amount,
             string type, string? description, DateTime transactionDate, out string errorMessage)
         {

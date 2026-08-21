@@ -62,6 +62,36 @@ namespace PersonalFinanceApp.Services
             _repository.Update(categoryId, userId, newName);
             return true;
         }
+
+        // Bütçe limiti sadece "expense" (gider) tipi kategorilerde anlamlı; null geçilirse limit kaldırılır.
+        public bool SetBudgetLimit(int categoryId, int userId, decimal? budgetLimit, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            var category = _repository.GetByUserId(userId).FirstOrDefault(c => c.Id == categoryId);
+            if (category == null)
+            {
+                errorMessage = "Kategori bulunamadı.";
+                return false;
+            }
+
+            if (budgetLimit.HasValue)
+            {
+                if (category.Type != "expense")
+                {
+                    errorMessage = "Bütçe limiti sadece gider kategorilerinde ayarlanabilir.";
+                    return false;
+                }
+                if (budgetLimit.Value <= 0)
+                {
+                    errorMessage = "Bütçe limiti 0'dan büyük olmalıdır.";
+                    return false;
+                }
+            }
+
+            _repository.SetBudgetLimit(categoryId, userId, budgetLimit);
+            return true;
+        }
         // İsme göre kategori arar; yoksa otomatik oluşturur (kullanıcı serbestçe kategori adı yazabilsin diye)
         public Category GetOrCreateCategory(int userId, string name, string type)
         {

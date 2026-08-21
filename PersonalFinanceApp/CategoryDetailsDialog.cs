@@ -26,7 +26,11 @@ namespace PersonalFinanceApp
         private Label lblTitle = new Label();
         private DataGridView dgvTransactions = new DataGridView();
         private TextBox txtRename = new TextBox();
+        private TextBox txtBudgetLimit = new TextBox();
+        private Label lblBudget = new Label();
+        private Control[] _budgetControls = Array.Empty<Control>();
         private Label lblStatus = new Label();
+        private Category? _category;
 
         public CategoryDetailsDialog(User user, int categoryId, string categoryName)
         {
@@ -36,11 +40,12 @@ namespace PersonalFinanceApp
 
             SetupDialog();
             LoadCategoryTransactions();
+            LoadCategoryInfo();
         }
 
         private void SetupDialog()
         {
-            this.Size = new Size(700, 500);
+            this.Size = new Size(700, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -58,7 +63,7 @@ namespace PersonalFinanceApp
             this.Controls.Add(lblTitle);
 
             // Tablo (Sadece bu kategoriye ait işlemler)
-            Panel pnlGridWrapper = new Panel { Left = 20, Top = 70, Width = 645, Height = 280, Padding = new Padding(2, 6, 2, 6) };
+            Panel pnlGridWrapper = new Panel { Left = 20, Top = 70, Width = 645, Height = 250, Padding = new Padding(2, 6, 2, 6) };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
 
             dgvTransactions.Dock = DockStyle.Fill;
@@ -84,8 +89,30 @@ namespace PersonalFinanceApp
             pnlGridWrapper.Controls.Add(dgvTransactions);
             this.Controls.Add(pnlGridWrapper);
 
+            // Kategori ayarları satırı: bütçe limiti (sadece gider kategorilerinde görünür).
+            // Bu satır ileride (renk/ikon fazında) sağ tarafa ek alanlarla genişleyecek şekilde
+            // ayrılmış durumda, bu yüzden alttaki yeniden adlandırma/sil satırları tekrar kaymayacak.
+            lblBudget.Text = "Aylık Bütçe Limiti (₺):"; lblBudget.Left = 20; lblBudget.Top = 332; lblBudget.ForeColor = TextMuted; lblBudget.AutoSize = true;
+            this.Controls.Add(lblBudget);
+
+            Panel pnlBudget = new Panel { Left = 20, Top = 355, Width = 160, Height = 36 };
+            SetupSmoothContainer(pnlBudget, 8, CardBackColor);
+            txtBudgetLimit.Left = 10; txtBudgetLimit.Top = 8; txtBudgetLimit.Width = 140;
+            txtBudgetLimit.Font = new Font("Segoe UI", 10.5F); txtBudgetLimit.BorderStyle = BorderStyle.None;
+            txtBudgetLimit.BackColor = CardBackColor; txtBudgetLimit.ForeColor = TextLight;
+            txtBudgetLimit.PlaceholderText = "Limit yok";
+            pnlBudget.Controls.Add(txtBudgetLimit);
+            this.Controls.Add(pnlBudget);
+
+            Button btnSaveBudget = new Button { Text = "Kaydet", Left = 190, Top = 355, Height = 36, Cursor = Cursors.Hand };
+            btnSaveBudget.Width = TextRenderer.MeasureText(btnSaveBudget.Text, btnSaveBudget.Font).Width + 36;
+            SetupRoundedButton(btnSaveBudget, Color.FromArgb(80, 85, 105), Color.White);
+            btnSaveBudget.Click += BtnSaveBudget_Click;
+            this.Controls.Add(btnSaveBudget);
+            _budgetControls = new Control[] { lblBudget, pnlBudget, btnSaveBudget };
+
             // Alt Kısım: Yeniden Adlandırma ve Silme (Eski Kategoriler ekranından taşındı)
-            Panel pnlRename = new Panel { Left = 20, Top = 370, Width = 200, Height = 36 };
+            Panel pnlRename = new Panel { Left = 20, Top = 410, Width = 200, Height = 36 };
             SetupSmoothContainer(pnlRename, 8, CardBackColor);
             txtRename.Left = 10; txtRename.Top = 8; txtRename.Width = 180;
             txtRename.Font = new Font("Segoe UI", 10.5F); txtRename.BorderStyle = BorderStyle.None;
@@ -94,23 +121,64 @@ namespace PersonalFinanceApp
             pnlRename.Controls.Add(txtRename);
             this.Controls.Add(pnlRename);
 
-            Button btnRename = new Button { Text = "✏️ Yeniden Adlandır", Top = 370, Height = 36, Cursor = Cursors.Hand };
+            Button btnRename = new Button { Text = "✏️ Yeniden Adlandır", Top = 410, Height = 36, Cursor = Cursors.Hand };
             btnRename.Width = TextRenderer.MeasureText(btnRename.Text, btnRename.Font).Width + 44;
             btnRename.Left = 230;
             SetupRoundedButton(btnRename, Color.FromArgb(80, 85, 105), Color.White);
             btnRename.Click += BtnRename_Click;
             this.Controls.Add(btnRename);
 
-            Button btnDelete = new Button { Text = "🗑️ Kategoriyi Sil", Top = 370, Height = 36, Cursor = Cursors.Hand };
+            Button btnDelete = new Button { Text = "🗑️ Kategoriyi Sil", Top = 410, Height = 36, Cursor = Cursors.Hand };
             btnDelete.Width = TextRenderer.MeasureText(btnDelete.Text, btnDelete.Font).Width + 44;
             btnDelete.Left = 665 - btnDelete.Width;
             SetupRoundedButton(btnDelete, DangerColor, Color.White);
             btnDelete.Click += BtnDelete_Click;
             this.Controls.Add(btnDelete);
 
-            lblStatus.Left = 20; lblStatus.Top = 420; lblStatus.AutoSize = true;
+            lblStatus.Left = 20; lblStatus.Top = 460; lblStatus.AutoSize = true;
             lblStatus.Font = new Font("Segoe UI", 9F);
             this.Controls.Add(lblStatus);
+        }
+
+        private void LoadCategoryInfo()
+        {
+            _category = _categoryService.GetUserCategories(_user.Id).FirstOrDefault(c => c.Id == _categoryId);
+
+            bool isExpense = _category?.Type == "expense";
+            foreach (var c in _budgetControls) c.Visible = isExpense;
+
+            if (isExpense && _category?.BudgetLimit != null)
+            {
+                txtBudgetLimit.Text = _category.BudgetLimit.Value.ToString("0.##");
+            }
+        }
+
+        private void BtnSaveBudget_Click(object? sender, EventArgs e)
+        {
+            string text = txtBudgetLimit.Text.Trim();
+            decimal? limit = null;
+
+            if (!string.IsNullOrEmpty(text))
+            {
+                if (!decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal parsed))
+                {
+                    lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                    lblStatus.Text = "Geçerli bir tutar giriniz.";
+                    return;
+                }
+                limit = parsed;
+            }
+
+            if (_categoryService.SetBudgetLimit(_categoryId, _user.Id, limit, out string errorMessage))
+            {
+                lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                lblStatus.Text = limit.HasValue ? "Bütçe limiti kaydedildi." : "Bütçe limiti kaldırıldı.";
+            }
+            else
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = errorMessage;
+            }
         }
 
         private void LoadCategoryTransactions()

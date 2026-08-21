@@ -260,6 +260,7 @@ namespace PersonalFinanceApp
             else _cachedCategories = _categoryService.GetUserCategoriesByType(_user.Id, TrToType(filter));
 
             var totals = _transactionService.GetCategoryTotals(_user.Id);
+            var monthlyExpense = _transactionService.GetMonthlyExpenseByCategoryId(_user.Id, DateTime.Today.Year, DateTime.Today.Month);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
             string searchText = txtSearch.Text.Trim();
@@ -274,16 +275,23 @@ namespace PersonalFinanceApp
                 Tip = TypeToTr(c.Type),
                 ToplamTutar = _user.HideAmountsEnabled
                     ? "••••••"
-                    : (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺"
+                    : (totals.TryGetValue(c.Id, out decimal total) ? total : 0).ToString("#,##0", tr) + " ₺",
+                Butce = c.BudgetLimit == null
+                    ? ""
+                    : _user.HideAmountsEnabled
+                        ? "••• / •••"
+                        : $"{(monthlyExpense.TryGetValue(c.Id, out decimal spent) ? spent : 0).ToString("#,##0", tr)} / {c.BudgetLimit.Value.ToString("#,##0", tr)} ₺"
             }).ToList();
 
             dgvCategories.DataSource = displayList;
 
             if (dgvCategories.Columns["ID"] != null)
             {
-                dgvCategories.Columns["ID"]!.FillWeight = 30; dgvCategories.Columns["Ad"]!.FillWeight = 90;
-                dgvCategories.Columns["Tip"]!.FillWeight = 60; dgvCategories.Columns["ToplamTutar"]!.FillWeight = 90;
+                dgvCategories.Columns["ID"]!.FillWeight = 30; dgvCategories.Columns["Ad"]!.FillWeight = 80;
+                dgvCategories.Columns["Tip"]!.FillWeight = 50; dgvCategories.Columns["ToplamTutar"]!.FillWeight = 80;
                 dgvCategories.Columns["ToplamTutar"]!.HeaderText = "Toplam Tutar";
+                dgvCategories.Columns["Butce"]!.FillWeight = 70;
+                dgvCategories.Columns["Butce"]!.HeaderText = "Bu Ayki Bütçe";
             }
         }
 
