@@ -12,7 +12,7 @@ namespace PersonalFinanceApp
         private readonly AccountService _accountService = new AccountService();
         private readonly AssetService _assetService = new AssetService();
 
-        private enum ReportMode { Genel, Varliklarim }
+        private enum ReportMode { Genel, Varliklarim, Trend }
         private ReportMode _reportMode = ReportMode.Genel;
         // Genel <-> Varlıklarım arasında hızlıca birkaç kez tıklanınca, önceki (yarım kalmış)
         // LoadAssetReportAsync çağrısı gecikmeli dönüp güncel grafiği ezmesin diye kullanılan sayaç.
@@ -64,6 +64,15 @@ namespace PersonalFinanceApp
         private Panel pnlModeToggle = new Panel();
         private Button btnModeGenel = new Button();
         private Button btnModeVarliklarim = new Button();
+        private Button btnModeTrend = new Button();
+        private Button btnExportAssets = new Button();
+        private List<AssetHoldingView> _currentHoldings = new List<AssetHoldingView>();
+
+        // --- Trend modu (son 6 ay Gelir/Gider karşılaştırması) ---
+        private Panel pnlTrendChart = new Panel();
+        private Chart trendChart = new Chart();
+        private ChartRevealAnimator? _trendChartReveal;
+        private Label lblTrendEmptyState = new Label();
         private Label lblCard1Title = new Label();
         private Label lblCard2Title = new Label();
         private Label lblCard3Title = new Label();
@@ -123,6 +132,7 @@ namespace PersonalFinanceApp
                 _revealSettleTimer.Dispose();
                 _lineChartReveal?.Dispose();
                 _columnChartReveal?.Dispose();
+                _trendChartReveal?.Dispose();
                 foreach (var t in _cardAnimTimers.Values) { t.Stop(); t.Dispose(); }
                 _cardAnimTimers.Clear();
             };
@@ -144,6 +154,8 @@ namespace PersonalFinanceApp
         {
             if (_reportMode == ReportMode.Varliklarim)
                 _ = LoadAssetReportAsync();
+            else if (_reportMode == ReportMode.Trend)
+                LoadTrendReport();
             else
                 LoadReport(resetDrillDown: false);
         }
@@ -161,10 +173,16 @@ namespace PersonalFinanceApp
         // Tema değişikliğinde ekran yeniden kurulduğunda Genel/Varlıklarım grafik modunun da
         // korunması için (bkz. MainForm.RebuildForThemeChange, DrillDownType ile aynı desen).
         public bool IsAssetReportMode => _reportMode == ReportMode.Varliklarim;
+        public bool IsTrendReportMode => _reportMode == ReportMode.Trend;
 
         public void RestoreAssetReportMode(bool isAssetMode)
         {
             if (isAssetMode) SetMode(ReportMode.Varliklarim);
+        }
+
+        public void RestoreTrendReportMode(bool isTrendMode)
+        {
+            if (isTrendMode) SetMode(ReportMode.Trend);
         }
         private void SetupUI()
         {
@@ -286,7 +304,17 @@ namespace PersonalFinanceApp
             btnExportReport.Click += BtnExportReport_Click;
             SetupOutlinedButton(btnExportReport, TextMuted, TextLight);
 
-            // --- Sağ alt: Genel / Varlıklarım grafik modu seçimi ---
+            btnExportAssets.Text = "Varlıkları CSV'ye Aktar";
+            btnExportAssets.Left = 0;
+            btnExportAssets.Top = 335;
+            btnExportAssets.Width = 405;
+            btnExportAssets.Height = 34;
+            btnExportAssets.Cursor = Cursors.Hand;
+            btnExportAssets.Click += BtnExportAssets_Click;
+            btnExportAssets.Visible = false;
+            SetupOutlinedButton(btnExportAssets, TextMuted, TextLight);
+
+            // --- Sağ alt: Genel / Varlıklarım / Trend grafik modu seçimi ---
             btnModeGenel.Text = "Genel";
             btnModeGenel.Width = 110; btnModeGenel.Height = 32; btnModeGenel.Left = 0; btnModeGenel.Top = 0;
             btnModeGenel.Cursor = Cursors.Hand; btnModeGenel.Font = new Font("Segoe UI", 9F);
@@ -301,11 +329,19 @@ namespace PersonalFinanceApp
             btnModeVarliklarim.Click += (s, e) => SetMode(ReportMode.Varliklarim);
             SetupModeToggleButton(btnModeVarliklarim, () => _reportMode == ReportMode.Varliklarim);
 
-            pnlModeToggle.Width = btnModeVarliklarim.Right;
+            btnModeTrend.Text = "Trend";
+            btnModeTrend.Width = 90; btnModeTrend.Height = 32; btnModeTrend.Left = btnModeVarliklarim.Right + 8; btnModeTrend.Top = 0;
+            btnModeTrend.Cursor = Cursors.Hand; btnModeTrend.Font = new Font("Segoe UI", 9F);
+            btnModeTrend.FlatAppearance.BorderSize = 0;
+            btnModeTrend.Click += (s, e) => SetMode(ReportMode.Trend);
+            SetupModeToggleButton(btnModeTrend, () => _reportMode == ReportMode.Trend);
+
+            pnlModeToggle.Width = btnModeTrend.Right;
             pnlModeToggle.Height = 32;
             pnlModeToggle.BackColor = AppBackColor;
             pnlModeToggle.Controls.Add(btnModeGenel);
             pnlModeToggle.Controls.Add(btnModeVarliklarim);
+            pnlModeToggle.Controls.Add(btnModeTrend);
 
             pnlRight.Controls.Add(lblMonth);
             pnlRight.Controls.Add(pnlMonth);
@@ -317,11 +353,13 @@ namespace PersonalFinanceApp
             pnlRight.Controls.Add(cardNet);
             pnlRight.Controls.Add(cardSafe);
             pnlRight.Controls.Add(btnExportReport);
+            pnlRight.Controls.Add(btnExportAssets);
             pnlRight.Controls.Add(pnlModeToggle);
             pnlRight.Resize += (s, e) => PositionModeToggle(pnlRight);
 
             // --- Sol taraf: Varlıklarım grafik modu (Genel modda görünmez) ---
             SetupAssetCharts(pnlLeft);
+            SetupTrendChart(pnlLeft);
 
             // Sıra önemli: önce Fill (sol), sonra Right (sağ) — böylece sağ blok sabit genişliğini korur, sol kalanı doldurur
             this.Controls.Add(pnlLeft);
@@ -369,33 +407,40 @@ namespace PersonalFinanceApp
             _reportMode = mode;
             btnModeGenel.Invalidate();
             btnModeVarliklarim.Invalidate();
+            btnModeTrend.Invalidate();
 
+            bool isGenel = mode == ReportMode.Genel;
             bool isAsset = mode == ReportMode.Varliklarim;
+            bool isTrend = mode == ReportMode.Trend;
 
-            if (isAsset)
+            if (!isGenel)
             {
                 // Genel moddan gecikmeli (zamanlayıcı tabanlı) "ortaya çıkarma" animasyonu hâlâ
                 // sürüyor olabilir; durdurmazsak birkaç yüz milisaniye sonra tetiklenip chart.Visible'ı
-                // tekrar TRUE yapıp Varlıklarım'ın üzerine Genel pastasını geri getiriyordu (hızlı
-                // Genel<->Varlıklarım geçişlerinde grafiğin "kaybolup" yanlış yerde görünmesi bug'ı).
+                // tekrar TRUE yapıp diğer modun üzerine Genel pastasını geri getiriyordu (hızlı mod
+                // geçişlerinde grafiğin "kaybolup" yanlış yerde görünmesi bug'ı).
                 _revealSettleTimer.Stop();
                 _revealTimer.Stop();
                 pnlChartReveal.Visible = false;
             }
 
-            chart.Visible = !isAsset;
-            pnlLegendWrapper.Visible = !isAsset;
+            chart.Visible = isGenel;
+            pnlLegendWrapper.Visible = isGenel;
             pnlAssetCharts.Visible = isAsset;
+            pnlTrendChart.Visible = isTrend;
 
-            lblMonth.Visible = !isAsset;
-            pnlMonth.Visible = !isAsset;
-            lblYear.Visible = !isAsset;
-            pnlYear.Visible = !isAsset;
-            btnView.Visible = !isAsset;
-            btnExportReport.Visible = !isAsset;
+            lblMonth.Visible = isGenel;
+            pnlMonth.Visible = isGenel;
+            lblYear.Visible = isGenel;
+            pnlYear.Visible = isGenel;
+            btnView.Visible = isGenel;
+            btnExportReport.Visible = isGenel;
+            btnExportAssets.Visible = isAsset;
 
             if (isAsset)
                 _ = LoadAssetReportAsync();
+            else if (isTrend)
+                LoadTrendReport();
             else
                 LoadReport(resetDrillDown: false);
         }
@@ -1304,6 +1349,172 @@ namespace PersonalFinanceApp
             }
         }
 
+        private void BtnExportAssets_Click(object? sender, EventArgs e)
+        {
+            if (_currentHoldings.Count == 0)
+            {
+                MessageBox.Show("Dışa aktarılacak varlık yok.", "Bilgi");
+                return;
+            }
+
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "CSV Dosyası (*.csv)|*.csv";
+                dialog.FileName = $"varliklarim_{DateTime.Today:yyyy_MM_dd}.csv";
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        var tr = new System.Globalization.CultureInfo("tr-TR");
+                        using (var writer = new StreamWriter(dialog.FileName, false, System.Text.Encoding.UTF8))
+                        {
+                            writer.WriteLine("Sembol;Miktar;Ort. Maliyet;Güncel Fiyat;Güncel Değer;Kâr/Zarar");
+                            foreach (var h in _currentHoldings)
+                            {
+                                string fiyat = h.CurrentPriceTry.HasValue ? h.CurrentPriceTry.Value.ToString("0.00", tr) : "";
+                                string deger = h.CurrentValueTry.HasValue ? h.CurrentValueTry.Value.ToString("0.00", tr) : "";
+                                string kz = h.ProfitLossTry.HasValue ? h.ProfitLossTry.Value.ToString("0.00", tr) : "";
+                                writer.WriteLine($"{h.Symbol};{h.Quantity.ToString("0.########", tr)};{h.AvgCostTry.ToString("0.00", tr)};{fiyat};{deger};{kz}");
+                            }
+                        }
+                        MessageBox.Show("Varlıklar CSV olarak dışa aktarıldı.", "Bilgi");
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Dışa aktarma başarısız: {ex.Message}", "Hata");
+                    }
+                }
+            }
+        }
+
+        // --- Trend grafik modu: kurulum, veri yükleme, sütun grafik çizimi ---
+
+        private void SetupTrendChart(Panel pnlLeft)
+        {
+            pnlTrendChart.Dock = DockStyle.Fill;
+            pnlTrendChart.BackColor = AppBackColor;
+            pnlTrendChart.Visible = false;
+
+            trendChart.Dock = DockStyle.Fill;
+            trendChart.BackColor = AppBackColor;
+            ChartArea trendArea = new ChartArea("trendArea") { BackColor = AppBackColor };
+            trendArea.AxisX.LabelStyle.ForeColor = TextMuted;
+            trendArea.AxisX.LineColor = AppTheme.GridLineColor;
+            trendArea.AxisX.MajorGrid.LineColor = Color.Transparent;
+            trendArea.AxisY.LabelStyle.ForeColor = TextMuted;
+            trendArea.AxisY.LineColor = AppTheme.GridLineColor;
+            trendArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
+            trendArea.AxisX.Interval = 1;
+            trendChart.ChartAreas.Add(trendArea);
+
+            Legend trendLegend = new Legend("trendLegend")
+            {
+                Docking = Docking.Top,
+                Alignment = StringAlignment.Center,
+                BackColor = Color.Transparent,
+                ForeColor = TextLight,
+                Font = new Font("Segoe UI", 9F)
+            };
+            trendChart.Legends.Add(trendLegend);
+
+            lblTrendEmptyState.Dock = DockStyle.Fill;
+            lblTrendEmptyState.ForeColor = TextMuted;
+            lblTrendEmptyState.TextAlign = ContentAlignment.MiddleCenter;
+            lblTrendEmptyState.Text = "Henüz işlem verisi yok.";
+            lblTrendEmptyState.Visible = false;
+
+            Label lblTrendTitle = new Label
+            {
+                Text = "Son 6 Ay: Gelir / Gider",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 0,
+                Top = 0,
+                AutoSize = true
+            };
+            Panel pnlTrendHeader = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = AppBackColor };
+            pnlTrendHeader.Controls.Add(lblTrendTitle);
+
+            pnlTrendChart.Controls.Add(trendChart);
+            pnlTrendChart.Controls.Add(lblTrendEmptyState);
+            pnlTrendChart.Controls.Add(pnlTrendHeader);
+            _trendChartReveal = new ChartRevealAnimator(trendChart, pnlTrendChart, AppBackColor, ChartRevealStyle.GrowFromBottom);
+
+            pnlLeft.Controls.Add(pnlTrendChart);
+        }
+
+        private void LoadTrendReport()
+        {
+            lblTitle.Text = "Rapor — Trend";
+
+            lblCard1Title.Text = "Ort. Aylık Gelir";
+            lblCard2Title.Text = "Ort. Aylık Gider";
+            lblCard3Title.Text = "6 Aylık Net";
+            lblCard4Title.Text = "En Yüksek Gider";
+
+            var trend = _reportService.GetMonthlyTrend(_user.Id, 6);
+
+            decimal avgIncome = trend.Count > 0 ? trend.Average(t => t.Income) : 0;
+            decimal avgExpense = trend.Count > 0 ? trend.Average(t => t.Expense) : 0;
+            decimal totalNet = trend.Sum(t => t.Income - t.Expense);
+            decimal maxExpense = trend.Count > 0 ? trend.Max(t => t.Expense) : 0;
+
+            AnimateCardValue(lblIncome, avgIncome, IncomeColor);
+            AnimateCardValue(lblExpense, avgExpense, ExpenseColor);
+            AnimateCardValue(lblNet, totalNet, totalNet >= 0 ? IncomeColor : ExpenseColor);
+            AnimateCardValue(lblSafeBalance, maxExpense, ExpenseColor);
+
+            BuildTrendChart(trend);
+        }
+
+        private void BuildTrendChart(List<(DateTime MonthStart, decimal Income, decimal Expense)> trend)
+        {
+            trendChart.Series.Clear();
+
+            bool hasData = trend.Any(t => t.Income > 0 || t.Expense > 0);
+            if (!hasData)
+            {
+                trendChart.Visible = false;
+                lblTrendEmptyState.Visible = true;
+                return;
+            }
+
+            lblTrendEmptyState.Visible = false;
+            trendChart.Visible = true;
+
+            var trCulture = new System.Globalization.CultureInfo("tr-TR");
+
+            Series incomeSeries = new Series("Gelir")
+            {
+                ChartType = SeriesChartType.Column,
+                ChartArea = "trendArea",
+                Color = IncomeColor,
+                IsXValueIndexed = true,
+                ToolTip = "#SERIESNAME #AXISLABEL: #VAL{N0} ₺"
+            };
+            Series expenseSeries = new Series("Gider")
+            {
+                ChartType = SeriesChartType.Column,
+                ChartArea = "trendArea",
+                Color = ExpenseColor,
+                IsXValueIndexed = true,
+                ToolTip = "#SERIESNAME #AXISLABEL: #VAL{N0} ₺"
+            };
+
+            foreach (var t in trend)
+            {
+                string label = trCulture.DateTimeFormat.GetAbbreviatedMonthName(t.MonthStart.Month) + " " + (t.MonthStart.Year % 100).ToString("00");
+                incomeSeries.Points.AddXY(label, t.Income);
+                expenseSeries.Points.AddXY(label, t.Expense);
+            }
+
+            trendChart.ChartAreas["trendArea"].AxisY.LabelStyle.Format = "#,##0 ₺";
+            trendChart.Series.Add(incomeSeries);
+            trendChart.Series.Add(expenseSeries);
+            if (this.IsHandleCreated) this.BeginInvoke(new Action(() => _trendChartReveal?.Reveal()));
+        }
+
         // --- Varlıklarım grafik modu: kurulum, veri yükleme, çizgi/sütun grafik çizimi ---
 
         private void SetupAssetCharts(Panel pnlLeft)
@@ -1415,6 +1626,8 @@ namespace PersonalFinanceApp
             // böyle bir durumda artık geçersiz olan bu sonucu uygulamıyoruz.
             if (requestId != _assetReportRequestId || _reportMode != ReportMode.Varliklarim || IsDisposed)
                 return;
+
+            _currentHoldings = holdings;
 
             var costBasis = _assetService.GetHoldingsCostBasisBySymbol(_user.Id);
             var snapshots = _assetService.GetPortfolioSnapshots(_user.Id);

@@ -541,10 +541,12 @@ namespace PersonalFinanceApp
             // sıfırdan kurulacağı için bu durumu yakalayıp yeni örneğe geri uyguluyoruz.
             string? reportDrillDownType = null;
             bool reportAssetMode = false;
+            bool reportTrendMode = false;
             if (_activeContentKey == "report" && _screenCache.TryGetValue("report", out var activeReportControl) && activeReportControl is ReportControl activeReport)
             {
                 reportDrillDownType = activeReport.DrillDownType;
                 reportAssetMode = activeReport.IsAssetReportMode;
+                reportTrendMode = activeReport.IsTrendReportMode;
             }
 
             // Aktif ekranda kullanıcının henüz kaydetmediği bir form girişi olabilir (ör. İşlemler'de
@@ -575,6 +577,8 @@ namespace PersonalFinanceApp
             {
                 if (reportAssetMode)
                     newReport.RestoreAssetReportMode(true);
+                else if (reportTrendMode)
+                    newReport.RestoreTrendReportMode(true);
                 else if (reportDrillDownType != null)
                     newReport.RestoreDrillDownType(reportDrillDownType);
             }

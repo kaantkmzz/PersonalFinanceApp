@@ -24,6 +24,24 @@ namespace PersonalFinanceApp.Services
             };
         }
 
+        // Rapor ekranındaki "Trend" modu için: son N ayın (bugünkü ay dahil) gelir/gider toplamları.
+        public List<(DateTime MonthStart, decimal Income, decimal Expense)> GetMonthlyTrend(int userId, int months)
+        {
+            var result = new List<(DateTime, decimal, decimal)>();
+            DateTime cursor = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-(months - 1));
+
+            for (int i = 0; i < months; i++)
+            {
+                DateTime end = cursor.AddMonths(1);
+                decimal income = _repository.GetTotalByTypeAndDateRange(userId, "income", cursor, end);
+                decimal expense = _repository.GetTotalByTypeAndDateRange(userId, "expense", cursor, end);
+                result.Add((cursor, income, expense));
+                cursor = end;
+            }
+
+            return result;
+        }
+
         public CategorySummary? GetTopExpenseCategory(MonthlyReport report)
         {
             return report.ExpenseBreakdown.OrderByDescending(c => c.TotalAmount).FirstOrDefault();
