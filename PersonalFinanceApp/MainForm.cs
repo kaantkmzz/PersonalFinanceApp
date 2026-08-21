@@ -140,6 +140,7 @@ namespace PersonalFinanceApp
             _trayIcon.Icon = this.Icon;
             _trayIcon.Text = "Finans Takip";
             _trayIcon.Visible = true;
+            UpdateTrayTooltip();
 
             var openItem = CreateMenuItem("Aç", SidebarTextColor, (s, e) => RestoreFromTray());
             var logoutItem = CreateMenuItem("Oturumu Kapat", LogoutColor, (s, e) => DoLogout());
@@ -359,6 +360,7 @@ namespace PersonalFinanceApp
                 _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
                 _accountService.SetHideAmounts(_user.Id, _user.HideAmountsEnabled);
                 RefreshAllCachedScreens();
+                UpdateTrayTooltip();
                 btnEye.Invalidate();
             };
             _eyeButton = btnEye;
@@ -529,6 +531,7 @@ namespace PersonalFinanceApp
             _user.HideAmountsEnabled = !_user.HideAmountsEnabled;
             _accountService.SetHideAmounts(_user.Id, _user.HideAmountsEnabled);
             RefreshAllCachedScreens();
+            UpdateTrayTooltip();
             _eyeButton?.Invalidate();
         }
 
@@ -694,6 +697,22 @@ namespace PersonalFinanceApp
             _trayIcon.ShowBalloonTip(durationMs);
         }
 
+        // Pencere simge alanına küçültülüp Teams tarzı arka planda çalışırken, simgenin üzerine
+        // gelindiğinde anlık bir özet görünsün diye. NotifyIcon.Text ~63 karakterle sınırlı (üzeri
+        // ArgumentOutOfRangeException fırlatır), bu yüzden güvenli tarafta kalmak için kırpıyoruz.
+        private void UpdateTrayTooltip()
+        {
+            var (wallet, safe) = _accountService.GetBalances(_user.Id);
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            string walletText = _user.HideAmountsEnabled ? "••••" : wallet.ToString("#,##0", tr) + " ₺";
+            string safeText = _user.HideAmountsEnabled ? "••••" : safe.ToString("#,##0", tr) + " ₺";
+
+            string text = $"Cüzdan: {walletText} · Kasa: {safeText}";
+            if (text.Length > 63) text = text.Substring(0, 60) + "...";
+            _trayIcon.Text = text;
+        }
+
         // BalloonTipClicked, tepside o an hangi hatırlatıcının gösterildiğini bilemediği için
         // (Windows API balon tıklamasında veri taşımıyor) son gösterilen hatırlatıcının tarihini
         // burada saklıyoruz; tıklanınca o günün ReminderDayDialog'u açılabiliyor.
@@ -730,6 +749,7 @@ namespace PersonalFinanceApp
                 CheckCategoryBudgets();
                 await CheckAssetPriceAlertsAsync();
                 ProcessDueGoalContributionsAndRecurring();
+                UpdateTrayTooltip();
             }
             finally
             {
