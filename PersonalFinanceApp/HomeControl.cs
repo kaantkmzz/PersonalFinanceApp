@@ -722,7 +722,7 @@ namespace PersonalFinanceApp
             _highlightedCells.Clear();
             foreach (var c in newCells) _highlightedCells.Add(c);
             _activeDropAnchor = newCells.Count > 0 ? newCells.Min() : (int?)null;
-            RefreshDragHighlightVisuals();
+            InvalidateHighlightRegion(newCells.Count > 0 ? GetCellsBoundingRect(newCells) : Rectangle.Empty);
         }
 
         private void ClearDragHighlight()
@@ -730,18 +730,37 @@ namespace PersonalFinanceApp
             if (_highlightedCells.Count == 0) return;
             _highlightedCells.Clear();
             _activeDropAnchor = null;
-            RefreshDragHighlightVisuals();
+            InvalidateHighlightRegion(Rectangle.Empty);
         }
 
-        // Vurgu/önizleme artık hücrelerin/çerçevelerin kendi Paint'inde değil, doğrudan this.Paint'te
-        // (bkz. SetupUI) tek bir bitişik dörtgen olarak çiziliyor — ızgara alanının tamamını değil,
-        // sadece o bölgeyi geçersiz kılmak (Invalidate) tüm Ana Sayfa'nın (grafik dahil) her sürükleme
-        // hareketinde yeniden boyanmasını önlüyor.
+        // Önceki ve yeni hedefin dörtgenini kapsayan KÜÇÜK bölgeyi geçersiz kılar. Önceden her hedef
+        // değişiminde ızgaranın 3 satırının TAMAMI geçersiz kılınıyordu (bkz. eski RefreshDragHighlightVisuals)
+        // — bu, o satırlardaki BAŞKA widget'ların da (ör. "Bu Ayın Özeti"ndeki Chart denetimi; GDI+ grafik
+        // çizimi ucuz değil) gereksiz yere yeniden çizilmesine yol açıp sürükleme sırasında, özellikle
+        // geçerli bir hedef yokken/değişirken, gözle görülür bir donmaya neden oluyordu (ekran kaydıyla
+        // doğrulandı). Sadece hedefin gerçekten bulunduğu küçük alanı geçersiz kılmak bunu ortadan kaldırıyor.
+        private Rectangle _lastHighlightRect = Rectangle.Empty;
+        private void InvalidateHighlightRegion(Rectangle newRect)
+        {
+            Rectangle combined = _lastHighlightRect.IsEmpty ? newRect
+                : (newRect.IsEmpty ? _lastHighlightRect : Rectangle.Union(_lastHighlightRect, newRect));
+            if (!combined.IsEmpty)
+            {
+                combined.Inflate(4, 4);
+                this.Invalidate(combined);
+            }
+            _lastHighlightRect = newRect;
+        }
+
+        // Sürükleme başında/sonunda TÜM uygun yuvaları (bkz. _validDropAnchors) bir kerelik göstermek/
+        // temizlemek için — bu ender çağrılır (drag başına 2 kez), bu yüzden tüm ızgarayı geçersiz
+        // kılmak burada sorun değil.
         private void RefreshDragHighlightVisuals()
         {
             int totalRows = _cellPanels.Length / GridCols;
             var gridArea = new Rectangle(CardLeft1 - 4, MiniRowTop - 4, CardLeft4 + CardWidth - CardLeft1 + 8, totalRows * (MiniRowHeight + 20) + 8);
             this.Invalidate(gridArea);
+            _lastHighlightRect = Rectangle.Empty;
         }
 
         private void PlaceWidget(string key, int anchorCell)
