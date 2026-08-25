@@ -660,10 +660,31 @@ namespace PersonalFinanceApp
         // sürükleme sırasında yalnızca varsayılan (küçük, tek hücrelik izlenim veren) imleç görünüyordu.
         private Form? _dragPreviewForm;
 
+        // Salt görsel bir "hayalet" pencere — fare olaylarını YAKALAMAMASI gerekiyor. Önizleme imlecin
+        // sağ-alt çaprazına konurken bu sorun hiç fark edilmemişti; imlecin TAM ÜZERİNE ortalanınca
+        // (bkz. StartWidgetDrag'daki not) bu TopMost pencere artık imlecin doğrudan altında oturuyor —
+        // Windows'un OLE sürükle-bırak "hedef" araması, o noktada ilk bulduğu pencereyi (asıl ızgara
+        // hücresi yerine bu önizlemeyi) hedef sanıp hiçbir yere bırakılmasına izin vermiyordu.
+        // WS_EX_TRANSPARENT, bu pencereyi fare/vuruş testi (hit-test) için tamamen görünmez kılar;
+        // sürükle-bırak hedefi her zaman altındaki gerçek denetime ulaşır.
+        private class DragPreviewForm : Form
+        {
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    const int WS_EX_TRANSPARENT = 0x20;
+                    var cp = base.CreateParams;
+                    cp.ExStyle |= WS_EX_TRANSPARENT;
+                    return cp;
+                }
+            }
+        }
+
         private void StartWidgetDrag(Control source, string key, int colSpan)
         {
             int width = colSpan * CardWidth + (colSpan - 1) * 20;
-            _dragPreviewForm = new Form
+            _dragPreviewForm = new DragPreviewForm
             {
                 FormBorderStyle = FormBorderStyle.None,
                 ShowInTaskbar = false,
