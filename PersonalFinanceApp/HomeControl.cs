@@ -1328,6 +1328,15 @@ namespace PersonalFinanceApp
 
             Panel pnlAmount = new Panel { Left = 18, Top = 92, Width = 140, Height = 34 };
             SetupSmoothContainer(pnlAmount, 8, CardBackColor);
+            // bkz. SetupHomeComboBox'taki aynı not: kutu dolgusu kartla aynı renkte, çerçevesiz
+            // neredeyse görünmüyordu.
+            pnlAmount.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using var pen = new Pen(AppTheme.CardBorderColor, 1f);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnlAmount.Width - 1, pnlAmount.Height - 1), 8);
+                e.Graphics.DrawPath(pen, path);
+            };
             TextBox txtAmount = new TextBox
             {
                 Left = 8,
@@ -1436,6 +1445,16 @@ namespace PersonalFinanceApp
         private void SetupHomeComboBox(Panel pnl, ComboBox cmb)
         {
             SetupSmoothContainer(pnl, 8, CardBackColor);
+            // Kutu dolgusu widget kartıyla aynı renkte (CardBackColor) olduğu için sınır çizilmeden
+            // kutu neredeyse görünmez oluyordu — diğer ekranlardaki kart-üstü kutular gibi (bkz.
+            // ReminderControl.SetupSmoothContainer'ın bordürlü sürümü) ince bir çerçeve ekliyoruz.
+            pnl.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using var pen = new Pen(AppTheme.CardBorderColor, 1f);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), 8);
+                e.Graphics.DrawPath(pen, path);
+            };
             cmb.FlatStyle = FlatStyle.Flat;
             cmb.BackColor = CardBackColor;
             cmb.ForeColor = TextLight;

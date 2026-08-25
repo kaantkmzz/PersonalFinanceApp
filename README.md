@@ -6,15 +6,17 @@ Tanıtım sitesi (canlı demo dahil): **https://kaantkmzz.github.io/PersonalFina
 
 ## Özellikler
 
-- **Cüzdan & Kasa** — günlük harcama gücünüz ile birikiminiz ayrı tutulur, ikisi arasında anında transfer yapılır
-- **İşlemler** — gelir/gider kayıtları; kategori, tutar, tarih, açıklama; arama ve CSV'ye aktarma
+- **Cüzdan & Kasa** — günlük harcama gücünüz ile birikiminiz ayrı tutulur, ikisi arasında anında transfer yapılır; transfer geçmişi ayrıca izlenebilir
+- **İşlemler** — gelir/gider kayıtları; kategori, tutar, tarih, açıklama; arama, tarih aralığı filtresi, toplu işlem modu ve CSV'ye aktarma
 - **Tekrarlanan İşlemler** — aylık/haftalık düzenli gelir-giderler otomatik işlenir
-- **Kategoriler** — kullanıcı tanımlı gelir/gider/hedef/yatırım kategorileri
-- **Varlıklarım** — döviz/altın/kripto pozisyonları, canlı fiyatlarla anlık kâr/zarar
-- **Rapor** — aylık gelir-gider dağılımı, kategori bazlı grafik, portföy değeri gelişimi
-- **Hedeflerim** — birikim hedefleri koyup Kasa'dan aktararak ilerleme takibi
-- **Notlar & Hatırlatıcılar** — finansal kararlar için not, ödeme tarihleri için hatırlatıcı
-- **Profil & Ayarlar** — avatar, tutarları gizleme, veri temizleme sıklığı, açık/koyu tema
+- **Kategoriler** — kullanıcı tanımlı gelir/gider/hedef/yatırım kategorileri; renk/ikon özelleştirme ve aylık bütçe limiti (aşılınca bildirim)
+- **Varlıklarım** — döviz/altın/kripto pozisyonları, canlı fiyatlarla anlık kâr/zarar, satışta gerçekleşen kâr/zarar hesaplaması, fiyat alarmı (eşik aşılınca bildirim)
+- **Rapor** — aylık gelir-gider dağılımı, kategori bazlı grafik, portföy değeri gelişimi, Varlıklarım için Trend modu ve CSV'ye aktarma
+- **Hedeflerim** — birikim hedefleri koyup Kasa'dan aktararak ilerleme takibi; tarih ve otomatik katkı, tamamlanınca bildirim
+- **Notlar & Hatırlatıcılar** — finansal kararlar için aranabilir not defteri; ödeme tarihleri için tekrar sıklığı ve erteleme destekli hatırlatıcı
+- **Ana Sayfa widget'ları** — sürükle-bırakla düzenlenebilir ızgara: Varlık Bildirimleri, Notlar, Yaklaşan Hatırlatıcılar, Bu Ayın Özeti, Son İşlemler, Hedeflerim, Nakit Akışı Tahmini (aktif tekrarlayan işlemlere göre 30 gün sonrası tahmini bakiye) ve Hızlı İşlem Ekle (ekrandan ayrılmadan tek satırda gelir/gider girme)
+- **Sistem tepsisi** — pencere kapatılınca arkaplanda çalışmaya devam eder; simge üzerine gelince anlık Cüzdan/Kasa özeti, arkaplanda hatırlatıcı/bütçe/fiyat alarmı bildirimleri
+- **Profil & Ayarlar** — avatar, tutarları gizleme (göz ikonuyla anında aç/kapat), veri temizleme sıklığı, açık/koyu tema
 
 ## Teknoloji
 

@@ -140,7 +140,7 @@ namespace PersonalFinanceApp
 
             // Sabit genişlikte ve ortalanmış: eskiden AutoSize ile tire karakteri beklenenden geniş
             // ölçülüp sağdaki kutunun içine taşıyordu.
-            Label lblDateSep = new Label { Text = "—", Left = 685, Top = 100, Width = 20, Height = 36, ForeColor = TextMuted, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false };
+            Label lblDateSep = new Label { Text = "—", Left = 692, Top = 100, Width = 20, Height = 36, ForeColor = TextMuted, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false };
 
             dtpEnd.Left = 715; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
             dtpEnd.Value = DateTime.Today;
