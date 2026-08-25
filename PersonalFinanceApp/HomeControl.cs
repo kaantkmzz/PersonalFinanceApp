@@ -17,6 +17,8 @@ namespace PersonalFinanceApp
         private readonly NoteService _noteService = new NoteService();
         private readonly CategoryService _categoryService = new CategoryService();
         private readonly RecurringTransactionService _recurringTransactionService = new RecurringTransactionService();
+        private readonly AssetPriceAlertService _assetPriceAlertService = new AssetPriceAlertService();
+        private readonly AssetPriceService _assetPriceService = new AssetPriceService();
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -67,6 +69,10 @@ namespace PersonalFinanceApp
             new WidgetDef { Key = "goals", Title = "Hedeflerim", ColSpan = 1 },
             new WidgetDef { Key = "cashflow", Title = "Nakit Akışı Tahmini", ColSpan = 1 },
             new WidgetDef { Key = "quickadd", Title = "Hızlı İşlem Ekle", ColSpan = 1 },
+            new WidgetDef { Key = "recurringUpcoming", Title = "Yaklaşan Ödemeler", ColSpan = 1 },
+            new WidgetDef { Key = "topCategory", Title = "En Çok Harcanan", ColSpan = 1 },
+            new WidgetDef { Key = "priceAlerts", Title = "Fiyat Alarmı Özeti", ColSpan = 1 },
+            new WidgetDef { Key = "weeklyCompare", Title = "Haftalık Karşılaştırma", ColSpan = 1 },
         };
 
         private const int GridCols = 4;
@@ -277,6 +283,10 @@ namespace PersonalFinanceApp
         private Panel pnlGoalsWidget = new Panel();
         private Panel pnlCashflowWidget = new Panel();
         private Panel pnlQuickAddWidget = new Panel();
+        private Panel pnlRecurringUpcomingWidget = new Panel();
+        private Panel pnlTopCategoryWidget = new Panel();
+        private Panel pnlPriceAlertsWidget = new Panel();
+        private Panel pnlWeeklyCompareWidget = new Panel();
 
         private void SetupMiniWidgets()
         {
@@ -284,11 +294,17 @@ namespace PersonalFinanceApp
             pnlMiniReportWidget = CreateWidgetCard(CardLeft2, "Bu Ayın Özeti", "Rapor");
             pnlRecentTxWidget = CreateWidgetCard(CardLeft3, "Son İşlemler", "İşlemler");
             pnlGoalsWidget = CreateWidgetCard(CardLeft4, "Hedeflerim", "Hedefler");
+            pnlRecurringUpcomingWidget = CreateWidgetCard(CardLeft1, "Yaklaşan Ödemeler", "İşlemler");
+            pnlTopCategoryWidget = CreateWidgetCard(CardLeft1, "En Çok Harcanan", "Kategoriler");
+            pnlPriceAlertsWidget = CreateWidgetCard(CardLeft1, "Fiyat Alarmı Özeti", "Varlıklarım");
             // Bu ikisi kendi başlığını Load* metodunda kendi çiziyor (Varlık Bildirimleri/Notlar ile
             // aynı desen) — "quickadd" tıklanabilir olmamalı (içinde kendi etkileşimli denetimleri var,
             // bkz. LoadQuickAddWidget), bu yüzden CreateWidgetCard'ın MakeClickable'ını kullanmıyoruz.
+            // "weeklyCompare" da Nakit Akışı Tahmini gibi bir alt başlık gösterdiği için kendi başlığını
+            // kendi çiziyor.
             SetupSmoothContainer(pnlCashflowWidget, 16, CardBackColor);
             SetupSmoothContainer(pnlQuickAddWidget, 16, CardBackColor);
+            SetupSmoothContainer(pnlWeeklyCompareWidget, 16, CardBackColor);
             // SetupSmoothContainer .BackColor'ı her zaman AppBackColor'a sabitliyor, ama bu widget
             // görsel olarak CardBackColor ile boyanıyor. İçindeki kutucuklar (pnlType/pnlCategory/
             // pnlAmount) kendi köşe boşluklarını Parent.BackColor ile temizliyor — uyumsuzluk yüzünden
@@ -310,6 +326,10 @@ namespace PersonalFinanceApp
             "goals" => pnlGoalsWidget,
             "cashflow" => pnlCashflowWidget,
             "quickadd" => pnlQuickAddWidget,
+            "recurringUpcoming" => pnlRecurringUpcomingWidget,
+            "topCategory" => pnlTopCategoryWidget,
+            "priceAlerts" => pnlPriceAlertsWidget,
+            "weeklyCompare" => pnlWeeklyCompareWidget,
             _ => throw new ArgumentException($"Bilinmeyen widget anahtarı: {key}")
         };
 
@@ -325,6 +345,10 @@ namespace PersonalFinanceApp
                 case "goals": LoadGoalsWidget(); break;
                 case "cashflow": LoadCashflowWidget(); break;
                 case "quickadd": LoadQuickAddWidget(); break;
+                case "recurringUpcoming": LoadRecurringUpcomingWidget(); break;
+                case "topCategory": LoadTopCategoryWidget(); break;
+                case "priceAlerts": _ = LoadPriceAlertsWidgetAsync(); break;
+                case "weeklyCompare": LoadWeeklyCompareWidget(); break;
             }
         }
 
@@ -795,7 +819,15 @@ namespace PersonalFinanceApp
                 ForeColor = TextLight,
                 Left = 18,
                 Top = 14,
-                AutoSize = true,
+                // AutoSize=true idi — uzun başlıklar (ör. "Yaklaşan Tekrarlayan Ödemeler") kartın
+                // sağ üstündeki kaldırma (✕) düğmesinin altına/üstüne binip kesiliyordu. Sabit
+                // genişlik + "..." ile kısaltma; 24, kaldırma düğmesinin sol kenarıyla (CreateWidgetFrame'de
+                // frame.Width - 24) hizalanacak şekilde seçildi.
+                Width = CardWidth - 18 - 24,
+                Height = 24,
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
                 BackColor = Color.Transparent,
                 Tag = "title"
             };
@@ -1294,6 +1326,357 @@ namespace PersonalFinanceApp
             AnimateLabelValue(lblExpense, expectedExpense, v => $"Beklenen Gider: -{v.ToString("#,##0", tr)} ₺", hiddenText: "Beklenen Gider: ••••••");
         }
 
+        // Bir tekrarlayan işlemin sıradaki işleneceği tarihi tahmin eder — ProcessDueRecurring
+        // (giriş yapıldığında süresi gelmişleri otomatik işleyen metod, bkz. RecurringTransactionService)
+        // ile aynı "süresi geldi mi" mantığının tarih karşılığı. Hiç işlenmemişse hemen şimdi demektir.
+        private static DateTime NextRecurringDueDate(RecurringTransaction r, DateTime today)
+        {
+            if (r.LastProcessedDate == null) return today;
+            DateTime last = r.LastProcessedDate.Value.Date;
+            return r.Frequency switch
+            {
+                "daily" => last.AddDays(1),
+                "weekly" => last.AddDays(7),
+                _ => new DateTime(last.Year, last.Month, 1).AddMonths(1) // "monthly": bir sonraki ayın 1'i
+            };
+        }
+
+        // Önümüzdeki 7 gün içinde (ya da süresi çoktan gelmiş) sırası gelecek aktif tekrarlayan
+        // işlemleri listeler — Nakit Akışı Tahmini'nin "toplamı" yerine "hangi işlemler" detayını verir.
+        private void LoadRecurringUpcomingWidget()
+        {
+            ClearWidgetContent(pnlRecurringUpcomingWidget);
+
+            Action goToTransactions = () => _onNavigate?.Invoke("İşlemler");
+            DateTime today = DateTime.Today;
+
+            var upcoming = _recurringTransactionService.GetUserRecurring(_user.Id)
+                .Where(r => r.IsActive)
+                .Select(r => new { Recurring = r, NextDue = NextRecurringDueDate(r, today) })
+                .Where(x => x.NextDue <= today.AddDays(7))
+                .OrderBy(x => x.NextDue)
+                .Take(5)
+                .ToList();
+
+            if (upcoming.Count == 0)
+            {
+                AddWidgetLine(pnlRecurringUpcomingWidget, "Yaklaşan tekrarlayan ödeme yok.", 48, TextMuted, 18, goToTransactions);
+                return;
+            }
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            int top = 48;
+            foreach (var x in upcoming)
+            {
+                string dateText = x.NextDue <= today ? "bugün" : x.NextDue == today.AddDays(1) ? "yarın" : x.NextDue.ToString("dd.MM");
+                Color amountColor = x.Recurring.Type == "income" ? IncomeColor : ExpenseColor;
+                string sign = x.Recurring.Type == "income" ? "+" : "-";
+
+                Label lblLine = new Label
+                {
+                    Text = $"{x.Recurring.CategoryName} — {dateText}",
+                    ForeColor = TextLight,
+                    Left = 18,
+                    Top = top,
+                    Width = CardWidth - 150,
+                    Height = 24,
+                    AutoSize = false,
+                    AutoEllipsis = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                Label lblAmount = new Label
+                {
+                    ForeColor = amountColor,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    Left = CardWidth - 150,
+                    Top = top,
+                    Width = 130,
+                    Height = 24,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent
+                };
+                pnlRecurringUpcomingWidget.Controls.Add(lblLine);
+                pnlRecurringUpcomingWidget.Controls.Add(lblAmount);
+                MakeClickable(lblLine, goToTransactions);
+                MakeClickable(lblAmount, goToTransactions);
+
+                AnimateLabelValue(lblAmount, x.Recurring.Amount, v => $"{sign}{v.ToString("#,##0", tr)} ₺", hiddenText: "••••••");
+                top += 30;
+            }
+        }
+
+        // Bu ayki gider kategorilerini tutara göre sıralayıp ilk 3'ünü gösterir; bütçe limiti
+        // tanımlı olanlarda harcama/limit oranını bir ilerleme çubuğuyla da vurgular (bkz.
+        // CreateBudgetProgressBar — Hedeflerim'deki çubuktan farklı olarak %100'e YAKLAŞMAK
+        // burada iyi değil kötü, bu yüzden renk yönü tersine çevrilmiş).
+        private void LoadTopCategoryWidget()
+        {
+            ClearWidgetContent(pnlTopCategoryWidget);
+
+            Action goToCategories = () => _onNavigate?.Invoke("Kategoriler");
+            DateTime today = DateTime.Today;
+
+            var monthlyExpense = _transactionService.GetMonthlyExpenseByCategoryId(_user.Id, today.Year, today.Month);
+            var categories = _categoryService.GetUserCategoriesByType(_user.Id, "expense");
+
+            var top3 = categories
+                .Select(c => new { Category = c, Spent = monthlyExpense.TryGetValue(c.Id, out decimal s) ? s : 0 })
+                .Where(x => x.Spent > 0)
+                .OrderByDescending(x => x.Spent)
+                .Take(3)
+                .ToList();
+
+            if (top3.Count == 0)
+            {
+                AddWidgetLine(pnlTopCategoryWidget, "Bu ay henüz gider yok.", 48, TextMuted, 18, goToCategories);
+                return;
+            }
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            int top = 48;
+            foreach (var x in top3)
+            {
+                bool hasBudget = x.Category.BudgetLimit.HasValue && x.Category.BudgetLimit.Value > 0;
+                string prefix = string.IsNullOrEmpty(x.Category.Icon) ? "" : x.Category.Icon + " ";
+
+                Label lblName = new Label
+                {
+                    Text = prefix + x.Category.Name,
+                    ForeColor = TextLight,
+                    Left = 18,
+                    Top = top,
+                    Width = CardWidth - 150,
+                    Height = 24,
+                    AutoSize = false,
+                    AutoEllipsis = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                Label lblAmount = new Label
+                {
+                    Text = _user.HideAmountsEnabled
+                        ? "••••••"
+                        : (hasBudget
+                            ? $"{x.Spent.ToString("#,##0", tr)}/{x.Category.BudgetLimit!.Value.ToString("#,##0", tr)} ₺"
+                            : $"{x.Spent.ToString("#,##0", tr)} ₺"),
+                    ForeColor = TextMuted,
+                    Left = CardWidth - 150,
+                    Top = top,
+                    Width = 130,
+                    Height = 24,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                pnlTopCategoryWidget.Controls.Add(lblName);
+                pnlTopCategoryWidget.Controls.Add(lblAmount);
+                MakeClickable(lblName, goToCategories);
+                MakeClickable(lblAmount, goToCategories);
+
+                if (hasBudget)
+                {
+                    double percent = (double)(x.Spent / x.Category.BudgetLimit!.Value * 100);
+                    Panel bar = CreateBudgetProgressBar(18, top + 26, CardWidth - 36, () => percent);
+                    pnlTopCategoryWidget.Controls.Add(bar);
+                    MakeClickable(bar, goToCategories);
+                    top += 48;
+                }
+                else
+                {
+                    top += 30;
+                }
+            }
+        }
+
+        // Hedeflerim'deki CreateMiniProgressBar ile aynı çizim ama renk anlamı ters: burada %100'e
+        // ulaşmak (bütçe limitini doldurmak) bir başarı değil bir uyarı, bu yüzden yeşil yerine
+        // kademeli turuncu/kırmızıya geçiyor.
+        private Panel CreateBudgetProgressBar(int left, int top, int width, Func<double> getPercent)
+        {
+            const int barHeight = 8;
+            Panel bar = new Panel { Left = left, Top = top, Width = width, Height = barHeight, BackColor = Color.Transparent };
+            bar.Paint += (s, e) =>
+            {
+                double percent = getPercent();
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var trackPath = GetRoundedRectPath(new Rectangle(0, 0, bar.Width, bar.Height), barHeight / 2))
+                using (var trackBrush = new SolidBrush(AppTheme.GridLineColor))
+                    e.Graphics.FillPath(trackBrush, trackPath);
+
+                int fillWidth = (int)(bar.Width * (Math.Min(100, percent) / 100.0));
+                if (fillWidth > barHeight)
+                {
+                    Color fillColor = percent >= 100 ? AppTheme.DangerColor : percent >= 80 ? AppTheme.IdleColor : AccentColor;
+                    using var fillPath = GetRoundedRectPath(new Rectangle(0, 0, fillWidth, bar.Height), barHeight / 2);
+                    using var fillBrush = new SolidBrush(fillColor);
+                    e.Graphics.FillPath(fillBrush, fillPath);
+                }
+            };
+            return bar;
+        }
+
+        // Varlıklarım'da kurulmuş aktif fiyat alarmlarının güncel fiyatla eşiğe ne kadar yaklaştığını
+        // gösterir (bkz. MainForm.CheckAssetPriceAlertsAsync — burası bildirim göndermez, sadece
+        // özetler). AssetPriceService 30sn'lik bellek-içi cache kullandığından (bkz. o dosyadaki not)
+        // Varlıklarım ekranıyla aynı fiyatı paylaşır, ekstra istek yükü oluşturmaz.
+        private int _priceAlertsRequestId = 0;
+
+        private async Task LoadPriceAlertsWidgetAsync()
+        {
+            ClearWidgetContent(pnlPriceAlertsWidget);
+            int requestId = ++_priceAlertsRequestId;
+            Panel target = pnlPriceAlertsWidget;
+
+            Action goToAssets = () => _onNavigate?.Invoke("Varlıklarım");
+
+            var alerts = _assetPriceAlertService.GetActiveByUser(_user.Id).Take(3).ToList();
+            if (alerts.Count == 0)
+            {
+                AddWidgetLine(target, "Aktif fiyat alarmı yok.", 48, TextMuted, 18, goToAssets);
+                return;
+            }
+
+            Label lblLoading = AddWidgetLine(target, "Fiyatlar yükleniyor...", 48, TextMuted, 18, goToAssets);
+
+            var results = new List<(AssetPriceAlert Alert, decimal? Price)>();
+            foreach (var alert in alerts)
+            {
+                decimal? price = await _assetPriceService.GetPriceTryAsync(alert.Symbol, alert.AssetType);
+                results.Add((alert, price));
+            }
+
+            if (this.IsDisposed || requestId != _priceAlertsRequestId) return;
+            if (!target.Controls.Contains(lblLoading)) return; // widget bu arada tekrar temizlenmiş olabilir
+            target.Controls.Remove(lblLoading);
+            lblLoading.Dispose();
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            int top = 48;
+            foreach (var (alert, price) in results)
+            {
+                string arrow = alert.Direction == "above" ? "▲" : "▼";
+                // Küsuratlı gösterim (ör. "5.000.000,00 ₺") satır genişliğini aşıp "..." ile
+                // kesiliyordu — eşik zaten kullanıcının kendi girdiği yuvarlak bir hedef, tam
+                // sayı yeterli.
+                string thresholdText = _user.HideAmountsEnabled ? "••••••" : alert.ThresholdPrice.ToString("#,##0", tr) + " ₺";
+
+                Label lblName = new Label
+                {
+                    Text = $"{alert.Symbol} {arrow} {thresholdText}",
+                    ForeColor = TextLight,
+                    Left = 18,
+                    Top = top,
+                    Width = CardWidth - 150,
+                    Height = 24,
+                    AutoSize = false,
+                    AutoEllipsis = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                Label lblPrice = new Label
+                {
+                    Text = !price.HasValue ? "N/A" : (_user.HideAmountsEnabled ? "••••••" : price.Value.ToString("#,##0.00", tr) + " ₺"),
+                    ForeColor = TextMuted,
+                    Left = CardWidth - 150,
+                    Top = top,
+                    Width = 130,
+                    Height = 24,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9.5F)
+                };
+                target.Controls.Add(lblName);
+                target.Controls.Add(lblPrice);
+                MakeClickable(lblName, goToAssets);
+                MakeClickable(lblPrice, goToAssets);
+
+                if (price.HasValue && price.Value > 0)
+                {
+                    double percent = alert.Direction == "above"
+                        ? (double)(price.Value / alert.ThresholdPrice * 100)
+                        : (double)(alert.ThresholdPrice / price.Value * 100);
+                    Panel bar = CreateMiniProgressBar(18, top + 26, CardWidth - 36, () => percent);
+                    target.Controls.Add(bar);
+                    MakeClickable(bar, goToAssets);
+                }
+                top += 48;
+            }
+        }
+
+        // Son 7 gün ile ondan önceki 7 günün toplam giderini karşılaştırır — Nakit Akışı Tahmini'nin
+        // "gelecek" tahminine karşılık burası "yakın geçmişteki" harcama eğilimini (artıyor mu azalıyor
+        // mu) gösterir.
+        private void LoadWeeklyCompareWidget()
+        {
+            ClearWidgetContent(pnlWeeklyCompareWidget);
+
+            Action goToReport = () => _onNavigate?.Invoke("Rapor");
+            DateTime today = DateTime.Today;
+            DateTime thisWeekStart = today.AddDays(-6);
+            DateTime lastWeekStart = today.AddDays(-13);
+            DateTime lastWeekEnd = today.AddDays(-7);
+
+            var expenses = _transactionService.GetUserTransactions(_user.Id).Where(t => t.Type == "expense").ToList();
+            decimal thisWeek = expenses.Where(t => t.TransactionDate.Date >= thisWeekStart && t.TransactionDate.Date <= today).Sum(t => t.Amount);
+            decimal lastWeek = expenses.Where(t => t.TransactionDate.Date >= lastWeekStart && t.TransactionDate.Date <= lastWeekEnd).Sum(t => t.Amount);
+
+            Label lblHeader = new Label
+            {
+                Text = "Haftalık Karşılaştırma",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = TextLight,
+                Left = 18,
+                Top = 14,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWeeklyCompareWidget.Controls.Add(lblHeader);
+            MakeClickable(lblHeader, goToReport);
+
+            Label lblSub = new Label
+            {
+                Text = "Son 7 gün vs önceki 7 gün",
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = TextMuted,
+                Left = 18,
+                Top = 44,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWeeklyCompareWidget.Controls.Add(lblSub);
+            MakeClickable(lblSub, goToReport);
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            Label lblThisWeek = new Label
+            {
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
+                ForeColor = ExpenseColor,
+                Left = 18,
+                Top = 66,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWeeklyCompareWidget.Controls.Add(lblThisWeek);
+            MakeClickable(lblThisWeek, goToReport);
+            AnimateLabelValue(lblThisWeek, thisWeek, v => v.ToString("#,##0", tr) + " ₺", hiddenText: "••••••");
+
+            decimal diff = thisWeek - lastWeek;
+            double diffPercent = lastWeek > 0 ? (double)(Math.Abs(diff) / lastWeek * 100) : (thisWeek > 0 ? 100 : 0);
+            string arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "▬";
+            string trend = diff > 0 ? "artış" : diff < 0 ? "azalış" : "değişim yok";
+            Color diffColor = diff > 0 ? ExpenseColor : diff < 0 ? IncomeColor : TextMuted;
+
+            Label lblLastWeek = AddWidgetLine(pnlWeeklyCompareWidget, "Geçen Hafta: 0 ₺", 112, TextMuted, 18, goToReport);
+            AnimateLabelValue(lblLastWeek, lastWeek, v => $"Geçen Hafta: {v.ToString("#,##0", tr)} ₺", hiddenText: "Geçen Hafta: ••••••");
+
+            string diffText = _user.HideAmountsEnabled ? $"{arrow} ••••••" : $"{arrow} %{diffPercent:0} {trend}";
+            AddWidgetLine(pnlWeeklyCompareWidget, diffText, 142, diffColor, 18, goToReport);
+        }
+
         // Ana ekrandan ayrılmadan hızlıca gelir/gider eklemek için: Tip + Kategori + Tutar + Ekle.
         // Diğer mini-widget'ların aksine tıklanınca başka ekrana GÖTÜRMEZ (MakeClickable ile
         // sarmalanmaz) — kendi Click handler'ı doğrudan TransactionService.AddTransaction çağırır.
@@ -1609,6 +1992,10 @@ namespace PersonalFinanceApp
             if (_placedWidgets.ContainsKey("goals")) LoadGoalsWidget();
             if (_placedWidgets.ContainsKey("cashflow")) LoadCashflowWidget();
             if (_placedWidgets.ContainsKey("quickadd")) LoadQuickAddWidget();
+            if (_placedWidgets.ContainsKey("recurringUpcoming")) LoadRecurringUpcomingWidget();
+            if (_placedWidgets.ContainsKey("topCategory")) LoadTopCategoryWidget();
+            if (_placedWidgets.ContainsKey("priceAlerts")) _ = LoadPriceAlertsWidgetAsync();
+            if (_placedWidgets.ContainsKey("weeklyCompare")) LoadWeeklyCompareWidget();
         }
 
         // Varlıklarım'daki pozisyonların anlık kâr/zararını "bildirim" tarzında listeler; en çok
