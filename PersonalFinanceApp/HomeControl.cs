@@ -78,17 +78,35 @@ namespace PersonalFinanceApp
         private const int GridCols = 4;
         private const int ButtonsTop = 30 + 240 + 16;
 
+        // Izgara 12 hücrelik (3 satır × 4 sütun) ama katalog artık 12 widget içeriyor (3+1×11=14 hücre
+        // gerektiriyor) — hepsi aynı anda tek sayfaya sığmıyor. Bunun yerine aynı 12 hücrelik görünür
+        // ızgara İKİ "sayfa" olarak kullanılıyor (bkz. _currentPage, SetupPageDots); depoda bir widget'ın
+        // hangi sayfada olduğu, hücre numarasının içine page*CellsPerPage eklenerek kodlanıyor — böylece
+        // home_layout'un JSON şeması (Dictionary<string,int>) değişmiyor, eski kayıtlar (hep <12) sessizce
+        // sayfa 0 olarak çözülüyor.
+        private const int CellsPerPage = 12;
+        private int _currentPage = 0;
+        private static int EncodeCell(int page, int cell) => page * CellsPerPage + cell;
+        private static int PageOf(int stored) => stored / CellsPerPage;
+        private static int CellOf(int stored) => stored % CellsPerPage;
+
         private readonly Dictionary<string, int> _placedWidgets = new Dictionary<string, int>();
         // Sürükleme sırasında kesikli çerçeveyle vurgulanan hücreler — sürüklenen widget'ın gerçek
         // kapladığı hücre sayısını (ör. 3 hücreli Varlık Bildirimleri) doğru yansıtsın diye tek hücre
-        // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget).
+        // yerine bir küme olarak tutuluyor (bkz. HighlightDragTarget). _activeDropAnchor aynı hedefin
+        // başlangıç hücresi — hem gereksiz yeniden çizimi önlemek (bkz. HighlightDragTarget) hem de
+        // "tüm uygun yuvalar" önizlemesinde (bkz. _validDropAnchors) aktif olanı atlamak için.
         private readonly HashSet<int> _highlightedCells = new HashSet<int>();
+        private int? _activeDropAnchor;
+        // Bir widget sürüklenmeye başladığı an, o widget'ın (boyutuna göre) bırakılabileceği TÜM
+        // başlangıç hücreleri burada toplanır (bkz. StartWidgetDrag) — kullanıcı nereye
+        // koyabileceğini sürüklemenin başından itibaren, imleci belirli bir hücreye götürmeden görsün diye.
+        private readonly HashSet<int> _validDropAnchors = new HashSet<int>();
+        private int _dragColSpan = 1;
         private readonly Dictionary<string, Panel> _widgetFrames = new Dictionary<string, Panel>();
-        // Izgara 12 hücrelik (3 satır × 4 sütun, bkz. MiniRowTop) — katalog artık 8 widget içeriyor
-        // (toplamda 3+1×7=10 hücre gerektiriyor), kullanıcı geri bildirimiyle üçüncü satır geri eklendi
-        // ki hepsi aynı anda yerleştirilebilsin; + panelinden istenildiği kadarı da sürükleyip bırakılabilir
-        // (bkz. BuildWidgetPickerRows).
         private readonly Panel[] _cellPanels = new Panel[12];
+        private Panel pnlPageDot0 = new Panel();
+        private Panel pnlPageDot1 = new Panel();
         private Button btnAddWidget = new Button();
         private Panel pnlWidgetPicker = new Panel();
         private Label lblEmptyGridHint = new Label();
@@ -144,9 +162,11 @@ namespace PersonalFinanceApp
             // Widget ızgarası 3 satır (bkz. SetupWidgetGrid, GridCols, _cellPanels) — yükseklik hesabı
             // eksik kalırsa alt satıra yerleştirilen widget'lar kırpılabilirdi.
             const int gridRows = 3;
-            this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20));
+            // +32: ızgaranın hemen altındaki sayfa noktalarına (bkz. SetupPageDots) yer aç.
+            this.MinimumSize = new Size(CardLeft4 + CardWidth + 20, MiniRowTop + gridRows * (MiniRowHeight + 20) + 32);
             this.BackColor = AppBackColor;
             this.Font = new Font("Segoe UI", 9F);
+            this.Paint += DrawDragHighlightOverlay;
 
             Panel pnlWallet = new Panel { Left = CardLeft1, Top = 30, Width = CardWidth, Height = 240 };
             SetupSmoothContainer(pnlWallet, 16, CardBackColor);
@@ -391,6 +411,11 @@ namespace PersonalFinanceApp
         {
             LoadPlacedWidgetsFromUser();
 
+            // Vurgu/önizleme artık hücrelerin kendi Paint'inde DEĞİL, tek bir yerde (bkz. this.Paint,
+            // SetupUI) çiziliyor — hücreler saydam olduğundan (BackColor=Transparent) altlarındaki
+            // this'in çizdiği yuvarlak köşeli dikdörtgen olduğu gibi görünür, ve aralarındaki gerçek
+            // 20px'lik boşluklar da (eskiden her hücre kendi sınırını çizdiği için) artık tek bir
+            // bitişik dörtgenin parçası oluyor (bkz. GetCellsBoundingRect / GetAnchorBoundingRect).
             for (int i = 0; i < _cellPanels.Length; i++)
             {
                 int col = i % GridCols, row = i / GridCols;
@@ -404,45 +429,164 @@ namespace PersonalFinanceApp
                     AllowDrop = true
                 };
 
-                int cellIndex = i;
-                cell.Paint += (s, e) =>
-                {
-                    if (!_highlightedCells.Contains(cellIndex)) return;
-                    // Çok hücreli bir widget (ör. 3 hücreli Varlık Bildirimleri) sürüklenirken her hücre
-                    // kendi tam dörtgenini çizerse aradaki ortak kenarlar (bitişik hücrelerin iç sınırları)
-                    // da görünüp tek bir kutu yerine yan yana ayrı ayrı kesikli kutular gibi duruyordu.
-                    // Sadece grubun DIŞ sınırında kalan kenarları çiziyoruz ki tek, birleşik bir dörtgen
-                    // görünsün (bkz. GetClampedSpanCells — yayılım her zaman aynı satırda, yatay).
-                    bool hasLeftNeighbor = _highlightedCells.Contains(cellIndex - 1) && cellIndex % GridCols != 0;
-                    bool hasRightNeighbor = _highlightedCells.Contains(cellIndex + 1) && (cellIndex + 1) % GridCols != 0;
-                    using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
-                    int right = cell.Width - 2, bottom = cell.Height - 2;
-                    e.Graphics.DrawLine(pen, 1, 1, right, 1); // üst
-                    e.Graphics.DrawLine(pen, 1, bottom, right, bottom); // alt
-                    if (!hasLeftNeighbor) e.Graphics.DrawLine(pen, 1, 1, 1, bottom);
-                    if (!hasRightNeighbor) e.Graphics.DrawLine(pen, right, 1, right, bottom);
-                };
-                // Sürüklenen widget 3 hücre kaplıyorsa (ör. Varlık Bildirimleri), kesikli kutu da o üç
-                // hücrenin tamamını göstermeli — önceden yalnızca imlecin üzerinde olduğu tek hücre
-                // vurgulanıyordu, gerçek yerleşim boyutunu yanıltıcı şekilde 1 birim gösteriyordu.
-                cell.DragEnter += (s, e) => { e.Effect = GetDropEffect(e); HighlightDragTarget(cellIndex, e.Data); };
-                cell.DragLeave += (s, e) => ClearDragHighlight();
-                cell.DragDrop += (s, e) =>
-                {
-                    ClearDragHighlight();
-                    if (e.Data?.GetData(typeof(string)) is string key) PlaceWidget(key, cellIndex);
-                };
+                cell.DragEnter += OnGridDragEnterOrOver;
+                cell.DragOver += OnGridDragEnterOrOver;
+                cell.DragLeave += OnGridDragLeave;
+                cell.DragDrop += OnGridDragDrop;
 
                 this.Controls.Add(cell);
                 _cellPanels[i] = cell;
             }
 
+            SetupPageDots();
             SetupWidgetPicker();
             RebuildWidgetGrid();
         }
 
         private static DragDropEffects GetDropEffect(DragEventArgs e) =>
             (e.Data?.GetDataPresent(typeof(string)) ?? false) ? DragDropEffects.Move : DragDropEffects.None;
+
+        // Hem boş hücreler hem de dolu widget çerçeveleri (bkz. CreateWidgetFrame) sürükleme sırasında
+        // aynı üç olayı aynı şekilde ele alıyor — imlecin GERÇEK ekran konumundan hedef hücreyi hesaplıyoruz
+        // (bkz. GetAnchorCellFromCursor), hangi alt-denetimin DragEnter/Over'ı tetiklediğinden bağımsız.
+        // Önceden hedef, olayı tetikleyen hücrenin sabit kimliğiydi (cellIndex/myCell) — bu, önizleme
+        // artık imlecin TAM ORTASINDA gösterildiği için (bkz. StartWidgetDrag) çok hücreli bir widget'ı
+        // en sol sütuna bırakmayı imkansız kılıyordu: imleç kutunun ortasındayken en soldaki hücrenin
+        // üzerine gelmiş gibi görünse de aslında bir sağdaki hücrenin sınırları içindeydi.
+        private void OnGridDragEnterOrOver(object? sender, DragEventArgs e)
+        {
+            e.Effect = GetDropEffect(e);
+            if (e.Data?.GetData(typeof(string)) is not string key) return;
+            int span = WidgetCatalog.FirstOrDefault(w => w.Key == key)?.ColSpan ?? 1;
+            HighlightDragTarget(GetAnchorCellFromCursor(span), e.Data);
+        }
+
+        private void OnGridDragLeave(object? sender, EventArgs e) => ClearDragHighlight();
+
+        private void OnGridDragDrop(object? sender, DragEventArgs e)
+        {
+            ClearDragHighlight();
+            if (e.Data?.GetData(typeof(string)) is not string key) return;
+            int span = WidgetCatalog.FirstOrDefault(w => w.Key == key)?.ColSpan ?? 1;
+            PlaceWidget(key, GetAnchorCellFromCursor(span));
+        }
+
+        // İmlecin gerçek ekran konumunu ızgara hücresine çevirir. Önizleme kutusunun SOL kenarı
+        // (imleç - genişlik/2) hangi sütuna en yakınsa o sütun anchor kabul edilir — böylece kullanıcı
+        // gördüğü önizleme kutusunu bir hücreye hizaladığında gerçekten de oraya bırakılır.
+        private int GetAnchorCellFromCursor(int colSpan)
+        {
+            Point clientPos = this.PointToClient(System.Windows.Forms.Cursor.Position);
+            int spanWidth = colSpan * CardWidth + (colSpan - 1) * 20;
+            int leftEdgeX = clientPos.X - spanWidth / 2;
+            int col = (int)Math.Round((double)(leftEdgeX - CardLeft1) / (CardWidth + 20));
+            col = Math.Max(0, Math.Min(GridCols - colSpan, col));
+
+            int totalRows = _cellPanels.Length / GridCols;
+            int row = (int)Math.Round((double)(clientPos.Y - MiniRowTop) / (MiniRowHeight + 20));
+            row = Math.Max(0, Math.Min(totalRows - 1, row));
+
+            return row * GridCols + col;
+        }
+
+        // anchor'dan başlayıp colSpan hücre kaplayan bir yerleşimin (aynı satırda, boşluklar dahil)
+        // gerçek piksel dörtgeni.
+        private Rectangle GetAnchorBoundingRect(int anchor, int colSpan)
+        {
+            int col = anchor % GridCols, row = anchor / GridCols;
+            int left = CardLeft1 + col * (CardWidth + 20);
+            int top = MiniRowTop + row * (MiniRowHeight + 20);
+            int width = colSpan * CardWidth + (colSpan - 1) * 20;
+            return new Rectangle(left, top, width, MiniRowHeight);
+        }
+
+        // Vurgulanan (genişletilmiş) hücre kümesinin dış sınır dörtgeni — küme her zaman aynı satırda
+        // ardışık hücrelerden oluşur (bkz. GetClampedSpanCells), bu yüzden min/max sütun yeterli.
+        private Rectangle GetCellsBoundingRect(IEnumerable<int> cells)
+        {
+            var list = cells as IList<int> ?? cells.ToList();
+            if (list.Count == 0) return Rectangle.Empty;
+            int minCol = list.Min(c => c % GridCols);
+            int maxCol = list.Max(c => c % GridCols);
+            return GetAnchorBoundingRect(list[0] / GridCols * GridCols + minCol, maxCol - minCol + 1);
+        }
+
+        // Sürükleme sırasındaki tüm görsel geri bildirim tek yerde: (1) widget'ın bırakılabileceği TÜM
+        // uygun yuvalar soluk/ince kesikli dörtgenlerle (bkz. _validDropAnchors, StartWidgetDrag), (2)
+        // imlecin şu an işaret ettiği hedef daha belirgin bir dörtgenle (bkz. _highlightedCells). İkisi
+        // de yuvarlak köşeli — hücreler arasındaki gerçek boşluklara rağmen (bkz. GetAnchorBoundingRect)
+        // tek, bitişik bir kutu gibi görünürler.
+        private void DrawDragHighlightOverlay(object? sender, PaintEventArgs e)
+        {
+            if (_validDropAnchors.Count == 0 && _highlightedCells.Count == 0) return;
+
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            if (_validDropAnchors.Count > 0)
+            {
+                using var mutedPen = new Pen(AppTheme.GridLineColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                foreach (var anchor in _validDropAnchors)
+                {
+                    if (anchor == _activeDropAnchor) continue; // aktif hedef aşağıda ayrı ve daha belirgin çiziliyor
+                    var rect = GetAnchorBoundingRect(anchor, _dragColSpan);
+                    using var path = GetRoundedRectPath(rect, 14);
+                    e.Graphics.DrawPath(mutedPen, path);
+                }
+            }
+
+            if (_highlightedCells.Count > 0)
+            {
+                var rect = GetCellsBoundingRect(_highlightedCells);
+                using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                using var path = GetRoundedRectPath(rect, 14);
+                e.Graphics.DrawPath(pen, path);
+            }
+        }
+
+        // Ana Sayfa widget ızgarasının sağ altındaki iki nokta: tıklanınca 1. ve 2. "sayfa" arasında
+        // geçiş yapar (bkz. _currentPage, EncodeCell) — üstteki Cüzdan/Kasa/Varlıklarım kartları ve
+        // Transfer düğmeleri sabit kalır, yalnızca widget ızgarası değişir. "Bu Ayın Özeti" mini-widget'ının
+        // kendi sayfa noktalarıyla (bkz. SetupMiniPageDots) aynı görsel dil.
+        private void SetupPageDots()
+        {
+            const int dotSize = 9;
+            const int hitSize = 22;
+            const int gap = 4;
+            int totalRows = _cellPanels.Length / GridCols;
+            int rightEdge = CardLeft4 + CardWidth;
+            int gridBottom = MiniRowTop + totalRows * (MiniRowHeight + 20) - 20;
+            int dot1Left = rightEdge - hitSize;
+            int dot0Left = dot1Left - gap - hitSize;
+            int dotsTop = gridBottom + 8;
+            int dotOffset = (hitSize - dotSize) / 2;
+
+            void SetupDot(Panel dot, int left, int page)
+            {
+                dot.Left = left; dot.Top = dotsTop; dot.Width = hitSize; dot.Height = hitSize;
+                dot.BackColor = Color.Transparent;
+                dot.Cursor = Cursors.Hand;
+                dot.Paint += (s, e) =>
+                {
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    Color c = _currentPage == page ? AccentColor : AppTheme.GridLineColor;
+                    using var brush = new SolidBrush(c);
+                    e.Graphics.FillEllipse(brush, dotOffset, dotOffset, dotSize, dotSize);
+                };
+                dot.Click += (s, e) =>
+                {
+                    if (_currentPage == page) return;
+                    _currentPage = page;
+                    RebuildWidgetGrid();
+                };
+            }
+
+            SetupDot(pnlPageDot0, dot0Left, 0);
+            SetupDot(pnlPageDot1, dot1Left, 1);
+            this.Controls.Add(pnlPageDot0);
+            this.Controls.Add(pnlPageDot1);
+            pnlPageDot0.BringToFront();
+            pnlPageDot1.BringToFront();
+        }
 
         private void SetupWidgetPicker()
         {
@@ -567,26 +711,37 @@ namespace PersonalFinanceApp
             return Enumerable.Range(anchorCell, def.ColSpan).ToList();
         }
 
+        // Aynı hedef zaten vurgulanıyorsa yeniden çizmiyoruz (DragOver imleç durağan olsa bile çok sık
+        // tetiklenebiliyor — sürükleme sırasında fark edilir bir yavaşlamaya/"kasma"ya yol açıyordu).
         private void HighlightDragTarget(int anchorCell, IDataObject? data)
         {
+            string? key = data?.GetData(typeof(string)) as string;
+            var newCells = key != null ? GetClampedSpanCells(key, anchorCell) : new List<int>();
+            if (newCells.Count > 0 && _highlightedCells.SetEquals(newCells)) return;
+
             _highlightedCells.Clear();
-            if (data?.GetData(typeof(string)) is string key)
-            {
-                foreach (var c in GetClampedSpanCells(key, anchorCell)) _highlightedCells.Add(c);
-            }
+            foreach (var c in newCells) _highlightedCells.Add(c);
+            _activeDropAnchor = newCells.Count > 0 ? newCells.Min() : (int?)null;
             RefreshDragHighlightVisuals();
         }
 
         private void ClearDragHighlight()
         {
+            if (_highlightedCells.Count == 0) return;
             _highlightedCells.Clear();
+            _activeDropAnchor = null;
             RefreshDragHighlightVisuals();
         }
 
+        // Vurgu/önizleme artık hücrelerin/çerçevelerin kendi Paint'inde değil, doğrudan this.Paint'te
+        // (bkz. SetupUI) tek bir bitişik dörtgen olarak çiziliyor — ızgara alanının tamamını değil,
+        // sadece o bölgeyi geçersiz kılmak (Invalidate) tüm Ana Sayfa'nın (grafik dahil) her sürükleme
+        // hareketinde yeniden boyanmasını önlüyor.
         private void RefreshDragHighlightVisuals()
         {
-            foreach (var cell in _cellPanels) cell.Invalidate();
-            foreach (var frame in _widgetFrames.Values) frame.Invalidate();
+            int totalRows = _cellPanels.Length / GridCols;
+            var gridArea = new Rectangle(CardLeft1 - 4, MiniRowTop - 4, CardLeft4 + CardWidth - CardLeft1 + 8, totalRows * (MiniRowHeight + 20) + 8);
+            this.Invalidate(gridArea);
         }
 
         private void PlaceWidget(string key, int anchorCell)
@@ -598,18 +753,19 @@ namespace PersonalFinanceApp
             if (col + def.ColSpan > GridCols) col = GridCols - def.ColSpan;
             anchorCell = row * GridCols + col;
 
-            int? previousCell = _placedWidgets.TryGetValue(key, out var pc) ? pc : (int?)null;
+            int? previousCell = (_placedWidgets.TryGetValue(key, out var pc) && PageOf(pc) == _currentPage) ? CellOf(pc) : (int?)null;
             _placedWidgets.Remove(key);
 
             var newCells = new HashSet<int>(Enumerable.Range(anchorCell, def.ColSpan));
 
             var displaced = _placedWidgets
-                .Where(kv => Enumerable.Range(kv.Value, WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => newCells.Contains(c)))
+                .Where(kv => PageOf(kv.Value) == _currentPage &&
+                    Enumerable.Range(CellOf(kv.Value), WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => newCells.Contains(c)))
                 .Select(kv => kv.Key)
                 .ToList();
 
             foreach (var dKey in displaced) _placedWidgets.Remove(dKey);
-            _placedWidgets[key] = anchorCell;
+            _placedWidgets[key] = EncodeCell(_currentPage, anchorCell);
 
             foreach (var dKey in displaced)
             {
@@ -624,20 +780,24 @@ namespace PersonalFinanceApp
                 {
                     target = FindFreeCell(dDef.ColSpan);
                 }
-                if (target.HasValue) _placedWidgets[dKey] = target.Value;
+                if (target.HasValue) _placedWidgets[dKey] = EncodeCell(_currentPage, target.Value);
             }
 
             SaveLayout();
             RebuildWidgetGrid();
         }
 
-        // [anchorCell, anchorCell+span) hücrelerinin tamamı satır sınırını aşmadan boşta mı?
-        private bool IsCellRangeFree(int anchorCell, int span)
+        // [anchorCell, anchorCell+span) hücrelerinin tamamı satır sınırını aşmadan, GEÇERLİ SAYFADA boşta
+        // mı? ignoreKey verilirse o widget'ın kendi (taşınmakta olan) hücreleri dolu sayılmaz — sürükleme
+        // başında "tüm uygun yuvaları" hesaplarken (bkz. StartWidgetDrag) widget'ın şu anki yerinin de
+        // geçerli bir hedef olarak görünmesi için.
+        private bool IsCellRangeFree(int anchorCell, int span, string? ignoreKey = null)
         {
             int col = anchorCell % GridCols;
             if (col + span > GridCols) return false;
             var cells = Enumerable.Range(anchorCell, span).ToList();
-            return !_placedWidgets.Any(kv => Enumerable.Range(kv.Value, WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => cells.Contains(c)));
+            return !_placedWidgets.Any(kv => kv.Key != ignoreKey && PageOf(kv.Value) == _currentPage &&
+                Enumerable.Range(CellOf(kv.Value), WidgetCatalog.First(w => w.Key == kv.Key).ColSpan).Any(c => cells.Contains(c)));
         }
 
         // Verilen genişlikte bir widget için ızgarada uygun ilk boş hücreyi (satır satır, soldan sağa) bulur.
@@ -694,7 +854,26 @@ namespace PersonalFinanceApp
                 Opacity = 0.35,
                 TopMost = true
             };
+            // Önizlemenin köşeleri diğer kart/widget'larla tutarlı olsun diye kartlarla aynı yarıçapta
+            // yuvarlatılıyor (bkz. SetupSmoothContainer'daki 16 yarıçapı).
+            _dragPreviewForm.Region = new Region(GetRoundedRectPath(new Rectangle(0, 0, width, MiniRowHeight), 16));
             _dragPreviewForm.Show();
+
+            // Sürükleme başlar başlamaz, bu widget'ın (boyutuna göre) bırakılabileceği TÜM başlangıç
+            // hücrelerini işaretliyoruz — kullanıcı imleci belirli bir hücreye götürmeden önce bile
+            // nereye koyabileceğini görsün diye (bkz. this.Paint'teki soluk/kesikli önizleme kutuları).
+            _dragColSpan = colSpan;
+            _validDropAnchors.Clear();
+            int totalRows = _cellPanels.Length / GridCols;
+            for (int r = 0; r < totalRows; r++)
+            {
+                for (int c = 0; c <= GridCols - colSpan; c++)
+                {
+                    int anchor = r * GridCols + c;
+                    if (IsCellRangeFree(anchor, colSpan, ignoreKey: key)) _validDropAnchors.Add(anchor);
+                }
+            }
+            RefreshDragHighlightVisuals();
 
             GiveFeedbackEventHandler onGiveFeedback = (s, e) =>
             {
@@ -716,6 +895,8 @@ namespace PersonalFinanceApp
                 _dragPreviewForm?.Close();
                 _dragPreviewForm?.Dispose();
                 _dragPreviewForm = null;
+                _validDropAnchors.Clear();
+                RefreshDragHighlightVisuals();
             }
         }
 
@@ -732,12 +913,15 @@ namespace PersonalFinanceApp
         {
             foreach (var def in WidgetCatalog)
             {
-                bool isPlaced = _placedWidgets.TryGetValue(def.Key, out int cell);
+                // Bir widget yalnızca TEK bir sayfada olabilir (bkz. EncodeCell) — geçerli sayfada
+                // değilse (ya hiç yerleştirilmemiş ya da diğer sayfadaysa) çerçevesi gizlenir.
+                bool isPlaced = _placedWidgets.TryGetValue(def.Key, out int stored) && PageOf(stored) == _currentPage;
                 if (!isPlaced)
                 {
                     if (_widgetFrames.TryGetValue(def.Key, out var hiddenFrame)) hiddenFrame.Visible = false;
                     continue;
                 }
+                int cell = CellOf(stored);
 
                 if (!_widgetFrames.TryGetValue(def.Key, out var frame))
                 {
@@ -761,8 +945,12 @@ namespace PersonalFinanceApp
             btnAddWidget.BringToFront();
             if (pnlWidgetPicker.Visible) BuildWidgetPickerRows();
             pnlWidgetPicker.BringToFront();
+            pnlPageDot0.BringToFront();
+            pnlPageDot1.BringToFront();
 
-            lblEmptyGridHint.Visible = _placedWidgets.Count == 0;
+            lblEmptyGridHint.Visible = !_placedWidgets.Any(kv => PageOf(kv.Value) == _currentPage);
+            pnlPageDot0.Invalidate();
+            pnlPageDot1.Invalidate();
         }
 
         // Bir widget'ı barındıran dış çerçeve: sürükleme tutamacı ve kaldırma düğmesi, içerik panelinin
@@ -776,18 +964,13 @@ namespace PersonalFinanceApp
             // kare görünümlü bir dolgu kalıyordu. Düz (opak) AppBackColor ile bu ortadan kalkıyor.
             Panel frame = new Panel { BackColor = AppBackColor, AllowDrop = true };
 
-            frame.DragEnter += (s, e) =>
-            {
-                e.Effect = GetDropEffect(e);
-                if (_placedWidgets.TryGetValue(def.Key, out int myCell)) HighlightDragTarget(myCell, e.Data);
-            };
-            frame.DragLeave += (s, e) => ClearDragHighlight();
-            frame.DragDrop += (s, e) =>
-            {
-                ClearDragHighlight();
-                if (e.Data?.GetData(typeof(string)) is string key && _placedWidgets.TryGetValue(def.Key, out int myCell))
-                    PlaceWidget(key, myCell);
-            };
+            // bkz. OnGridDragEnterOrOver'daki üstteki not — boş hücreler VE dolu çerçeveler artık aynı,
+            // imlecin gerçek konumuna dayalı hesaplamayı kullanıyor (önceden burada bu çerçevenin KENDİ
+            // sabit hücresi hedef alınıyordu, tutarsızdı).
+            frame.DragEnter += OnGridDragEnterOrOver;
+            frame.DragOver += OnGridDragEnterOrOver;
+            frame.DragLeave += OnGridDragLeave;
+            frame.DragDrop += OnGridDragDrop;
 
             Panel content = GetContentPanelFor(def.Key);
             content.Dock = DockStyle.Fill;
