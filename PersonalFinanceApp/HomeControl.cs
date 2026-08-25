@@ -898,6 +898,17 @@ namespace PersonalFinanceApp
             }
             RefreshDragHighlightVisuals();
 
+            // Önizlemenin (ve dolayısıyla imlecin sürüklerken izlendiği alanın) widget ızgarasının
+            // dışına çıkmasını engelliyoruz — köşeleri düzleştirmek donmayı tamamen gidermedi, imleç
+            // ızgara dışına (kenar çubuğu, başka bir pencere, masaüstü) çıktığında bu katmanlı pencere
+            // hâlâ oraya taşınıp Windows'a onu YABANCI pencerelerin/masaüstünün üzerinde yeniden
+            // bileştirtiyordu — bu da ekran kaydında görülen donmanın asıl kaynağıydı. Önizleme artık
+            // ekran koordinatında ızgara sınırlarının içinde tutuluyor, imleç dışarı çıksa bile.
+            int totalRowsForClamp = _cellPanels.Length / GridCols;
+            var gridClientRect = new Rectangle(CardLeft1, MiniRowTop, CardLeft4 + CardWidth - CardLeft1, totalRowsForClamp * (MiniRowHeight + 20) - 20);
+            var gridScreenTopLeft = this.PointToScreen(new Point(gridClientRect.Left, gridClientRect.Top));
+            var gridScreenBottomRight = this.PointToScreen(new Point(gridClientRect.Right, gridClientRect.Bottom));
+
             GiveFeedbackEventHandler onGiveFeedback = (s, e) =>
             {
                 e.UseDefaultCursors = true;
@@ -905,7 +916,11 @@ namespace PersonalFinanceApp
                 var p = System.Windows.Forms.Cursor.Position;
                 // Önceden imlecin sağ-alt çaprazına (+16,+16) konuyordu — imleç önizlemenin bir
                 // köşesindeymiş gibi duruyordu. Widget'ın gerçek boyutunu imlecin merkezinde gösteriyoruz.
-                _dragPreviewForm.Location = new Point(p.X - width / 2, p.Y - MiniRowHeight / 2);
+                int x = p.X - width / 2;
+                int y = p.Y - MiniRowHeight / 2;
+                x = Math.Max(gridScreenTopLeft.X, Math.Min(gridScreenBottomRight.X - width, x));
+                y = Math.Max(gridScreenTopLeft.Y, Math.Min(gridScreenBottomRight.Y - MiniRowHeight, y));
+                _dragPreviewForm.Location = new Point(x, y);
             };
             source.GiveFeedback += onGiveFeedback;
             try
