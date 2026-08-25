@@ -68,7 +68,7 @@ CREATE TABLE recurring_transactions (
     type                   TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     description            TEXT,
     is_active              BOOLEAN NOT NULL DEFAULT TRUE,
-    frequency              VARCHAR(10) NOT NULL DEFAULT 'monthly',
+    frequency              VARCHAR(10) NOT NULL DEFAULT 'monthly' CHECK (frequency IN ('daily', 'weekly', 'monthly')),
     last_processed_month   INTEGER,
     last_processed_year    INTEGER,
     last_processed_date    DATE,
