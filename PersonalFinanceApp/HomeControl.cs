@@ -407,11 +407,20 @@ namespace PersonalFinanceApp
                 int cellIndex = i;
                 cell.Paint += (s, e) =>
                 {
-                    if (_highlightedCells.Contains(cellIndex))
-                    {
-                        using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
-                        e.Graphics.DrawRectangle(pen, 1, 1, cell.Width - 2, cell.Height - 2);
-                    }
+                    if (!_highlightedCells.Contains(cellIndex)) return;
+                    // Çok hücreli bir widget (ör. 3 hücreli Varlık Bildirimleri) sürüklenirken her hücre
+                    // kendi tam dörtgenini çizerse aradaki ortak kenarlar (bitişik hücrelerin iç sınırları)
+                    // da görünüp tek bir kutu yerine yan yana ayrı ayrı kesikli kutular gibi duruyordu.
+                    // Sadece grubun DIŞ sınırında kalan kenarları çiziyoruz ki tek, birleşik bir dörtgen
+                    // görünsün (bkz. GetClampedSpanCells — yayılım her zaman aynı satırda, yatay).
+                    bool hasLeftNeighbor = _highlightedCells.Contains(cellIndex - 1) && cellIndex % GridCols != 0;
+                    bool hasRightNeighbor = _highlightedCells.Contains(cellIndex + 1) && (cellIndex + 1) % GridCols != 0;
+                    using var pen = new Pen(AccentColor, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+                    int right = cell.Width - 2, bottom = cell.Height - 2;
+                    e.Graphics.DrawLine(pen, 1, 1, right, 1); // üst
+                    e.Graphics.DrawLine(pen, 1, bottom, right, bottom); // alt
+                    if (!hasLeftNeighbor) e.Graphics.DrawLine(pen, 1, 1, 1, bottom);
+                    if (!hasRightNeighbor) e.Graphics.DrawLine(pen, right, 1, right, bottom);
                 };
                 // Sürüklenen widget 3 hücre kaplıyorsa (ör. Varlık Bildirimleri), kesikli kutu da o üç
                 // hücrenin tamamını göstermeli — önceden yalnızca imlecin üzerinde olduğu tek hücre
@@ -671,7 +680,9 @@ namespace PersonalFinanceApp
                 e.UseDefaultCursors = true;
                 if (_dragPreviewForm == null) return;
                 var p = System.Windows.Forms.Cursor.Position;
-                _dragPreviewForm.Location = new Point(p.X + 16, p.Y + 16);
+                // Önceden imlecin sağ-alt çaprazına (+16,+16) konuyordu — imleç önizlemenin bir
+                // köşesindeymiş gibi duruyordu. Widget'ın gerçek boyutunu imlecin merkezinde gösteriyoruz.
+                _dragPreviewForm.Location = new Point(p.X - width / 2, p.Y - MiniRowHeight / 2);
             };
             source.GiveFeedback += onGiveFeedback;
             try
@@ -824,7 +835,10 @@ namespace PersonalFinanceApp
                 // genişlik + "..." ile kısaltma; 24, kaldırma düğmesinin sol kenarıyla (CreateWidgetFrame'de
                 // frame.Width - 24) hizalanacak şekilde seçildi.
                 Width = CardWidth - 18 - 24,
-                Height = 24,
+                // 24px'te bu büyüklükteki (11.5F Bold) yazı tipinde "ç"/"ş"/"ğ" gibi harflerin alt
+                // kuyruğu kesiliyordu (bkz. bu dosyadaki diğer 20px→24px notları, burada yazı tipi
+                // daha büyük olduğundan 28 gerekti).
+                Height = 28,
                 AutoSize = false,
                 AutoEllipsis = true,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -1711,15 +1725,6 @@ namespace PersonalFinanceApp
 
             Panel pnlAmount = new Panel { Left = 18, Top = 92, Width = 140, Height = 34 };
             SetupSmoothContainer(pnlAmount, 8, CardBackColor);
-            // bkz. SetupHomeComboBox'taki aynı not: kutu dolgusu kartla aynı renkte, çerçevesiz
-            // neredeyse görünmüyordu.
-            pnlAmount.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                using var pen = new Pen(AppTheme.CardBorderColor, 1f);
-                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnlAmount.Width - 1, pnlAmount.Height - 1), 8);
-                e.Graphics.DrawPath(pen, path);
-            };
             TextBox txtAmount = new TextBox
             {
                 Left = 8,
@@ -1731,6 +1736,10 @@ namespace PersonalFinanceApp
                 ForeColor = TextLight
             };
             pnlAmount.Controls.Add(txtAmount);
+
+            // bkz. AddBorderRingOverlay'in üzerindeki not: kutu dolgusu kartla aynı renkte,
+            // çerçevesiz neredeyse görünmüyordu.
+            AddBorderRingOverlay(pnlAmount, 8);
 
             Button btnAdd = new Button { Text = "Ekle", Left = 166, Top = 92, Width = CardWidth - 166 - 18, Height = 34, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F) };
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
@@ -1828,16 +1837,6 @@ namespace PersonalFinanceApp
         private void SetupHomeComboBox(Panel pnl, ComboBox cmb)
         {
             SetupSmoothContainer(pnl, 8, CardBackColor);
-            // Kutu dolgusu widget kartıyla aynı renkte (CardBackColor) olduğu için sınır çizilmeden
-            // kutu neredeyse görünmez oluyordu — diğer ekranlardaki kart-üstü kutular gibi (bkz.
-            // ReminderControl.SetupSmoothContainer'ın bordürlü sürümü) ince bir çerçeve ekliyoruz.
-            pnl.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                using var pen = new Pen(AppTheme.CardBorderColor, 1f);
-                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), 8);
-                e.Graphics.DrawPath(pen, path);
-            };
             cmb.FlatStyle = FlatStyle.Flat;
             cmb.BackColor = CardBackColor;
             cmb.ForeColor = TextLight;
@@ -1875,6 +1874,12 @@ namespace PersonalFinanceApp
             pnl.MouseClick += (s, e) => { cmb.DroppedDown = true; };
             pnl.Controls.Add(pnlArrow);
             pnlArrow.BringToFront();
+
+            // Kutu dolgusu widget kartıyla aynı renkte (CardBackColor) olduğu için sınır çizilmeden
+            // kutu neredeyse görünmez oluyordu — diğer ekranlardaki kart-üstü kutular gibi ince bir
+            // çerçeve ekliyoruz (bkz. AddBorderRingOverlay'in üzerindeki not — neden pnl'in kendi
+            // Paint'i yerine ayrı, bölgesi daraltılmış bir katman kullandığımız orada açıklanıyor).
+            AddBorderRingOverlay(pnl, 8);
         }
 
         // parent'ın kartı zaten tıklanabilir (bkz. CreateWidgetCard) ama bu satır SetupUI bittikten
@@ -1975,6 +1980,44 @@ namespace PersonalFinanceApp
             path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
             path.CloseFigure();
             return path;
+        }
+
+        // Hızlı İşlem Ekle'deki kutuların (gider/kategori/tutar) dolgusu widget kartıyla aynı renkte
+        // (CardBackColor) olduğundan, bir çerçeve çizilmeden neredeyse görünmüyorlardı. Çerçeveyi
+        // doğrudan pnl'in kendi Paint'inde çizmek işe yaramadı: pnl önce boyanır, İÇİNDEKİ ComboBox/
+        // TextBox gibi opak alt denetimler SONRA üzerine çizilir, bu yüzden özellikle alt kenar
+        // (ComboBox'ın Height ile değiştirilemeyen, yazı tipine göre sabit yüksekliği yüzünden) alt
+        // denetimin arkasında kalıp görünmüyordu. Bunu tüm pnl'i kaplayan şeffaf bir katmanla
+        // düzeltmek de işe yaramadı: WinForms'ta BackColor=Transparent yalnızca PARENT'ın (pnl'in)
+        // düz arka planına karşı "şeffaf" davranır, KARDEŞ (sibling) denetimlerin (ComboBox/TextBox)
+        // çizdiklerine karşı değil — üstteki katman onların üzerini pnl'in düz rengiyle kaplayıp
+        // yazıyı tamamen görünmez kılıyordu. Çözüm: katmanın Region'ını sadece ince çerçeve
+        // halkasıyla sınırlamak — halkanın dışında pencere hiç yok sayıldığından altındaki
+        // denetimlerin pikselleri hiç dokunulmadan kalıyor, ve halka zaten kutuların içindeki
+        // metinle çakışmayacak kadar ince (kenardan birkaç piksel).
+        private void AddBorderRingOverlay(Panel pnl, int radius)
+        {
+            Panel ring = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Enabled = false };
+            ring.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using var pen = new Pen(AppTheme.CardBorderColor, 1f);
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width - 1, pnl.Height - 1), radius);
+                e.Graphics.DrawPath(pen, path);
+            };
+            void UpdateRegion()
+            {
+                if (pnl.Width <= 4 || pnl.Height <= 4) return;
+                using var outer = GetRoundedRectPath(new Rectangle(0, 0, pnl.Width, pnl.Height), radius);
+                using var inner = GetRoundedRectPath(new Rectangle(2, 2, pnl.Width - 4, pnl.Height - 4), Math.Max(radius - 2, 1));
+                var region = new Region(outer);
+                region.Exclude(inner);
+                ring.Region = region;
+            }
+            UpdateRegion();
+            ring.Resize += (s, e) => UpdateRegion();
+            pnl.Controls.Add(ring);
+            ring.BringToFront();
         }
 
         public void RefreshData()
