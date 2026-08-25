@@ -43,6 +43,7 @@ namespace PersonalFinanceApp
             public string Hedef { get; set; } = string.Empty;
             public string Biriken { get; set; } = string.Empty;
             public string HedefTutar { get; set; } = string.Empty;
+            public string KalanGun { get; set; } = string.Empty;
             public string Ilerleme { get; set; } = string.Empty;
             public double IlerlemeRaw { get; set; }
             public bool Tamamlandı { get; set; }
@@ -87,12 +88,14 @@ namespace PersonalFinanceApp
             Label lblGoalName = new Label { Text = "Yeni Hedef Adı:", Left = 20, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlGoalName = new Panel { Left = 20, Top = 95, Width = 250, Height = 38 };
             SetupSmoothContainer(pnlGoalName, 8, CardBackColor);
+            txtGoalName.Name = "GoalName";
             txtGoalName.BorderStyle = BorderStyle.None; txtGoalName.Font = new Font("Segoe UI", 10.5F); txtGoalName.BackColor = CardBackColor; txtGoalName.ForeColor = TextLight; txtGoalName.Width = 230; txtGoalName.Location = new Point(10, 8);
             pnlGoalName.Controls.Add(txtGoalName);
 
             Label lblTargetAmount = new Label { Text = "Hedef Tutar:", Left = 290, Top = 70, ForeColor = TextMuted, AutoSize = true };
             Panel pnlTargetAmount = new Panel { Left = 290, Top = 95, Width = 150, Height = 38 };
             SetupSmoothContainer(pnlTargetAmount, 8, CardBackColor);
+            txtTargetAmount.Name = "GoalTargetAmount";
             txtTargetAmount.BorderStyle = BorderStyle.None; txtTargetAmount.Font = new Font("Segoe UI", 10.5F); txtTargetAmount.BackColor = CardBackColor; txtTargetAmount.ForeColor = TextLight; txtTargetAmount.Width = 130; txtTargetAmount.Location = new Point(10, 8);
             txtTargetAmount.TextChanged += TxtTargetAmount_TextChanged;
             pnlTargetAmount.Controls.Add(txtTargetAmount);
@@ -135,7 +138,7 @@ namespace PersonalFinanceApp
 
             dgvGoals.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvGoals.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
             dgvGoals.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvGoals.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
-            dgvGoals.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvGoals.EnableHeadersVisualStyles = false; dgvGoals.ColumnHeadersHeight = 40;
+            dgvGoals.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold); dgvGoals.EnableHeadersVisualStyles = false; dgvGoals.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None; dgvGoals.ColumnHeadersHeight = 40;
 
             dgvGoals.CellPainting += DgvGoals_CellPainting;
             dgvGoals.CellDoubleClick += DgvGoals_CellDoubleClick;
@@ -289,12 +292,20 @@ namespace PersonalFinanceApp
                 decimal percent = g.TargetAmount > 0 ? (g.CurrentAmount / g.TargetAmount) * 100 : 0;
                 if (g.IsAchieved) percent = 100;
 
+                string kalanGun = "";
+                if (g.DueDate.HasValue && !g.IsAchieved)
+                {
+                    int days = (g.DueDate.Value.Date - DateTime.Today).Days;
+                    kalanGun = days < 0 ? "Süresi geçti" : days == 0 ? "Bugün" : $"{days} gün";
+                }
+
                 return new GoalRow
                 {
                     ID = g.Id,
                     Hedef = g.GoalName,
                     Biriken = _user.HideAmountsEnabled ? "••••••" : g.CurrentAmount.ToString("#,##0", tr) + " ₺",
                     HedefTutar = _user.HideAmountsEnabled ? "••••••" : g.TargetAmount.ToString("#,##0", tr) + " ₺",
+                    KalanGun = kalanGun,
                     Ilerleme = $"% {percent:N1}",
                     IlerlemeRaw = (double)percent,
                     Tamamlandı = g.IsAchieved
@@ -315,6 +326,10 @@ namespace PersonalFinanceApp
                 dgvGoals.Columns["HedefTutar"]!.HeaderText = "Hedef Tutar";
                 dgvGoals.Columns["HedefTutar"]!.FillWeight = 60;
                 dgvGoals.Columns["HedefTutar"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+                dgvGoals.Columns["KalanGun"]!.HeaderText = "Kalan Süre";
+                dgvGoals.Columns["KalanGun"]!.FillWeight = 55;
+                dgvGoals.Columns["KalanGun"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
                 dgvGoals.Columns["Ilerleme"]!.HeaderText = "İlerleme";
                 dgvGoals.Columns["Ilerleme"]!.FillWeight = 55;

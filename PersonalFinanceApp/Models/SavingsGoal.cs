@@ -11,5 +11,9 @@ namespace PersonalFinanceApp.Models
         public decimal CurrentAmount { get; set; } // YENİ EKLENEN SÜTUN
         public bool IsAchieved { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? DueDate { get; set; }
+        public string? RecurringFrequency { get; set; } // null, "daily", "weekly", "monthly"
+        public decimal? RecurringAmount { get; set; }
+        public DateTime? LastContributionDate { get; set; }
     }
 }

@@ -3,6 +3,16 @@
 --   1. Boş bir veritabanı oluşturun (örn. `createdb PersonalFinanceDb`)
 --   2. Bu dosyayı çalıştırın: `psql -h <host> -p <port> -U <kullanıcı> -d PersonalFinanceDb -f schema.sql`
 --   3. PersonalFinanceApp/config.json içindeki ConnectionString'i buna göre ayarlayın.
+--
+-- Manuel ALTER TABLE geçmişi (bu dosya otomatik uygulanmıyor; canlı veritabanına elle
+-- ALTER TABLE ile uygulanan her değişiklik burada da CREATE TABLE'a yansıtılır ve
+-- denetlenebilirlik için burada tarihleniyor):
+--   2026-08-21  categories.budget_limit eklendi (Faz 2 — kategori bütçe limiti)
+--   2026-08-21  categories.color, categories.icon eklendi (Faz 3 — kategori renk/ikon)
+--   2026-08-21  asset_price_alerts tablosu eklendi (Faz 4 — varlık fiyat alarmı)
+--   2026-08-21  asset_transactions.realized_pl_try eklendi (Faz 5 — gerçekleşen kâr/zarar)
+--   2026-08-21  savings_goals.due_date/recurring_frequency/recurring_amount/last_contribution_date eklendi (Faz 6 — hedef tarihi + otomatik katkı)
+--   2026-08-21  reminders.recurrence eklendi (Faz 7 — tekrarlanan hatırlatıcı + ertele)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -16,14 +26,27 @@ CREATE TABLE users (
     wallet_balance        NUMERIC(14,2) NOT NULL DEFAULT 0,
     safe_balance           NUMERIC(14,2) NOT NULL DEFAULT 0,
     last_income_month     INTEGER,
-    last_income_year      INTEGER
+    last_income_year      INTEGER,
+    full_name                    TEXT NOT NULL DEFAULT '',
+    cleanup_frequency            VARCHAR(10) NOT NULL DEFAULT 'never',
+    cleanup_period_start         TIMESTAMP NOT NULL DEFAULT NOW(),
+    cleanup_export_before_clear  BOOLEAN NOT NULL DEFAULT FALSE,
+    avatar_color                 VARCHAR(7) NOT NULL DEFAULT '#6366F1',
+    -- Ana Sayfa'daki isteğe bağlı widget'ların (Varlık Bildirimleri, Notlar, ...) hücre yerleşimi (JSON).
+    -- Boşsa hiç widget eklenmemiş demektir.
+    home_layout                  TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE categories (
     category_id  SERIAL PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
-    type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal'))
+    type         TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal', 'invest')),
+    -- Aylık harcama limiti; sadece 'expense' tipi kategorilerde anlamlı, aşılınca tepsi bildirimi gösterilir.
+    budget_limit NUMERIC(14,2),
+    color        VARCHAR(7),  -- "#RRGGBB"
+    icon         VARCHAR(10), -- tek bir emoji
+    CONSTRAINT chk_budget_limit CHECK (budget_limit IS NULL OR (type = 'expense' AND budget_limit > 0))
 );
 
 CREATE TABLE transactions (
@@ -31,7 +54,7 @@ CREATE TABLE transactions (
     user_id           INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     category_id       INTEGER NOT NULL REFERENCES categories(category_id),
     amount            NUMERIC(14,2) NOT NULL,
-    type              TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal')),
+    type              TEXT NOT NULL CHECK (type IN ('income', 'expense', 'goal', 'invest')),
     description       TEXT,
     transaction_date  TIMESTAMP NOT NULL,
     created_at        TIMESTAMP NOT NULL DEFAULT NOW()
@@ -59,9 +82,14 @@ CREATE TABLE savings_goals (
     target_amount   NUMERIC(14,2) NOT NULL,
     current_amount  NUMERIC(14,2) NOT NULL DEFAULT 0,
     is_achieved     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    due_date                DATE,          -- Hedef tarihi (opsiyonel)
+    recurring_frequency     VARCHAR(10),   -- null, 'daily', 'weekly', 'monthly'
+    recurring_amount        NUMERIC(14,2), -- Otomatik katkı tutarı
+    last_contribution_date  DATE           -- Son otomatik katkının işlendiği tarih
 );
 
+-- Hedeflerim: bir hedefe yapılan tekil yatırım/katkı geçmişi
 CREATE TABLE savings_goal_investments (
     investment_id  SERIAL PRIMARY KEY,
     goal_id        INTEGER NOT NULL REFERENCES savings_goals(goal_id) ON DELETE CASCADE,
@@ -75,7 +103,8 @@ CREATE TABLE notes (
     user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     title       TEXT,
     content     TEXT,
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE reminders (
@@ -85,7 +114,8 @@ CREATE TABLE reminders (
     reminder_date   TIMESTAMP NOT NULL,
     is_completed    BOOLEAN NOT NULL DEFAULT FALSE,
     is_notified     BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    recurrence      VARCHAR(10) -- null, 'daily', 'weekly', 'monthly'
 );
 
 CREATE TABLE transfer_history (
@@ -94,4 +124,54 @@ CREATE TABLE transfer_history (
     direction    TEXT NOT NULL,
     amount       NUMERIC(14,2) NOT NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Varlıklarım: kullanıcının döviz/altın/kripto pozisyonları (miktar + ağırlıklı ortalama maliyet)
+CREATE TABLE user_holdings (
+    holding_id    SERIAL PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    symbol        TEXT NOT NULL,
+    asset_type    TEXT NOT NULL CHECK (asset_type IN ('crypto', 'currency', 'gold')),
+    quantity      NUMERIC(20,8) NOT NULL DEFAULT 0,
+    avg_cost_try  NUMERIC(14,4) NOT NULL DEFAULT 0,
+    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, symbol)
+);
+
+-- Varlıklarım: fiyat alarmları (eşik geçilince tepsi bildirimi gösterilir, günde en fazla bir kez)
+CREATE TABLE asset_price_alerts (
+    alert_id          SERIAL PRIMARY KEY,
+    user_id           INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    symbol            TEXT NOT NULL,
+    asset_type        TEXT NOT NULL,
+    direction         TEXT NOT NULL CHECK (direction IN ('above','below')),
+    threshold_price   NUMERIC(18,4) NOT NULL,
+    is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+    last_triggered_at TIMESTAMP,
+    created_at        TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Varlıklarım: alım/satım işlem geçmişi
+CREATE TABLE asset_transactions (
+    asset_tx_id  SERIAL PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    symbol       TEXT NOT NULL,
+    asset_type   TEXT NOT NULL,
+    direction    TEXT NOT NULL CHECK (direction IN ('buy', 'sell')),
+    quantity     NUMERIC(20,8) NOT NULL,
+    price_try    NUMERIC(14,4) NOT NULL,
+    total_try    NUMERIC(14,2) NOT NULL,
+    -- Sadece 'sell' işlemlerinde dolu: (satış fiyatı - o anki ortalama maliyet) × miktar
+    realized_pl_try NUMERIC(18,4),
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Varlıklarım: Rapor'daki "Portföy Değeri Gelişimi" çizgi grafiği için günlük toplam değer anlık görüntüsü
+CREATE TABLE portfolio_value_snapshots (
+    snapshot_id      SERIAL PRIMARY KEY,
+    user_id          INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    snapshot_date    DATE NOT NULL,
+    total_value_try  NUMERIC(16,2) NOT NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, snapshot_date)
 );

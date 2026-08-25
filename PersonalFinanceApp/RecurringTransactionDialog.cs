@@ -65,7 +65,7 @@ namespace PersonalFinanceApp
             this.Font = new Font("Segoe UI", 9.5F);
 
             // --- SIKLIK SEÇİMİ ---
-            Label lblFrequency = new Label { Text = "Sıklık:", Left = 20, Top = 15, ForeColor = TextMuted, AutoSize = true };
+            Label lblFrequency = new Label { Text = "Sıklık:", Left = 20, Top = 15, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
 
             const int freqTop = 37, freqHeight = 36, freqGap = 10;
             int freqWidth = (500 - freqGap * 2) / 3;
@@ -88,9 +88,9 @@ namespace PersonalFinanceApp
             RefreshFrequencyButtons();
 
             // --- GİRDİ ALANLARI ---
-            const int fieldLabelTop = 90, fieldTop = 112, fieldHeight = 36;
+            const int fieldLabelTop = 88, fieldTop = 116, fieldHeight = 36;
 
-            Label lblTypeField = new Label { Text = "Tip:", Left = 20, Top = fieldLabelTop, ForeColor = TextMuted, AutoSize = true };
+            Label lblTypeField = new Label { Text = "Tip:", Left = 20, Top = fieldLabelTop, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
             Panel pnlType = new Panel { Left = 20, Top = fieldTop, Width = 110, Height = fieldHeight };
             cmbType.Left = 5; cmbType.Top = 7; cmbType.Width = 105;
             cmbType.Font = new Font("Segoe UI", 9.5F); cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -98,7 +98,7 @@ namespace PersonalFinanceApp
             pnlType.Controls.Add(cmbType);
             SetupCustomComboBox(pnlType, cmbType);
 
-            Label lblCategoryField = new Label { Text = "Kategori:", Left = 145, Top = fieldLabelTop, ForeColor = TextMuted, AutoSize = true };
+            Label lblCategoryField = new Label { Text = "Kategori:", Left = 145, Top = fieldLabelTop, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
             Panel pnlCategory = new Panel { Left = 145, Top = fieldTop, Width = 140, Height = fieldHeight };
             SetupSmoothContainer(pnlCategory, 8, CardBackColor);
             txtCategory.Left = 10; txtCategory.Top = 8; txtCategory.Width = 120;
@@ -106,15 +106,16 @@ namespace PersonalFinanceApp
             txtCategory.BackColor = CardBackColor; txtCategory.ForeColor = TextLight;
             pnlCategory.Controls.Add(txtCategory);
 
-            Label lblAmountField = new Label { Text = "Tutar:", Left = 300, Top = fieldLabelTop, ForeColor = TextMuted, AutoSize = true };
+            Label lblAmountField = new Label { Text = "Tutar:", Left = 300, Top = fieldLabelTop, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
             Panel pnlAmount = new Panel { Left = 300, Top = fieldTop, Width = 100, Height = fieldHeight };
             SetupSmoothContainer(pnlAmount, 8, CardBackColor);
             txtAmount.Left = 10; txtAmount.Top = 8; txtAmount.Width = 80;
             txtAmount.Font = new Font("Segoe UI", 9.5F); txtAmount.BorderStyle = BorderStyle.None;
             txtAmount.BackColor = CardBackColor; txtAmount.ForeColor = TextLight;
+            txtAmount.TextChanged += (s, e) => SmartFormatAmount(txtAmount);
             pnlAmount.Controls.Add(txtAmount);
 
-            Label lblDescField = new Label { Text = "Açıklama:", Left = 415, Top = fieldLabelTop, ForeColor = TextMuted, AutoSize = true };
+            Label lblDescField = new Label { Text = "Açıklama:", Left = 415, Top = fieldLabelTop, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
             Panel pnlDesc = new Panel { Left = 415, Top = fieldTop, Width = 125, Height = fieldHeight };
             SetupSmoothContainer(pnlDesc, 8, CardBackColor);
             txtDescription.Left = 10; txtDescription.Top = 8; txtDescription.Width = 105;
@@ -123,11 +124,12 @@ namespace PersonalFinanceApp
             pnlDesc.Controls.Add(txtDescription);
 
             btnAdd.Text = "Ekle";
-            btnAdd.Left = 20; btnAdd.Top = 160; btnAdd.Width = 520; btnAdd.Height = 36; btnAdd.Cursor = Cursors.Hand;
+            btnAdd.Left = 20; btnAdd.Top = 164; btnAdd.Width = 520; btnAdd.Height = 36; btnAdd.Cursor = Cursors.Hand;
             SetupRoundedButton(btnAdd, AccentColor, Color.White);
             btnAdd.Click += BtnAdd_Click;
 
-            lblStatus.Left = 20; lblStatus.Top = 204; lblStatus.Width = 520; lblStatus.Height = 22;
+            lblStatus.Left = 20; lblStatus.Top = 208; lblStatus.Width = 520; lblStatus.Height = 22;
+            lblStatus.BackColor = Color.Transparent;
             lblStatus.Font = new Font("Segoe UI", 9F);
 
             // --- LİSTE ---
@@ -155,7 +157,7 @@ namespace PersonalFinanceApp
 
             dgvRecurring.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.HeaderBackColor; dgvRecurring.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
             dgvRecurring.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor; dgvRecurring.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
-            dgvRecurring.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); dgvRecurring.EnableHeadersVisualStyles = false; dgvRecurring.ColumnHeadersHeight = 34;
+            dgvRecurring.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold); dgvRecurring.EnableHeadersVisualStyles = false; dgvRecurring.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None; dgvRecurring.ColumnHeadersHeight = 34;
 
             dgvRecurring.CurrentCellDirtyStateChanged += (s, e) =>
             {
@@ -257,13 +259,33 @@ namespace PersonalFinanceApp
             _recurringService.SetActive(recurringId, _user.Id, newValue);
         }
 
+        private bool _suppressAmountFormatting = false;
+
+        // Tutar kutusuna yazılan rakamları "10.000" gibi binlik ayraçlarla biçimlendirir.
+        private void SmartFormatAmount(TextBox txt)
+        {
+            if (_suppressAmountFormatting || string.IsNullOrWhiteSpace(txt.Text)) return;
+            string value = new string(txt.Text.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(value)) return;
+            if (decimal.TryParse(value, out decimal amount))
+            {
+                string formatted = amount.ToString("#,##0", new System.Globalization.CultureInfo("tr-TR"));
+                if (txt.Text == formatted) return;
+                _suppressAmountFormatting = true;
+                txt.Text = formatted;
+                txt.SelectionStart = txt.Text.Length;
+                _suppressAmountFormatting = false;
+            }
+        }
+
         private void BtnAdd_Click(object? sender, EventArgs e)
         {
             string type = cmbType.SelectedItem?.ToString() == "Gelir" ? "income" : "expense";
             string category = txtCategory.Text.Trim();
             string description = txtDescription.Text;
 
-            if (!decimal.TryParse(txtAmount.Text, out decimal amount))
+            string rawAmount = new string(txtAmount.Text.Where(char.IsDigit).ToArray());
+            if (!decimal.TryParse(rawAmount, out decimal amount))
             {
                 lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
                 lblStatus.Text = "Geçersiz tutar.";
@@ -274,8 +296,26 @@ namespace PersonalFinanceApp
 
             if (success)
             {
-                lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
-                lblStatus.Text = "Tekrarlanan işlem eklendi.";
+                // Yeni eklenen tekrarlayan işlemi kullanıcı uygulamayı kapatıp açana kadar beklemeden hemen
+                // işliyoruz (LastProcessedDate boş olduğu için "due" sayılır, giriş anındaki akışla aynı yolu
+                // kullanır) — böylece ilk işlem oluşturmak için yeniden giriş yapmaya gerek kalmıyor.
+                var (added, failed) = _recurringService.ProcessDueRecurring(_user.Id);
+
+                if (added.Count > 0)
+                {
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                    lblStatus.Text = "Tekrarlanan işlem eklendi ve ilk işlem oluşturuldu.";
+                }
+                else if (failed.Count > 0)
+                {
+                    lblStatus.ForeColor = Color.FromArgb(255, 200, 120);
+                    lblStatus.Text = $"Tekrarlanan işlem eklendi. İlk işlem oluşturulamadı: {failed[0]}";
+                }
+                else
+                {
+                    lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+                    lblStatus.Text = "Tekrarlanan işlem eklendi.";
+                }
                 txtCategory.Clear();
                 txtAmount.Clear();
                 txtDescription.Clear();
@@ -326,13 +366,13 @@ namespace PersonalFinanceApp
                 bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bgColor = isSelected ? AppTheme.HoverBackColor : CardBackColor;
                 e.Graphics.FillRectangle(new SolidBrush(bgColor), e.Bounds);
-                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                TextRenderer.DrawText(e.Graphics, cmb.Items[e.Index]?.ToString() ?? string.Empty, cmb.Font, e.Bounds, TextLight, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             };
 
             cmb.Region = new Region(new Rectangle(1, 1, cmb.Width - 2, cmb.Height - 2));
 
             Panel pnlArrow = new Panel();
-            pnlArrow.Width = 24;
+            pnlArrow.Width = 28;
             pnlArrow.Height = cmb.Height - 2;
             pnlArrow.Left = cmb.Right - pnlArrow.Width - 1;
             pnlArrow.Top = cmb.Top + 1;

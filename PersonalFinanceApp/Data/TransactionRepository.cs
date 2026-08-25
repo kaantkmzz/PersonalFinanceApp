@@ -64,6 +64,23 @@ namespace PersonalFinanceApp.Data
             }
         }
 
+        // Kullanıcının gelir/gider işlem geçmişini siler (temizleme sıklığı ayarı tarafından kullanılır).
+        // "goal" ve "invest" tipindeki işlemler hedef/yatırım geçmişine ait olduğundan kasıtlı olarak hariç tutulur.
+        public void DeleteAllForUser(int userId)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "DELETE FROM transactions WHERE user_id = @userId AND type IN ('income', 'expense')";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         public void Delete(int transactionId, int userId)
         {
             using (var conn = DatabaseHelper.GetConnection())
@@ -157,7 +174,7 @@ namespace PersonalFinanceApp.Data
             };
         }
 
-        public decimal GetTotalByTypeAndMonth(int userId, string type, int year, int month)
+        public decimal GetTotalByTypeAndDateRange(int userId, string type, DateTime start, DateTime end)
         {
             using (var conn = DatabaseHelper.GetConnection())
             {
@@ -167,22 +184,21 @@ namespace PersonalFinanceApp.Data
             SELECT COALESCE(SUM(amount), 0)
             FROM transactions
             WHERE user_id = @userId AND type = @type
-              AND EXTRACT(YEAR FROM transaction_date) = @year
-              AND EXTRACT(MONTH FROM transaction_date) = @month";
+              AND transaction_date >= @start AND transaction_date < @end";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.Parameters.AddWithValue("@type", type);
-                    cmd.Parameters.AddWithValue("@year", year);
-                    cmd.Parameters.AddWithValue("@month", month);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
 
                     return (decimal)(cmd.ExecuteScalar() ?? 0m);
                 }
             }
         }
 
-        public List<CategorySummary> GetCategoryBreakdown(int userId, string type, int year, int month)
+        public List<CategorySummary> GetCategoryBreakdownByDateRange(int userId, string type, DateTime start, DateTime end)
         {
             var results = new List<CategorySummary>();
 
@@ -195,8 +211,7 @@ namespace PersonalFinanceApp.Data
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
             WHERE t.user_id = @userId AND t.type = @type
-              AND EXTRACT(YEAR FROM t.transaction_date) = @year
-              AND EXTRACT(MONTH FROM t.transaction_date) = @month
+              AND t.transaction_date >= @start AND t.transaction_date < @end
             GROUP BY c.name
             ORDER BY total_amount DESC";
 
@@ -204,8 +219,8 @@ namespace PersonalFinanceApp.Data
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.Parameters.AddWithValue("@type", type);
-                    cmd.Parameters.AddWithValue("@year", year);
-                    cmd.Parameters.AddWithValue("@month", month);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
 
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -241,6 +256,45 @@ namespace PersonalFinanceApp.Data
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            int categoryId = reader.GetInt32(reader.GetOrdinal("category_id"));
+                            decimal total = reader.GetDecimal(reader.GetOrdinal("total"));
+                            totals[categoryId] = total;
+                        }
+                    }
+                }
+            }
+
+            return totals;
+        }
+
+        // Belirli bir ayda, category_id bazında toplam gider (kategori bütçe limiti kontrolü için).
+        // İsimle değil ID ile grupluyoruz — kategori adlarının benzersizliği DB düzeyinde garanti değil.
+        public Dictionary<int, decimal> GetMonthlyExpenseByCategoryId(int userId, int year, int month)
+        {
+            var totals = new Dictionary<int, decimal>();
+            var start = new DateTime(year, month, 1);
+            var end = start.AddMonths(1);
+
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = @"
+            SELECT category_id, SUM(amount) AS total
+            FROM transactions
+            WHERE user_id = @userId AND type = 'expense'
+              AND transaction_date >= @start AND transaction_date < @end
+            GROUP BY category_id";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.Parameters.AddWithValue("@start", start);
+                    cmd.Parameters.AddWithValue("@end", end);
 
                     using (var reader = cmd.ExecuteReader())
                     {

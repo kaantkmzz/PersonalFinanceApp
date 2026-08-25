@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
@@ -16,17 +17,10 @@ namespace PersonalFinanceApp
         private static readonly Color DangerColor = Color.FromArgb(230, 120, 120);
 
         private Panel pnlCard = new Panel();
-        private Panel pnlStep1 = new Panel();
-        private Panel pnlStep2 = new Panel();
-        private Panel pnlStepDot1 = new Panel();
-        private Panel pnlStepDot2 = new Panel();
+        private Panel pnlStep = new Panel();
 
-        private TextBox txtMonthlyIncome = new TextBox();
         private TextBox txtInitialSavings = new TextBox();
-        private Label lblError1 = new Label();
-        private Label lblError2 = new Label();
-
-        private decimal _monthlyIncomeValue;
+        private Label lblError = new Label();
 
         public OnboardingForm(int userId)
         {
@@ -48,7 +42,7 @@ namespace PersonalFinanceApp
             this.ControlBox = false;
 
             pnlCard.Width = 480;
-            pnlCard.Height = 420;
+            pnlCard.Height = 360;
             pnlCard.BackColor = AppBackColor;
             pnlCard.Paint += (s, e) =>
             {
@@ -59,111 +53,55 @@ namespace PersonalFinanceApp
                 e.Graphics.FillPath(brush, path);
             };
 
-            // --- Adım göstergesi (üstte iki nokta) ---
-            pnlStepDot1.Size = new Size(28, 6);
-            pnlStepDot1.Top = 26;
-            pnlStepDot1.Paint += (s, e) => PaintStepDot(e.Graphics, pnlStepDot1, true);
+            // --- Kasa / Toplam Birikim (tek adım; cüzdan artık burada sorulmuyor, 0 ile başlıyor) ---
+            pnlStep.Dock = DockStyle.Fill;
+            PaintCardShape(pnlStep);
 
-            pnlStepDot2.Size = new Size(28, 6);
-            pnlStepDot2.Top = 26;
-            pnlStepDot2.Paint += (s, e) => PaintStepDot(e.Graphics, pnlStepDot2, false);
+            Panel pnlIconBadge = CreateIconBadge("🏦");
+            Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
 
-            pnlStepDot1.Left = pnlCard.Width / 2 - 34;
-            pnlStepDot2.Left = pnlCard.Width / 2 + 6;
-
-            // --- Adım 1: Cüzdan / Aylık Gelir ---
-            pnlStep1.Dock = DockStyle.Fill;
-            PaintCardShape(pnlStep1);
-
-            Panel pnlIconBadge1 = CreateIconBadge("👛");
-            Label lblPrompt1 = new Label { Text = "Aylık toplam gelirinizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true };
-            Label lblHint1 = new Label { Text = "Bu tutar, aylık bütçenizi takip etmemize yardımcı olur", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, AutoSize = true };
-
-            Panel pnlField1 = new Panel { Left = 60, Top = 195, Width = 360, Height = 48 };
-            SetupSmoothContainer(pnlField1, 10, FieldBackColor);
-            txtMonthlyIncome.BorderStyle = BorderStyle.None;
-            txtMonthlyIncome.BackColor = FieldBackColor;
-            txtMonthlyIncome.ForeColor = TextLight;
-            txtMonthlyIncome.Font = new Font("Segoe UI", 13F);
-            txtMonthlyIncome.TextAlign = HorizontalAlignment.Center;
-            txtMonthlyIncome.Location = new Point(0, 13);
-            txtMonthlyIncome.Width = 360;
-            txtMonthlyIncome.TextChanged += (s, e) => SmartFormatAmount(txtMonthlyIncome);
-            pnlField1.Controls.Add(txtMonthlyIncome);
-
-            lblError1.Left = 60;
-            lblError1.Top = 250;
-            lblError1.Width = 360;
-            lblError1.Height = 24;
-            lblError1.ForeColor = DangerColor;
-            lblError1.Font = new Font("Segoe UI", 9F);
-            lblError1.TextAlign = ContentAlignment.MiddleCenter;
-
-            Button btnNext = new Button { Text = "Devam Et", Left = 60, Top = 285, Width = 360, Height = 46, Cursor = Cursors.Hand };
-            SetupRoundedButton(btnNext, AccentColor, Color.White);
-            btnNext.Click += BtnNext_Click;
-
-            CenterHorizontally(pnlIconBadge1, 0, 40);
-            CenterHorizontally(lblPrompt1, 0, 118);
-            CenterHorizontally(lblHint1, 0, 150);
-
-            pnlStep1.Controls.Add(pnlIconBadge1);
-            pnlStep1.Controls.Add(lblPrompt1);
-            pnlStep1.Controls.Add(lblHint1);
-            pnlStep1.Controls.Add(pnlField1);
-            pnlStep1.Controls.Add(lblError1);
-            pnlStep1.Controls.Add(btnNext);
-
-            // --- Adım 2: Kasa / Toplam Birikim ---
-            pnlStep2.Dock = DockStyle.Fill;
-            pnlStep2.Visible = false;
-            PaintCardShape(pnlStep2);
-
-            Panel pnlIconBadge2 = CreateIconBadge("🏦");
-            Label lblPrompt2 = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, AutoSize = true };
-            Label lblHint2 = new Label { Text = "Kasanızda şu an bulunan toplam tasarruf tutarı", Font = new Font("Segoe UI", 9F), ForeColor = TextMuted, AutoSize = true };
-
-            Panel pnlField2 = new Panel { Left = 60, Top = 195, Width = 360, Height = 48 };
-            SetupSmoothContainer(pnlField2, 10, FieldBackColor);
+            // Alt açıklama kaldırıldı — tek başlık yeterli. Kaldırılan boşluk yukarı çekildi,
+            // metin kutusu geniş olsun diye kart genişletildi (bkz. pnlCard.Width).
+            Panel pnlField = new Panel { Left = 40, Top = 180, Width = 400, Height = 52 };
+            SetupSmoothContainer(pnlField, 10, FieldBackColor);
             txtInitialSavings.BorderStyle = BorderStyle.None;
             txtInitialSavings.BackColor = FieldBackColor;
             txtInitialSavings.ForeColor = TextLight;
             txtInitialSavings.Font = new Font("Segoe UI", 13F);
             txtInitialSavings.TextAlign = HorizontalAlignment.Center;
-            txtInitialSavings.Location = new Point(0, 13);
-            txtInitialSavings.Width = 360;
+            txtInitialSavings.Location = new Point(0, 15);
+            txtInitialSavings.Width = 400;
             txtInitialSavings.TextChanged += (s, e) => SmartFormatAmount(txtInitialSavings);
-            pnlField2.Controls.Add(txtInitialSavings);
+            // "p", "y" gibi alt çıkıntılı (descender) harflerin native metin kutusunun alt sınırına
+            // çok yakın yazılıp kırpılmasını önlemek için metni birkaç piksel yukarı kaydırıyoruz
+            // (bkz. TransactionControl.ShiftEditTextUp — aynı teknik, burada doğrudan TextBox'a uygulanıyor).
+            txtInitialSavings.HandleCreated += (s, e) => ShiftTextBoxTextUp(txtInitialSavings, 3);
+            if (txtInitialSavings.IsHandleCreated) ShiftTextBoxTextUp(txtInitialSavings, 3);
+            pnlField.Controls.Add(txtInitialSavings);
 
-            lblError2.Left = 60;
-            lblError2.Top = 250;
-            lblError2.Width = 360;
-            lblError2.Height = 24;
-            lblError2.ForeColor = DangerColor;
-            lblError2.Font = new Font("Segoe UI", 9F);
-            lblError2.TextAlign = ContentAlignment.MiddleCenter;
+            lblError.Left = 40;
+            lblError.Top = 238;
+            lblError.Width = 400;
+            lblError.Height = 24;
+            lblError.ForeColor = DangerColor;
+            lblError.BackColor = Color.Transparent;
+            lblError.Font = new Font("Segoe UI", 9F);
+            lblError.TextAlign = ContentAlignment.MiddleCenter;
 
-            Button btnFinish = new Button { Text = "Tamamla", Left = 60, Top = 285, Width = 360, Height = 46, Cursor = Cursors.Hand };
+            Button btnFinish = new Button { Text = "Tamamla", Left = 40, Top = 274, Width = 400, Height = 46, Cursor = Cursors.Hand };
             SetupRoundedButton(btnFinish, AccentColor, Color.White);
             btnFinish.Click += BtnFinish_Click;
 
-            CenterHorizontally(pnlIconBadge2, 0, 40);
-            CenterHorizontally(lblPrompt2, 0, 118);
-            CenterHorizontally(lblHint2, 0, 150);
+            CenterHorizontally(pnlIconBadge, 0, 36);
+            CenterHorizontally(lblPrompt, 0, 118);
 
-            pnlStep2.Controls.Add(pnlIconBadge2);
-            pnlStep2.Controls.Add(lblPrompt2);
-            pnlStep2.Controls.Add(lblHint2);
-            pnlStep2.Controls.Add(pnlField2);
-            pnlStep2.Controls.Add(lblError2);
-            pnlStep2.Controls.Add(btnFinish);
+            pnlStep.Controls.Add(pnlIconBadge);
+            pnlStep.Controls.Add(lblPrompt);
+            pnlStep.Controls.Add(pnlField);
+            pnlStep.Controls.Add(lblError);
+            pnlStep.Controls.Add(btnFinish);
 
-            pnlCard.Controls.Add(pnlStep1);
-            pnlCard.Controls.Add(pnlStep2);
-            pnlCard.Controls.Add(pnlStepDot1);
-            pnlCard.Controls.Add(pnlStepDot2);
-            pnlStepDot1.BringToFront();
-            pnlStepDot2.BringToFront();
+            pnlCard.Controls.Add(pnlStep);
             this.Controls.Add(pnlCard);
 
             this.Resize += (s, e) => CenterCard();
@@ -179,24 +117,35 @@ namespace PersonalFinanceApp
                 e.Graphics.Clear(CardBackColor);
                 using var brush = new SolidBrush(Color.FromArgb(40, AccentColor));
                 e.Graphics.FillEllipse(brush, 0, 0, badge.Width - 1, badge.Height - 1);
-                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 28F), badge.ClientRectangle, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                // Emoji glifleri genelde alt tarafa doğru fazladan boşluk bırakıyor; küçültülmüş
+                // font + birkaç piksel yukarı kaydırılmış çizim dikdörtgeni ile yuvarlağın
+                // ortasına optik olarak hizalıyoruz.
+                var iconRect = new Rectangle(0, -4, badge.Width, badge.Height);
+                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 22F), iconRect, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
             return badge;
+        }
+
+        // TextBox'ın metin biçimlendirme dikdörtgenini (EM_SETRECT) birkaç piksel yukarı taşıyarak
+        // "p", "y" gibi alt çıkıntılı harflerin alt sınıra çok yakın yazılıp kırpılmasını önler.
+        private const int EM_SETRECT = 0xB3;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref RECT lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        private static void ShiftTextBoxTextUp(TextBox txt, int pixels)
+        {
+            var rect = new RECT { Left = 0, Top = -pixels, Right = txt.ClientSize.Width, Bottom = txt.ClientSize.Height };
+            SendMessage(txt.Handle, EM_SETRECT, IntPtr.Zero, ref rect);
         }
 
         private void CenterHorizontally(Control control, int unusedLeft, int top)
         {
             control.Top = top;
             control.Left = (pnlCard.Width - control.Width) / 2;
-        }
-
-        private void PaintStepDot(Graphics g, Panel dot, bool active)
-        {
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(CardBackColor);
-            using var path = GetRoundedRectPath(new Rectangle(0, 0, dot.Width - 1, dot.Height - 1), dot.Height / 2);
-            using var brush = new SolidBrush(active ? AccentColor : Color.FromArgb(70, 74, 96));
-            g.FillPath(brush, path);
         }
 
         private bool _suppressFormatting = false;
@@ -223,36 +172,22 @@ namespace PersonalFinanceApp
             pnlCard.Top = (this.ClientSize.Height - pnlCard.Height) / 2;
         }
 
-        private void BtnNext_Click(object? sender, EventArgs e)
-        {
-            string raw = new string(txtMonthlyIncome.Text.Where(char.IsDigit).ToArray());
-            if (!decimal.TryParse(raw, out decimal income) || income < 0)
-            {
-                lblError1.Text = "Geçerli bir tutar girin.";
-                return;
-            }
-
-            _monthlyIncomeValue = income;
-            pnlStep1.Visible = false;
-            pnlStep2.Visible = true;
-            pnlStepDot1.Invalidate();
-        }
-
         private void BtnFinish_Click(object? sender, EventArgs e)
         {
             string raw = new string(txtInitialSavings.Text.Where(char.IsDigit).ToArray());
             if (!decimal.TryParse(raw, out decimal savings) || savings < 0)
             {
-                lblError2.Text = "Geçerli bir tutar girin.";
+                lblError.Text = "Geçerli bir tutar girin.";
                 return;
             }
 
-            _accountService.CompleteOnboarding(_userId, _monthlyIncomeValue, savings);
+            // Cüzdan artık onboarding'de sorulmuyor; 0 bakiyeyle başlıyor.
+            _accountService.CompleteOnboarding(_userId, 0, savings);
             this.DialogResult = DialogResult.OK;
             this.Close();
         }
 
-        // pnlCard'ın yuvarlatılmış köşeleriyle aynı şekli, üstünü tamamen kaplayan adım panelleri için de çizer
+        // pnlCard'ın yuvarlatılmış köşeleriyle aynı şekli, üstünü tamamen kaplayan adım paneli için de çizer
         // (Dock=Fill bir çocuk, ebeveynin köşe yuvarlamasını düz bir dikdörtgenle kapatmasın diye).
         private void PaintCardShape(Panel panel)
         {

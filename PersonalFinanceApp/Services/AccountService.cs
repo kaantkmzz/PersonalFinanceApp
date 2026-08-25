@@ -77,6 +77,7 @@ namespace PersonalFinanceApp.Services
             return true;
         }
 
+
         public void AdjustWalletBalance(int userId, decimal delta)
         {
             _repository.AdjustWalletBalance(userId, delta);
@@ -90,6 +91,36 @@ namespace PersonalFinanceApp.Services
         public void SetHideAmounts(int userId, bool hideAmounts)
         {
             _repository.SetHideAmounts(userId, hideAmounts);
+        }
+
+        public void SetFullName(int userId, string fullName)
+        {
+            _repository.SetFullName(userId, fullName);
+        }
+
+        public void SetCleanupFrequency(int userId, string frequency, DateTime periodStart)
+        {
+            _repository.SetCleanupFrequency(userId, frequency, periodStart);
+        }
+
+        public void SetCleanupPeriodStart(int userId, DateTime periodStart)
+        {
+            _repository.SetCleanupPeriodStart(userId, periodStart);
+        }
+
+        public void SetCleanupExportBeforeClear(int userId, bool exportBeforeClear)
+        {
+            _repository.SetCleanupExportBeforeClear(userId, exportBeforeClear);
+        }
+
+        public void SetAvatarColor(int userId, string hexColor)
+        {
+            _repository.SetAvatarColor(userId, hexColor);
+        }
+
+        public void SetHomeLayout(int userId, string layoutJson)
+        {
+            _repository.SetHomeLayout(userId, layoutJson);
         }
     }
 }

@@ -68,13 +68,17 @@ namespace PersonalFinanceApp
             dgvHistory.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvHistory.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvHistory.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            dgvHistory.EnableHeadersVisualStyles = false;
+            dgvHistory.EnableHeadersVisualStyles = false; dgvHistory.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             dgvHistory.ColumnHeadersHeight = 36;
             dgvHistory.RowTemplate.Height = 34;
             dgvHistory.AlternatingRowsDefaultCellStyle.BackColor = CardBackColor;
 
             dgvHistory.DefaultCellStyle.SelectionBackColor = AccentColor;
             dgvHistory.DefaultCellStyle.SelectionForeColor = Color.White;
+
+            // Kaydırma çubuğu Windows'un yerleşik denetimi olduğundan BackColor/ForeColor'a uymuyor;
+            // handle oluşunca koyu temaya göre boyatıyoruz.
+            dgvHistory.HandleCreated += (s, e) => DarkTitleBarHelper.SetScrollBarDarkMode(dgvHistory, AppTheme.IsDark);
 
             Panel pnlGridWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2, 6, 2, 6) };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -98,6 +102,17 @@ namespace PersonalFinanceApp
             pnl.SizeChanged += (s, e) => pnl.Invalidate();
         }
 
+        private static string DirectionLabel(string direction) => direction switch
+        {
+            "wallet_to_safe" => "Cüzdan → Kasa",
+            "safe_to_wallet" => "Kasa → Cüzdan",
+            "wallet_to_invest" => "Cüzdan → Yatırım",
+            "safe_to_invest" => "Kasa → Yatırım",
+            "invest_to_wallet" => "Yatırım → Cüzdan",
+            "invest_to_safe" => "Yatırım → Kasa",
+            _ => direction
+        };
+
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
         {
             var path = new System.Drawing.Drawing2D.GraphicsPath();
@@ -118,7 +133,7 @@ namespace PersonalFinanceApp
             var displayList = history.Select(h => new
             {
                 Tarih = h.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"),
-                Yön = h.Direction == "wallet_to_safe" ? "Cüzdan → Kasa" : "Kasa → Cüzdan",
+                Yön = DirectionLabel(h.Direction),
                 Tutar = h.Amount.ToString("#,##0", tr) + " ₺"
             }).ToList();
 

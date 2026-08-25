@@ -12,6 +12,11 @@ namespace PersonalFinanceApp.Services
             return _repository.GetByUserId(userId);
         }
 
+        public List<Note> GetRecentlyUpdatedNotes(int userId, int limit)
+        {
+            return _repository.GetRecentlyUpdated(userId, limit);
+        }
+
         public bool AddNote(int userId, string title, string content, out string errorMessage)
         {
             errorMessage = string.Empty;

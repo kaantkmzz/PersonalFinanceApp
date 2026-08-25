@@ -6,5 +6,8 @@
         public int UserId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty; // "income" veya "expense"
+        public decimal? BudgetLimit { get; set; } // Sadece "expense" tipi kategorilerde anlamlı
+        public string? Color { get; set; } // "#RRGGBB"
+        public string? Icon { get; set; } // Tek bir emoji
     }
 }

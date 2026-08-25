@@ -205,7 +205,17 @@ namespace PersonalFinanceApp
             if (success)
             {
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
-                lblStatus.Text = "Kayıt başarılı! Giriş ekranına dönüp giriş yapabilirsiniz.";
+                lblStatus.Text = "Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz...";
+                btnRegister.Enabled = false;
+
+                var redirectTimer = new System.Windows.Forms.Timer { Interval = 1200 };
+                redirectTimer.Tick += (s, e2) =>
+                {
+                    redirectTimer.Stop();
+                    redirectTimer.Dispose();
+                    this.Close();
+                };
+                redirectTimer.Start();
             }
             else
             {

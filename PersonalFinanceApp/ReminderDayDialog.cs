@@ -30,7 +30,14 @@ namespace PersonalFinanceApp
         private MaskedTextBox mskTime = new MaskedTextBox();
         private Button btnAdd = new Button();
         private Button btnDelete = new Button();
+        private Button btnSnooze = new Button();
         private Label lblStatus = new Label();
+
+        private Button btnRecNone = new Button();
+        private Button btnRecDaily = new Button();
+        private Button btnRecWeekly = new Button();
+        private Button btnRecMonthly = new Button();
+        private string _selectedRecurrence = "none"; // "none"|"daily"|"weekly"|"monthly"
 
         private class ReminderRow
         {
@@ -58,7 +65,7 @@ namespace PersonalFinanceApp
             string[] monthNames = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
             this.Text = $"{_date.Day} {monthNames[_date.Month - 1]} {_date.Year}";
             this.Width = 560;
-            this.Height = 615;
+            this.Height = 660;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -121,13 +128,24 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnAdd, AccentColor, Color.White, false);
             btnAdd.Click += BtnAdd_Click;
 
+            // Tekrar Sıklığı
+            Label lblRecurrence = new Label { Text = "Tekrar:", Left = 20, Top = 132, ForeColor = TextMuted, AutoSize = true };
+            const int recBtnW = 120, recGap = 5;
+            SetupRecurrenceButton(btnRecNone, "none", "Yok", 20 + 0 * (recBtnW + recGap));
+            SetupRecurrenceButton(btnRecDaily, "daily", "Günlük", 20 + 1 * (recBtnW + recGap));
+            SetupRecurrenceButton(btnRecWeekly, "weekly", "Haftalık", 20 + 2 * (recBtnW + recGap));
+            SetupRecurrenceButton(btnRecMonthly, "monthly", "Aylık", 20 + 3 * (recBtnW + recGap));
+            btnRecNone.Top = btnRecDaily.Top = btnRecWeekly.Top = btnRecMonthly.Top = 156;
+            btnRecNone.Width = btnRecDaily.Width = btnRecWeekly.Width = btnRecMonthly.Width = recBtnW;
+            btnRecNone.Height = btnRecDaily.Height = btnRecWeekly.Height = btnRecMonthly.Height = 30;
+
             // Tabloyu saran panel
             Panel pnlGridWrapper = new Panel
             {
                 Left = 20,
-                Top = 140,
+                Top = 196,
                 Width = 500,
-                Height = 340,
+                Height = 300,
                 Padding = new Padding(2, 6, 2, 6)
             };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -163,7 +181,7 @@ namespace PersonalFinanceApp
             dgvReminders.ColumnHeadersDefaultCellStyle.SelectionBackColor = AppTheme.HeaderBackColor;
             dgvReminders.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
             dgvReminders.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            dgvReminders.EnableHeadersVisualStyles = false;
+            dgvReminders.EnableHeadersVisualStyles = false; dgvReminders.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             dgvReminders.ColumnHeadersHeight = 38;
 
             dgvReminders.CellPainting += DgvReminders_CellPainting;
@@ -180,30 +198,93 @@ namespace PersonalFinanceApp
             pnlGridWrapper.Controls.Add(dgvReminders);
 
             lblStatus.Left = 20;
-            lblStatus.Top = 485;
+            lblStatus.Top = 505;
             lblStatus.Width = 500;
             lblStatus.Height = 22;
             lblStatus.Font = new Font("Segoe UI", 9F);
             lblStatus.TextAlign = ContentAlignment.MiddleCenter;
 
-            // Sil Butonu
+            // Sil ve Ertele Butonları
             btnDelete.Text = "Seçili Hatırlatıcıyı Sil";
             btnDelete.Left = 20;
-            btnDelete.Top = 515;
-            btnDelete.Width = 500;
+            btnDelete.Top = 535;
+            btnDelete.Width = 240;
             btnDelete.Height = 38;
             btnDelete.Cursor = Cursors.Hand;
             SetupRoundedButton(btnDelete, DangerColor, Color.White, false);
             btnDelete.Click += BtnDelete_Click;
+
+            btnSnooze.Text = "⏰ 15 dk Ertele";
+            btnSnooze.Left = 280;
+            btnSnooze.Top = 535;
+            btnSnooze.Width = 240;
+            btnSnooze.Height = 38;
+            btnSnooze.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSnooze, Color.FromArgb(80, 85, 105), Color.White, false);
+            btnSnooze.Click += BtnSnooze_Click;
 
             this.Controls.Add(lblTitleField);
             this.Controls.Add(pnlTitleWrapper);
             this.Controls.Add(lblTimeField);
             this.Controls.Add(pnlTimeWrapper);
             this.Controls.Add(btnAdd);
+            this.Controls.Add(lblRecurrence);
+            this.Controls.Add(btnRecNone); this.Controls.Add(btnRecDaily); this.Controls.Add(btnRecWeekly); this.Controls.Add(btnRecMonthly);
             this.Controls.Add(pnlGridWrapper);
             this.Controls.Add(lblStatus);
             this.Controls.Add(btnDelete);
+            this.Controls.Add(btnSnooze);
+        }
+
+        private void SetupRecurrenceButton(Button btn, string recurrence, string text, int left)
+        {
+            btn.Text = text;
+            btn.Left = left;
+            btn.Cursor = Cursors.Hand;
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            btn.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(this.BackColor);
+                bool active = _selectedRecurrence == recurrence;
+                using var path = GetRoundedRectPath(new Rectangle(0, 0, btn.Width - 1, btn.Height - 1), 8);
+                if (active)
+                {
+                    using var brush = new SolidBrush(AccentColor);
+                    e.Graphics.FillPath(brush, path);
+                }
+                else
+                {
+                    using var pen = new Pen(TextMuted, 1.2f);
+                    e.Graphics.DrawPath(pen, path);
+                }
+                TextRenderer.DrawText(e.Graphics, text, btn.Font, new Rectangle(0, 0, btn.Width, btn.Height), active ? Color.White : TextMuted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            };
+            btn.Click += (s, e) =>
+            {
+                _selectedRecurrence = recurrence;
+                btnRecNone.Invalidate(); btnRecDaily.Invalidate(); btnRecWeekly.Invalidate(); btnRecMonthly.Invalidate();
+            };
+        }
+
+        private void BtnSnooze_Click(object? sender, EventArgs e)
+        {
+            if (dgvReminders.CurrentRow == null)
+            {
+                lblStatus.ForeColor = Color.FromArgb(255, 140, 140);
+                lblStatus.Text = "Lütfen ertelemek için bir hatırlatıcı seçin.";
+                return;
+            }
+
+            var idCell = dgvReminders.CurrentRow.Cells["ID"];
+            if (idCell?.Value == null || !int.TryParse(idCell.Value.ToString(), out int reminderId)) return;
+
+            _reminderService.Snooze(reminderId, _user.Id);
+            lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
+            lblStatus.Text = "Hatırlatıcı 15 dakika ertelendi.";
+            LoadReminders();
         }
 
         private void DgvReminders_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -235,7 +316,7 @@ namespace PersonalFinanceApp
             {
                 ID = r.Id,
                 Saat = r.ReminderDate.ToString("HH:mm"),
-                Başlık = r.Title,
+                Başlık = r.Recurrence != null ? $"🔁 {r.Title}" : r.Title,
                 Tamamlandı = r.IsCompleted
             }).ToList();
 
@@ -304,14 +385,17 @@ namespace PersonalFinanceApp
             }
 
             DateTime reminderDateTime = _date.Date + timeOfDay;
+            string? recurrence = _selectedRecurrence == "none" ? null : _selectedRecurrence;
 
-            bool success = _reminderService.AddReminder(_user.Id, title, reminderDateTime, out string errorMessage);
+            bool success = _reminderService.AddReminder(_user.Id, title, reminderDateTime, recurrence, out string errorMessage);
 
             if (success)
             {
                 lblStatus.ForeColor = Color.FromArgb(120, 220, 150);
                 lblStatus.Text = "Hatırlatıcı eklendi.";
                 txtTitle.Clear();
+                _selectedRecurrence = "none";
+                btnRecNone.Invalidate(); btnRecDaily.Invalidate(); btnRecWeekly.Invalidate(); btnRecMonthly.Invalidate();
                 LoadReminders();
             }
             else

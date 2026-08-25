@@ -6,6 +6,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+		<ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -34,6 +34,11 @@ namespace PersonalFinanceApp
 
         private int _currentYear;
         private List<Reminder> _cachedReminders = new List<Reminder>();
+        // 12 aylık takvim ~370 gün hücresi çiziyor; her hücrenin "aktif hatırlatıcı var mı" sorusunu
+        // _cachedReminders üzerinde ayrı ayrı .Any() ile taramak O(gün×hatırlatıcı) oluyordu ve
+        // ekranın "direkt açılmıyormuş" gibi hissettiren gecikmeye katkıda bulunuyordu — tek seferde
+        // hesaplanan bu küme ile O(gün+hatırlatıcı)'ya iniyor.
+        private HashSet<DateTime> _activeReminderDates = new HashSet<DateTime>();
 
         private static readonly string[] MonthNames =
         {
@@ -223,6 +228,7 @@ namespace PersonalFinanceApp
         private void LoadRemindersAndBuildCalendar()
         {
             _cachedReminders = _reminderService.GetUserReminders(_user.Id);
+            _activeReminderDates = _cachedReminders.Where(r => !r.IsCompleted).Select(r => r.ReminderDate.Date).ToHashSet();
             BuildAllMonths();
         }
 
@@ -342,6 +348,14 @@ namespace PersonalFinanceApp
                 grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rowCount));
             }
 
+            // Ayda en fazla 31 gün hücresi Paint'lenirken her seferinde "new Font" çağırmak (eskiden
+            // hücre başına, HER yeniden çizimde) gereksiz GDI nesnesi üretiyordu — bu ayın tüm
+            // hücrelerinin paylaştığı iki sabit Font (bugün/normal) burada tek seferde kuruluyor.
+            Font dayFontRegular = new Font("Segoe UI Semibold", 8.5F, FontStyle.Regular);
+            Font dayFontToday = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold);
+
+            grid.SuspendLayout();
+
             int dayCounter = 1;
             for (int cell = 0; cell < rowCount * 7; cell++)
             {
@@ -358,9 +372,11 @@ namespace PersonalFinanceApp
                 int thisDay = dayCounter;
                 DateTime cellDate = new DateTime(year, month, thisDay);
                 bool isToday = cellDate.Date == DateTime.Today;
+                Font dayFont = isToday ? dayFontToday : dayFontRegular;
 
-                // Tamamlanmamış aktif hatırlatıcı var mı kontrolü
-                bool hasActiveReminders = _cachedReminders.Any(r => r.ReminderDate.Date == cellDate.Date && !r.IsCompleted);
+                // Tamamlanmamış aktif hatırlatıcı var mı kontrolü (bkz. _activeReminderDates — önceden
+                // burada _cachedReminders üzerinde her hücre için ayrı bir .Any() taraması yapılıyordu).
+                bool hasActiveReminders = _activeReminderDates.Contains(cellDate.Date);
 
                 Panel dayCell = new Panel
                 {
@@ -381,8 +397,6 @@ namespace PersonalFinanceApp
                     int chipHeight = 26;
                     int cornerRadius = 6;
 
-                    Font dayFont = new Font("Segoe UI Semibold", 8.5F, isToday ? FontStyle.Bold : FontStyle.Regular);
-
                     // Eğer aktif hatırlatıcı varsa arka planı kırmızı kapsül yap, üzerine gelinmişse hafif aydınlat, yoksa normal şeffaf rengini ver
                     Color capsuleColor = hasActiveReminders ? ActiveReminderColor : (isHovering ? Color.FromArgb(45, 255, 255, 255) : DefaultCapsuleColor);
 
@@ -396,6 +410,7 @@ namespace PersonalFinanceApp
                 dayCounter++;
             }
 
+            grid.ResumeLayout(true);
             return grid;
         }
 

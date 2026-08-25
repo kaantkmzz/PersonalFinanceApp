@@ -38,6 +38,37 @@ namespace PersonalFinanceApp.Helpers
             try { SetWindowTheme(control.Handle, "", ""); } catch { }
         }
 
+        // Panel.AutoScroll gibi yerleşik kaydırma çubuklarını (Windows 10 1809+ üzerinde) koyu
+        // temaya uygun renklendirir; aksi halde koyu temada bile hep açık/beyaz görünürler.
+        // Not: bunlar denetimin KENDİ penceresine (WS_VSCROLL) uygulanan kaydırma çubukları içindir
+        // (ör. AutoScroll Panel) — DataGridView için SetDataGridViewScrollBarDarkMode'u kullanın.
+        public static void SetScrollBarDarkMode(Control control, bool dark)
+        {
+            try { SetWindowTheme(control.Handle, dark ? "DarkMode_Explorer" : "Explorer", null); } catch { }
+        }
+
+        // DataGridView'in kaydırma çubukları, denetimin kendi penceresi değil; içinde gizli tuttuğu
+        // ayrı VScrollBar/HScrollBar alt denetimleridir (reflection dışında erişilemezler). Bu yüzden
+        // SetScrollBarDarkMode'u doğrudan DataGridView üzerinde çağırmak hiçbir görsel etki yapmıyordu
+        // (ve DataGridView.Handle'a tema uygulamak, sütun başlıklarıyla ilgisiz görünse de, dolaylı
+        // yollarla düzen sorunlarına yol açabiliyor) — burada gerçek alt denetimleri bulup onları boyuyoruz.
+        public static void SetDataGridViewScrollBarDarkMode(DataGridView dgv, bool dark)
+        {
+            try
+            {
+                foreach (Control child in dgv.Controls)
+                {
+                    if (child is VScrollBar || child is HScrollBar)
+                    {
+                        SetWindowTheme(child.Handle, dark ? "DarkMode_Explorer" : "Explorer", null);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         // DateTimePicker'ın açılır takvim penceresi ayrı bir sistem penceresi olduğundan,
         // açıldığı anda o pencereyi bulup koyu tema (immersive dark mode) uyguluyoruz.
         public static void EnableDarkCalendarPopup(DateTimePicker dtp)

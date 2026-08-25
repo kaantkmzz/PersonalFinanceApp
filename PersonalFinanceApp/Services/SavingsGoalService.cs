@@ -13,6 +13,12 @@ namespace PersonalFinanceApp.Services
         private readonly CategoryService _categoryService = new CategoryService();
         private readonly TransactionService _transactionService = new TransactionService();
 
+        // MainForm bu olaya abone olup tepside "Hedef Tamamlandı" bildirimi gösterir. Servis
+        // katmanının UI/tepsi katmanına doğrudan bağımlı olmaması için event tercih edildi
+        // (bu projede DI konteyneri yok, örnekler her yerde doğrudan `new ServiceX()` ile
+        // oluşturuluyor — statik event, singleton kurmadan tüm örnekler arası paylaşımı sağlıyor).
+        public static event Action<int, string>? GoalCompleted; // (userId, goalName)
+
         public List<SavingsGoal> GetUserGoals(int userId)
         {
             return _repository.GetByUserId(userId);
@@ -122,8 +128,10 @@ namespace PersonalFinanceApp.Services
             decimal actualInvested = amount;
 
             // 4. Hedef tamamlandı mı kontrolü (Otomatik İşaretleme)
+            bool justCompleted = false;
             if (goal.CurrentAmount >= goal.TargetAmount)
             {
+                justCompleted = true;
                 goal.IsAchieved = true;
 
                 // Eğer hedefi aşan bir ödeme yapıldıysa, fazlalığı kasaya iade et
@@ -148,6 +156,11 @@ namespace PersonalFinanceApp.Services
                     $"'{goal.GoalName}' hedefine yatırım", out _);
             }
 
+            if (justCompleted)
+            {
+                GoalCompleted?.Invoke(userId, goal.GoalName);
+            }
+
             return true;
         }
 
@@ -159,6 +172,65 @@ namespace PersonalFinanceApp.Services
         public List<Models.SavingsGoalInvestment> GetInvestmentHistory(int goalId, int userId)
         {
             return _repository.GetInvestmentHistory(goalId, userId);
+        }
+
+        public bool SetRecurringSettings(int goalId, int userId, DateTime? dueDate, string? frequency, decimal? amount, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            if (frequency != null && frequency != "daily" && frequency != "weekly" && frequency != "monthly")
+            {
+                errorMessage = "Geçersiz tekrar sıklığı.";
+                return false;
+            }
+            if (frequency != null && (amount == null || amount <= 0))
+            {
+                errorMessage = "Otomatik katkı için bir tutar girin.";
+                return false;
+            }
+
+            _repository.SetRecurringSettings(goalId, userId, dueDate, frequency, amount);
+            return true;
+        }
+
+        // Giriş yapıldığında ve arka plan zamanlayıcısında çağrılır: süresi gelmiş otomatik hedef
+        // katkılarını işler. RecurringTransactionService.ProcessDueRecurring ile aynı davranış:
+        // LastContributionDate başarı/başarısızlık fark etmeksizin güncellenir (aksi halde
+        // kasa bakiyesi yetersizken her tur yeniden denenip aynı hatayı üretir).
+        public List<string> ProcessDueContributions(int userId)
+        {
+            var processed = new List<string>();
+            var goals = _repository.GetByUserId(userId)
+                .Where(g => !g.IsAchieved && g.RecurringFrequency != null && g.RecurringAmount != null)
+                .ToList();
+            var today = DateTime.Today;
+
+            foreach (var goal in goals)
+            {
+                if (!IsDue(goal.LastContributionDate, goal.RecurringFrequency!, today)) continue;
+
+                if (InvestInGoal(goal.Id, userId, goal.RecurringAmount!.Value, out _))
+                {
+                    processed.Add(goal.GoalName);
+                }
+
+                _repository.UpdateLastContributionDate(goal.Id, userId, today);
+            }
+
+            return processed;
+        }
+
+        private static bool IsDue(DateTime? lastContributionDate, string frequency, DateTime today)
+        {
+            if (lastContributionDate == null) return true;
+            var last = lastContributionDate.Value.Date;
+
+            return frequency switch
+            {
+                "daily" => last < today,
+                "weekly" => (today - last).Days >= 7,
+                _ => last.Month != today.Month || last.Year != today.Year // "monthly"
+            };
         }
     }
 }

@@ -31,6 +31,8 @@ namespace PersonalFinanceApp
         private Button btnSave = new Button();
         private Button btnDelete = new Button();
         private Label lblStatus = new Label();
+        private TextBox txtSearch = new TextBox();
+        private Button btnSearch = new Button();
 
         protected override CreateParams CreateParams
         {
@@ -99,12 +101,24 @@ namespace PersonalFinanceApp
             SetupRoundedButton(btnNew, AccentColor, Color.White, false);
             btnNew.Click += BtnNew_Click;
 
+            Label lblSearch = new Label { Text = "Ara:", Left = 20, Top = 105, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
+            Panel pnlSearch = new Panel { Left = 20, Top = 136, Width = 340, Height = 36 };
+            SetupSmoothContainer(pnlSearch, 8, CardBackColor);
+            txtSearch.BorderStyle = BorderStyle.None; txtSearch.BackColor = CardBackColor; txtSearch.ForeColor = TextLight;
+            txtSearch.Font = new Font("Segoe UI", 10.5F); txtSearch.Location = new Point(10, 8); txtSearch.Width = 320;
+            txtSearch.TextChanged += (s, e) => LoadNotes();
+            pnlSearch.Controls.Add(txtSearch);
+
+            btnSearch.Text = "🔍"; btnSearch.Left = 370; btnSearch.Top = 136; btnSearch.Width = 40; btnSearch.Height = 36; btnSearch.Cursor = Cursors.Hand;
+            SetupRoundedButton(btnSearch, AccentColor, Color.White, false);
+            btnSearch.Click += (s, e) => LoadNotes();
+
             Panel pnlGridWrapper = new Panel
             {
                 Left = 20,
-                Top = 115,
+                Top = 182,
                 Width = 420,
-                Height = 600,
+                Height = 533,
                 Padding = new Padding(2, 6, 2, 6)
             };
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
@@ -140,10 +154,18 @@ namespace PersonalFinanceApp
             dgvNotes.CellPainting += DgvNotes_CellPainting;
             dgvNotes.RowPrePaint += DgvNotes_RowPrePaint;
 
+            // Kendi çizdiğimiz (owner-paint) satır/hücreler çift arabelleğe alınmadan çiziliyordu;
+            // bu da özellikle yeniden çizim sırasında önceki karenin kalıntılarının (ör. bir üstteki
+            // satırın metni) bir sonraki satırın arkasında "hayalet" olarak görünmesine yol açıyordu.
+            EnableDoubleBuffering(dgvNotes);
+
             pnlGridWrapper.Controls.Add(dgvNotes);
 
             pnlLeft.Controls.Add(lblTitle);
             pnlLeft.Controls.Add(btnNew);
+            pnlLeft.Controls.Add(lblSearch);
+            pnlLeft.Controls.Add(pnlSearch);
+            pnlLeft.Controls.Add(btnSearch);
             pnlLeft.Controls.Add(pnlGridWrapper);
 
             // --- Sağ panel: not düzenleme alanı ---
@@ -172,6 +194,7 @@ namespace PersonalFinanceApp
             };
             SetupSmoothContainer(pnlTitleWrapper, 8, CardBackColor);
 
+            txtTitle.Name = "NoteTitle";
             txtTitle.BorderStyle = BorderStyle.None;
             txtTitle.Font = new Font("Segoe UI", 11F);
             txtTitle.BackColor = CardBackColor;
@@ -223,6 +246,7 @@ namespace PersonalFinanceApp
             pnlRightBottom.Controls.Add(btnDelete);
             pnlRightBottom.Controls.Add(lblStatus);
 
+            txtContent.Name = "NoteContent";
             txtContent.Dock = DockStyle.Fill;
             txtContent.BorderStyle = BorderStyle.None;
             txtContent.Multiline = true;
@@ -343,7 +367,16 @@ namespace PersonalFinanceApp
         {
             _cachedNotes = _noteService.GetUserNotes(_user.Id);
 
-            var displayList = _cachedNotes.Select(n => new
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            string searchText = txtSearch.Text.Trim();
+            var visibleNotes = string.IsNullOrEmpty(searchText)
+                ? _cachedNotes
+                : _cachedNotes.Where(n =>
+                    tr.CompareInfo.IndexOf(n.Title ?? "", searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0 ||
+                    tr.CompareInfo.IndexOf(n.Content ?? "", searchText, System.Globalization.CompareOptions.IgnoreCase) >= 0
+                  ).ToList();
+
+            var displayList = visibleNotes.Select(n => new
             {
                 ID = n.Id,
                 Başlık = string.IsNullOrWhiteSpace(n.Title) ? "(Başlıksız)" : n.Title,
@@ -525,6 +558,16 @@ namespace PersonalFinanceApp
             path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
             path.CloseFigure();
             return path;
+        }
+
+        private void EnableDoubleBuffering(Control control)
+        {
+            typeof(Control).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null,
+                control,
+                new object[] { true });
         }
     }
 

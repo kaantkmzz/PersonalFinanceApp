@@ -173,7 +173,7 @@ namespace PersonalFinanceApp.Services
                 {
                     conn.Open();
 
-                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts FROM users WHERE username = @input OR email = @input";
+                    string selectQuery = "SELECT user_id, username, email, password_hash, created_at, onboarding_completed, hide_amounts, full_name, cleanup_frequency, cleanup_period_start, cleanup_export_before_clear, avatar_color, home_layout FROM users WHERE username = @input OR email = @input";
                     using (var cmd = new NpgsqlCommand(selectQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@input", usernameOrEmail);
@@ -189,6 +189,12 @@ namespace PersonalFinanceApp.Services
                                 int createdAtOrdinal = reader.GetOrdinal("created_at");
                                 int onboardingOrdinal = reader.GetOrdinal("onboarding_completed");
                                 int hideAmountsOrdinal = reader.GetOrdinal("hide_amounts");
+                                int fullNameOrdinal = reader.GetOrdinal("full_name");
+                                int cleanupFrequencyOrdinal = reader.GetOrdinal("cleanup_frequency");
+                                int cleanupPeriodStartOrdinal = reader.GetOrdinal("cleanup_period_start");
+                                int cleanupExportOrdinal = reader.GetOrdinal("cleanup_export_before_clear");
+                                int avatarColorOrdinal = reader.GetOrdinal("avatar_color");
+                                int homeLayoutOrdinal = reader.GetOrdinal("home_layout");
 
                                 string storedHash = reader.GetString(passwordHashOrdinal);
 
@@ -204,7 +210,13 @@ namespace PersonalFinanceApp.Services
                                         PasswordHash = storedHash,
                                         CreatedAt = reader.GetDateTime(createdAtOrdinal),
                                         OnboardingCompleted = reader.GetBoolean(onboardingOrdinal),
-                                        HideAmountsEnabled = reader.GetBoolean(hideAmountsOrdinal)
+                                        HideAmountsEnabled = reader.GetBoolean(hideAmountsOrdinal),
+                                        FullName = reader.GetString(fullNameOrdinal),
+                                        CleanupFrequency = reader.GetString(cleanupFrequencyOrdinal),
+                                        CleanupPeriodStart = reader.GetDateTime(cleanupPeriodStartOrdinal),
+                                        CleanupExportBeforeClear = reader.GetBoolean(cleanupExportOrdinal),
+                                        AvatarColor = reader.GetString(avatarColorOrdinal),
+                                        HomeLayout = reader.GetString(homeLayoutOrdinal)
                                     };
                                 }
                             }
