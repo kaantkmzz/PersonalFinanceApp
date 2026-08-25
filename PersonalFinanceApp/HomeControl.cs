@@ -552,12 +552,12 @@ namespace PersonalFinanceApp
             const int dotSize = 9;
             const int hitSize = 22;
             const int gap = 4;
-            int totalRows = _cellPanels.Length / GridCols;
             int rightEdge = CardLeft4 + CardWidth;
-            int gridBottom = MiniRowTop + totalRows * (MiniRowHeight + 20) - 20;
             int dot1Left = rightEdge - hitSize;
             int dot0Left = dot1Left - gap - hitSize;
-            int dotsTop = gridBottom + 8;
+            // Izgaranın altında (bkz. eski gridBottom hesabı) kullanıcı gözden kaçırıyordu — widget
+            // alanının hemen ÜSTÜNE, sağ üst köşeye taşındı (bkz. ekran görüntüsündeki not).
+            int dotsTop = MiniRowTop - 30;
             int dotOffset = (hitSize - dotSize) / 2;
 
             void SetupDot(Panel dot, int left, int page)
