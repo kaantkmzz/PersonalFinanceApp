@@ -162,6 +162,7 @@ namespace PersonalFinanceApp
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
 
             dgvHoldings.Dock = DockStyle.Fill;
+            dgvHoldings.ReadOnly = true;
             dgvHoldings.AllowUserToAddRows = false; dgvHoldings.AllowUserToDeleteRows = false; dgvHoldings.AllowUserToResizeColumns = false; dgvHoldings.AllowUserToResizeRows = false;
             dgvHoldings.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgvHoldings.MultiSelect = false; dgvHoldings.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvHoldings.RowHeadersVisible = false; dgvHoldings.Font = new Font("Segoe UI", 9.5F); dgvHoldings.RowTemplate.Height = 44;
