@@ -49,12 +49,15 @@ namespace PersonalFinanceApp
             cmbCategory.Left = 5; cmbCategory.Top = 8; cmbCategory.Width = 290;
             cmbCategory.Font = new Font("Segoe UI", 10F); cmbCategory.DropDownStyle = ComboBoxStyle.DropDownList;
             foreach (var c in _categories) cmbCategory.Items.Add(c.Name);
-            if (cmbCategory.Items.Count > 0) cmbCategory.SelectedIndex = 0;
+            // Otomatik olarak ilk kategoriyi (listede ne varsa) seçiyordu — kullanıcı hiç dokunmadan
+            // "Uygula"ya basarsa yanlışlıkla o kategoriye taşınabiliyordu. Artık boş başlıyor, kullanıcı
+            // bilinçli olarak seçmeden Uygula zaten devre dışı (bkz. aşağıdaki SelectedIndexChanged).
             pnlCombo.Controls.Add(cmbCategory);
             SetupCustomComboBox(pnlCombo, cmbCategory);
 
-            Button btnOk = new Button { Text = "Uygula", Left = 20, Top = 130, Width = 140, Height = 38, Cursor = Cursors.Hand };
+            Button btnOk = new Button { Text = "Uygula", Left = 20, Top = 130, Width = 140, Height = 38, Cursor = Cursors.Hand, Enabled = false };
             SetupRoundedButton(btnOk, AccentColor, Color.White);
+            cmbCategory.SelectedIndexChanged += (s, e) => btnOk.Enabled = cmbCategory.SelectedIndex >= 0;
             btnOk.Click += (s, e) =>
             {
                 if (cmbCategory.SelectedIndex < 0) return;

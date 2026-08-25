@@ -96,7 +96,9 @@ namespace PersonalFinanceApp
             // "Varlık Ara:" yazısının kutunun üstüne/içine binmesine yol açıyordu) satır aralığı 24'ten 28'e çıkarıldı.
             const int rowGap = 28;
             Label lblSearch = new Label { Text = "Varlık Ara:", Left = 20, Top = row2Top, ForeColor = TextMuted, AutoSize = true };
-            Panel pnlSearch = new Panel { Left = 20, Top = row2Top + rowGap, Width = 220, Height = 34 };
+            // Height 34 idi — kutunun kendi yazı tipine göre belirlenen gerçek yüksekliği (10F Segoe UI)
+            // bu sınıra çok yakın kalıp alt kenarında metni kırpıyordu, 38'e çıkarıldı.
+            Panel pnlSearch = new Panel { Left = 20, Top = row2Top + rowGap, Width = 220, Height = 38 };
             cmbSearch.Font = new Font("Segoe UI", 10F);
             cmbSearch.DropDownStyle = ComboBoxStyle.DropDownList;
             foreach (var item in AssetCatalog.Items)
@@ -107,7 +109,7 @@ namespace PersonalFinanceApp
             pnlSearch.Controls.Add(cmbSearch);
             SetupCustomComboBox(pnlSearch, cmbSearch);
 
-            lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + rowGap + 32; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 26;
+            lblSelectedPrice.Left = 20; lblSelectedPrice.Top = row2Top + rowGap + 36; lblSelectedPrice.Width = 220; lblSelectedPrice.Height = 26;
             lblSelectedPrice.ForeColor = TextMuted;
             lblSelectedPrice.TextAlign = ContentAlignment.MiddleLeft;
 
@@ -435,7 +437,9 @@ namespace PersonalFinanceApp
             cmb.ForeColor = TextLight;
 
             cmb.DrawMode = DrawMode.OwnerDrawFixed;
-            cmb.ItemHeight = 22;
+            // 22px'te 10F yazı tipinde "g/ğ/y" gibi alt uzantılı harflerin kuyruğu kesiliyordu
+            // (bkz. bu depodaki diğer 20px/22px→24px+ notları — aynı sınıf hata).
+            cmb.ItemHeight = 26;
             cmb.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;

@@ -30,6 +30,17 @@ namespace PersonalFinanceApp
         private Label lblSummary = new Label();
         private TextBox txtBuyQuantity = new TextBox();
         private TextBox txtSellQuantity = new TextBox();
+        // Ana Varlıklarım ekranındaki (bkz. AssetControl) "₺ Tutar / Adet" geçişiyle aynı desen —
+        // önceden burada sadece adet girilebiliyordu, kullanıcı örneğin "500 TL'lik al" diyemiyordu.
+        private bool _buyByAmount = true;
+        private bool _sellByAmount = true;
+        private decimal? _currentPriceTry;
+        private Button btnBuyModeAmount = new Button();
+        private Button btnBuyModeQuantity = new Button();
+        private Button btnSellModeAmount = new Button();
+        private Button btnSellModeQuantity = new Button();
+        private Label lblBuyConversionHint = new Label();
+        private Label lblSellConversionHint = new Label();
         private Label lblStatus = new Label();
         private DataGridView dgvHistory = new DataGridView();
         private ComboBox cmbAlertDirection = new ComboBox();
@@ -72,29 +83,49 @@ namespace PersonalFinanceApp
 
             Label lblBuyTitle = new Label { Text = "Satın Al", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 220, AutoSize = true };
             Label lblBuyHint = new Label { Text = "Miktar:", ForeColor = TextMuted, Left = 20, Top = 252, AutoSize = true };
+            // "₺ Tutar / Adet" küçük geçiş düğmeleri — bkz. AssetControl.SetBuyMode, aynı desen.
+            btnBuyModeAmount.Text = "₺ Tutar"; btnBuyModeAmount.Left = 90; btnBuyModeAmount.Top = 250; btnBuyModeAmount.Width = 62; btnBuyModeAmount.Height = 20; btnBuyModeAmount.Cursor = Cursors.Hand; btnBuyModeAmount.Font = new Font("Segoe UI", 7.5F);
+            btnBuyModeQuantity.Text = "Adet"; btnBuyModeQuantity.Left = 156; btnBuyModeQuantity.Top = 250; btnBuyModeQuantity.Width = 62; btnBuyModeQuantity.Height = 20; btnBuyModeQuantity.Cursor = Cursors.Hand; btnBuyModeQuantity.Font = new Font("Segoe UI", 7.5F);
+            btnBuyModeAmount.Click += (s, e) => SetBuyMode(true);
+            btnBuyModeQuantity.Click += (s, e) => SetBuyMode(false);
             Panel pnlBuy = new Panel { Left = 20, Top = 278, Width = 200, Height = 38 };
             SetupSmoothContainer(pnlBuy, 8, CardBackColor);
             txtBuyQuantity.BorderStyle = BorderStyle.None; txtBuyQuantity.BackColor = CardBackColor; txtBuyQuantity.ForeColor = TextLight; txtBuyQuantity.Font = new Font("Segoe UI", 10F); txtBuyQuantity.Location = new Point(10, 9); txtBuyQuantity.Width = 180;
+            txtBuyQuantity.TextChanged += (s, e) => UpdateConversionHint(true);
             pnlBuy.Controls.Add(txtBuyQuantity);
 
             Button btnBuy = new Button { Text = "➕ Al", Left = 240, Top = 278, Width = 200, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnBuy, SuccessColor, Color.White);
             btnBuy.Click += BtnBuy_Click;
 
+            lblBuyConversionHint.Left = 20; lblBuyConversionHint.Top = 318; lblBuyConversionHint.Width = 200; lblBuyConversionHint.Height = 16;
+            lblBuyConversionHint.ForeColor = TextMuted; lblBuyConversionHint.Font = new Font("Segoe UI", 8F);
+
             Panel divider2 = new Panel { Left = 20, Top = 335, Width = 420, Height = 1, BackColor = AppTheme.HoverBackColor };
 
             Label lblSellTitle = new Label { Text = "Sat", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 350, AutoSize = true };
             Label lblSellHint = new Label { Text = "Miktar:", ForeColor = TextMuted, Left = 20, Top = 382, AutoSize = true };
+            btnSellModeAmount.Text = "₺ Tutar"; btnSellModeAmount.Left = 90; btnSellModeAmount.Top = 380; btnSellModeAmount.Width = 62; btnSellModeAmount.Height = 20; btnSellModeAmount.Cursor = Cursors.Hand; btnSellModeAmount.Font = new Font("Segoe UI", 7.5F);
+            btnSellModeQuantity.Text = "Adet"; btnSellModeQuantity.Left = 156; btnSellModeQuantity.Top = 380; btnSellModeQuantity.Width = 62; btnSellModeQuantity.Height = 20; btnSellModeQuantity.Cursor = Cursors.Hand; btnSellModeQuantity.Font = new Font("Segoe UI", 7.5F);
+            btnSellModeAmount.Click += (s, e) => SetSellMode(true);
+            btnSellModeQuantity.Click += (s, e) => SetSellMode(false);
             Panel pnlSell = new Panel { Left = 20, Top = 408, Width = 200, Height = 38 };
             SetupSmoothContainer(pnlSell, 8, CardBackColor);
             txtSellQuantity.BorderStyle = BorderStyle.None; txtSellQuantity.BackColor = CardBackColor; txtSellQuantity.ForeColor = TextLight; txtSellQuantity.Font = new Font("Segoe UI", 10F); txtSellQuantity.Location = new Point(10, 9); txtSellQuantity.Width = 180;
+            txtSellQuantity.TextChanged += (s, e) => UpdateConversionHint(false);
             pnlSell.Controls.Add(txtSellQuantity);
 
             Button btnSell = new Button { Text = "➖ Sat", Left = 240, Top = 408, Width = 200, Height = 38, Cursor = Cursors.Hand };
             SetupRoundedButton(btnSell, DangerColor, Color.White);
             btnSell.Click += BtnSell_Click;
 
-            lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Left = 20; lblStatus.Top = 458; lblStatus.Width = 420; lblStatus.Height = 30; lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+            lblSellConversionHint.Left = 20; lblSellConversionHint.Top = 447; lblSellConversionHint.Width = 200; lblSellConversionHint.Height = 14;
+            lblSellConversionHint.ForeColor = TextMuted; lblSellConversionHint.Font = new Font("Segoe UI", 8F);
+
+            lblStatus.ForeColor = Color.FromArgb(255, 140, 140); lblStatus.Left = 20; lblStatus.Top = 463; lblStatus.Width = 420; lblStatus.Height = 28; lblStatus.TextAlign = ContentAlignment.MiddleCenter;
+
+            SetBuyMode(_buyByAmount);
+            SetSellMode(_sellByAmount);
 
             Panel divider3 = new Panel { Left = 20, Top = 495, Width = 420, Height = 1, BackColor = AppTheme.HoverBackColor };
             Label lblHistoryTitle = new Label { Text = "İşlem Geçmişi", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = TextLight, Left = 20, Top = 510, AutoSize = true };
@@ -162,9 +193,11 @@ namespace PersonalFinanceApp
             pnlAlertList.BackColor = AppBackColor;
 
             this.Controls.Add(lblTitle); this.Controls.Add(lblSummary); this.Controls.Add(divider1);
-            this.Controls.Add(lblBuyTitle); this.Controls.Add(lblBuyHint); this.Controls.Add(pnlBuy); this.Controls.Add(btnBuy);
+            this.Controls.Add(lblBuyTitle); this.Controls.Add(lblBuyHint); this.Controls.Add(btnBuyModeAmount); this.Controls.Add(btnBuyModeQuantity);
+            this.Controls.Add(pnlBuy); this.Controls.Add(btnBuy); this.Controls.Add(lblBuyConversionHint);
             this.Controls.Add(divider2);
-            this.Controls.Add(lblSellTitle); this.Controls.Add(lblSellHint); this.Controls.Add(pnlSell); this.Controls.Add(btnSell);
+            this.Controls.Add(lblSellTitle); this.Controls.Add(lblSellHint); this.Controls.Add(btnSellModeAmount); this.Controls.Add(btnSellModeQuantity);
+            this.Controls.Add(pnlSell); this.Controls.Add(btnSell); this.Controls.Add(lblSellConversionHint);
             this.Controls.Add(lblStatus);
             this.Controls.Add(divider3); this.Controls.Add(lblHistoryTitle); this.Controls.Add(pnlHistoryWrapper);
             this.Controls.Add(divider4); this.Controls.Add(lblAlertTitle);
@@ -250,6 +283,7 @@ namespace PersonalFinanceApp
             if (view == null)
             {
                 lblSummary.Text = "Bilgi alınamadı.";
+                _currentPriceTry = null;
             }
             else
             {
@@ -260,10 +294,54 @@ namespace PersonalFinanceApp
                     : "-";
 
                 lblSummary.Text = $"Miktar: {view.Quantity:0.########}\nOrtalama Maliyet: {view.AvgCostTry.ToString("#,##0.00", tr)} ₺\nGüncel Fiyat: {priceText}\nGüncel Değer: {valueText}\nKâr/Zarar: {plText}";
+                _currentPriceTry = view.CurrentPriceTry;
             }
 
+            UpdateConversionHint(true);
+            UpdateConversionHint(false);
             LoadHistory();
             LoadAlerts();
+        }
+
+        // bkz. AssetControl.SetBuyMode/UpdateConversionHint — aynı "₺ Tutar / Adet" deseni, burada
+        // hem Al hem Sat bölümü için ayrı ayrı (bağımsız mod seçilebilsin diye).
+        private void SetBuyMode(bool byAmount)
+        {
+            _buyByAmount = byAmount;
+            SetupRoundedButton(btnBuyModeAmount, byAmount ? AppTheme.AccentColor : CardBackColor, byAmount ? Color.White : TextMuted);
+            SetupRoundedButton(btnBuyModeQuantity, !byAmount ? AppTheme.AccentColor : CardBackColor, !byAmount ? Color.White : TextMuted);
+            btnBuyModeAmount.Invalidate();
+            btnBuyModeQuantity.Invalidate();
+            UpdateConversionHint(true);
+        }
+
+        private void SetSellMode(bool byAmount)
+        {
+            _sellByAmount = byAmount;
+            SetupRoundedButton(btnSellModeAmount, byAmount ? AppTheme.AccentColor : CardBackColor, byAmount ? Color.White : TextMuted);
+            SetupRoundedButton(btnSellModeQuantity, !byAmount ? AppTheme.AccentColor : CardBackColor, !byAmount ? Color.White : TextMuted);
+            btnSellModeAmount.Invalidate();
+            btnSellModeQuantity.Invalidate();
+            UpdateConversionHint(false);
+        }
+
+        private void UpdateConversionHint(bool forBuy)
+        {
+            var textBox = forBuy ? txtBuyQuantity : txtSellQuantity;
+            var hintLabel = forBuy ? lblBuyConversionHint : lblSellConversionHint;
+            bool byAmount = forBuy ? _buyByAmount : _sellByAmount;
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+
+            string raw = new string(textBox.Text.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.');
+            if (!_currentPriceTry.HasValue || !decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered <= 0)
+            {
+                hintLabel.Text = string.Empty;
+                return;
+            }
+
+            hintLabel.Text = byAmount
+                ? $"≈ {(entered / _currentPriceTry.Value).ToString("0.########", tr)} adet"
+                : $"≈ {(entered * _currentPriceTry.Value).ToString("#,##0.00", tr)} ₺";
         }
 
         private void LoadHistory()
@@ -296,9 +374,19 @@ namespace PersonalFinanceApp
         private async void BtnBuy_Click(object? sender, EventArgs e)
         {
             string raw = new string(txtBuyQuantity.Text.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.');
-            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity) || quantity <= 0)
+            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered <= 0)
             {
-                lblStatus.ForeColor = Color.Salmon; lblStatus.Text = "Geçerli bir miktar girin."; return;
+                lblStatus.ForeColor = Color.Salmon; lblStatus.Text = _buyByAmount ? "Geçerli bir tutar girin." : "Geçerli bir miktar girin."; return;
+            }
+
+            decimal quantity = entered;
+            if (_buyByAmount)
+            {
+                if (!_currentPriceTry.HasValue)
+                {
+                    lblStatus.ForeColor = Color.Salmon; lblStatus.Text = "Fiyat henüz alınamadı, birazdan tekrar deneyin."; return;
+                }
+                quantity = entered / _currentPriceTry.Value;
             }
 
             var (success, error) = await _assetService.BuyAssetAsync(_user.Id, _symbol, quantity);
@@ -318,9 +406,19 @@ namespace PersonalFinanceApp
         private async void BtnSell_Click(object? sender, EventArgs e)
         {
             string raw = new string(txtSellQuantity.Text.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.');
-            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity) || quantity <= 0)
+            if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered <= 0)
             {
-                lblStatus.ForeColor = Color.Salmon; lblStatus.Text = "Geçerli bir miktar girin."; return;
+                lblStatus.ForeColor = Color.Salmon; lblStatus.Text = _sellByAmount ? "Geçerli bir tutar girin." : "Geçerli bir miktar girin."; return;
+            }
+
+            decimal quantity = entered;
+            if (_sellByAmount)
+            {
+                if (!_currentPriceTry.HasValue)
+                {
+                    lblStatus.ForeColor = Color.Salmon; lblStatus.Text = "Fiyat henüz alınamadı, birazdan tekrar deneyin."; return;
+                }
+                quantity = entered / _currentPriceTry.Value;
             }
 
             var (success, error) = await _assetService.SellAssetAsync(_user.Id, _symbol, quantity);

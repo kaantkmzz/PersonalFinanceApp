@@ -854,9 +854,13 @@ namespace PersonalFinanceApp
                 Opacity = 0.35,
                 TopMost = true
             };
-            // Önizlemenin köşeleri diğer kart/widget'larla tutarlı olsun diye kartlarla aynı yarıçapta
-            // yuvarlatılıyor (bkz. SetupSmoothContainer'daki 16 yarıçapı).
-            _dragPreviewForm.Region = new Region(GetRoundedRectPath(new Rectangle(0, 0, width, MiniRowHeight), 16));
+            // Köşeleri yuvarlatmak için bir ara denendi (Region = yuvarlak köşeli yol) ama katmanlı
+            // (Opacity<1 → WS_EX_LAYERED) ve sık sık taşınan (bkz. aşağıdaki GiveFeedback) bir pencereye
+            // Region eklemek, Windows'un her karede yeniden bileştirme yapmasına yol açıp sürükleme
+            // sırasında (özellikle geçerli bir bırakma hedefi yokken, "yasak" imleci gösterilirken) fark
+            // edilir bir kasmaya neden oluyordu — köşeler bu yüzden düz bırakıldı. Statik olarak çizilen
+            // (bir pencere gibi taşınmayan) kesikli kutular (bkz. DrawDragHighlightOverlay) bu sorunu
+            // yaşamıyor, onlar yuvarlak kalıyor.
             _dragPreviewForm.Show();
 
             // Sürükleme başlar başlamaz, bu widget'ın (boyutuna göre) bırakılabileceği TÜM başlangıç
