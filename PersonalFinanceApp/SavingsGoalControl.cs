@@ -126,6 +126,7 @@ namespace PersonalFinanceApp
             SetupSmoothContainer(pnlGridWrapper, 12, CardBackColor);
 
             dgvGoals.Dock = DockStyle.Fill;
+            dgvGoals.ReadOnly = true;
             dgvGoals.AllowUserToAddRows = false; dgvGoals.AllowUserToDeleteRows = false; dgvGoals.AllowUserToResizeColumns = false; dgvGoals.AllowUserToResizeRows = false;
             dgvGoals.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgvGoals.MultiSelect = false; dgvGoals.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvGoals.RowHeadersVisible = false; dgvGoals.Font = new Font("Segoe UI", 9.5F); dgvGoals.RowTemplate.Height = 50;
