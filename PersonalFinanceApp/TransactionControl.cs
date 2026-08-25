@@ -123,7 +123,11 @@ namespace PersonalFinanceApp
             pnlDesc.Controls.Add(txtDescription);
 
             // Tarih Aralığı Filtresi (Tip/Kategori/Tutar satırının sağında, aynı hizada)
-            chkDateFilter.Text = "Tarih Aralığı"; chkDateFilter.ForeColor = TextMuted; chkDateFilter.Left = 540; chkDateFilter.Top = 75; chkDateFilter.AutoSize = true;
+            // CheckBox'ın sistem-çizimli kutusu Label'lardan daha yüksek olduğu için 75→100 arasındaki
+            // 25px'lik boşluğa sığmıyor, metin alttaki tarih kutusunun içine taşıyordu — Top yukarı
+            // alındı. BackColor=Transparent koyu temada arkasında görünen açık dikdörtgeni kaldırır
+            // (bkz. LoginForm.chkRememberMe — aynı desen).
+            chkDateFilter.Text = "Tarih Aralığı"; chkDateFilter.ForeColor = TextMuted; chkDateFilter.BackColor = Color.Transparent; chkDateFilter.Left = 540; chkDateFilter.Top = 68; chkDateFilter.AutoSize = true;
             chkDateFilter.CheckedChanged += (s, e) =>
             {
                 dtpStart.Enabled = dtpEnd.Enabled = chkDateFilter.Checked;
@@ -134,9 +138,11 @@ namespace PersonalFinanceApp
             dtpStart.Value = DateTime.Today.AddMonths(-1);
             dtpStart.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
 
-            Label lblDateSep = new Label { Text = "—", Left = 690, Top = 106, ForeColor = TextMuted, AutoSize = true };
+            // Sabit genişlikte ve ortalanmış: eskiden AutoSize ile tire karakteri beklenenden geniş
+            // ölçülüp sağdaki kutunun içine taşıyordu.
+            Label lblDateSep = new Label { Text = "—", Left = 685, Top = 100, Width = 20, Height = 36, ForeColor = TextMuted, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false };
 
-            dtpEnd.Left = 705; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
+            dtpEnd.Left = 715; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
             dtpEnd.Value = DateTime.Today;
             dtpEnd.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
 

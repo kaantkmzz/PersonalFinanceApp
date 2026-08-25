@@ -289,6 +289,13 @@ namespace PersonalFinanceApp
             // bkz. LoadQuickAddWidget), bu yüzden CreateWidgetCard'ın MakeClickable'ını kullanmıyoruz.
             SetupSmoothContainer(pnlCashflowWidget, 16, CardBackColor);
             SetupSmoothContainer(pnlQuickAddWidget, 16, CardBackColor);
+            // SetupSmoothContainer .BackColor'ı her zaman AppBackColor'a sabitliyor, ama bu widget
+            // görsel olarak CardBackColor ile boyanıyor. İçindeki kutucuklar (pnlType/pnlCategory/
+            // pnlAmount) kendi köşe boşluklarını Parent.BackColor ile temizliyor — uyumsuzluk yüzünden
+            // köşelerinde AppBackColor (koyu/siyahımsı) görünüyordu. Burada gerçek görsel rengi
+            // yansıtacak şekilde düzeltiyoruz (kendi çizimini etkilemez, sadece çocuklarının okuduğu
+            // Parent.BackColor değerini düzeltir).
+            pnlQuickAddWidget.BackColor = CardBackColor;
         }
 
         // --- Widget ızgarası: 4 sütun × 2 satır, sürükle-bırakla düzenlenebilir ---

@@ -301,16 +301,17 @@ namespace PersonalFinanceApp
             var views = await _assetService.GetHoldingsWithLivePricesAsync(_user.Id);
             var tr = new System.Globalization.CultureInfo("tr-TR");
 
+            bool hide = _user.HideAmountsEnabled;
             var rows = views.Select(v => new HoldingRow
             {
                 Sembol = v.Symbol,
-                Miktar = v.Quantity.ToString("0.########", tr),
-                OrtMaliyet = v.AvgCostTry.ToString("#,##0.00", tr) + " ₺",
-                GuncelFiyat = v.CurrentPriceTry.HasValue ? v.CurrentPriceTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A",
-                GuncelDeğer = v.CurrentValueTry.HasValue ? v.CurrentValueTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A",
-                KarZarar = v.ProfitLossTry.HasValue
+                Miktar = hide ? "••••••" : v.Quantity.ToString("0.########", tr),
+                OrtMaliyet = hide ? "••••••" : v.AvgCostTry.ToString("#,##0.00", tr) + " ₺",
+                GuncelFiyat = hide ? "••••••" : (v.CurrentPriceTry.HasValue ? v.CurrentPriceTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A"),
+                GuncelDeğer = hide ? "••••••" : (v.CurrentValueTry.HasValue ? v.CurrentValueTry.Value.ToString("#,##0.00", tr) + " ₺" : "N/A"),
+                KarZarar = hide ? "••••••" : (v.ProfitLossTry.HasValue
                     ? $"{v.ProfitLossTry.Value.ToString("+#,##0.00;-#,##0.00", tr)} ₺ (%{v.ProfitLossPercent!.Value.ToString("+0.00;-0.00", tr)})"
-                    : "N/A",
+                    : "N/A"),
                 KarZararRaw = (double)(v.ProfitLossTry ?? 0),
                 FiyatVar = v.CurrentPriceTry.HasValue
             }).ToList();
