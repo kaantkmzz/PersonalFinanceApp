@@ -98,6 +98,10 @@ namespace PersonalFinanceApp
             EnableDoubleBuffering(pnlContent);
 
             this.Controls.Add(pnlContent);
+            // Ana Sayfa widget'larla dolduğunda (ör. üç dolu satır) pencerenin en küçük boyutunda bile
+            // dikey kaydırmaya ihtiyaç duyuyor — bu kaydırma çubuğu Profilim/Ayarlar'daki pnlScroll gibi
+            // koyulaştırılmamıştı, düz/varsayılan (açık) sistem rengiyle tema ile çelişiyordu.
+            Helpers.DarkTitleBarHelper.SetScrollBarDarkMode(pnlContent, AppTheme.IsDark);
 
             BuildSidebar();
 
@@ -557,6 +561,7 @@ namespace PersonalFinanceApp
 
             this.BackColor = ContentBackColor;
             pnlContent.BackColor = ContentBackColor;
+            Helpers.DarkTitleBarHelper.SetScrollBarDarkMode(pnlContent, AppTheme.IsDark);
 
             BuildSidebar();
             ShowCachedContent(_activeContentKey, _activeContentFactory);
