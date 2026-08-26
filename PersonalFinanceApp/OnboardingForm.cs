@@ -60,7 +60,9 @@ namespace PersonalFinanceApp
             PaintCardShape(pnlStep);
 
             Panel pnlIconBadge = CreateIconBadge("🏦");
-            Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 30, TextAlign = ContentAlignment.MiddleCenter };
+            // Height=30 "p"/"y" gibi alt çıkıntılı harflerin kuyruğunu kesiyordu (kutu, fontun
+            // descender'ı için yeterli yer bırakmıyordu); 40'a çıkarıldı.
+            Label lblPrompt = new Label { Text = "Toplam birikiminizi yazınız", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TextLight, BackColor = Color.Transparent, AutoSize = false, Left = 40, Width = 400, Height = 40, TextAlign = ContentAlignment.MiddleCenter };
 
             // Alt açıklama kaldırıldı — tek başlık yeterli. Kaldırılan boşluk yukarı çekildi,
             // metin kutusu geniş olsun diye kart genişletildi (bkz. pnlCard.Width).
@@ -95,7 +97,7 @@ namespace PersonalFinanceApp
             btnFinish.Click += BtnFinish_Click;
 
             CenterHorizontally(pnlIconBadge, 0, 36);
-            CenterHorizontally(lblPrompt, 0, 118);
+            CenterHorizontally(lblPrompt, 0, 113);
 
             pnlStep.Controls.Add(pnlIconBadge);
             pnlStep.Controls.Add(lblPrompt);
