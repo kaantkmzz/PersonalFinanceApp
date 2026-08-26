@@ -1301,6 +1301,51 @@ namespace PersonalFinanceApp
             }
         }
 
+        // "Portföy Değeri Gelişimi" çizgi grafiğindeki bir noktaya tıklanınca o günün toplam
+        // portföy değerini gösterir (fareyle üzerine gelmenin ToolTip'iyle aynı bilgi, dokunmatik/tık
+        // tercih edenler için).
+        private void LineChart_MouseClick(object? sender, MouseEventArgs e)
+        {
+            var result = lineChart.HitTest(e.X, e.Y);
+            if (result.ChartElementType != ChartElementType.DataPoint || result.Series == null || result.PointIndex < 0) return;
+
+            var point = result.Series.Points[result.PointIndex];
+            double value = point.YValues[0];
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
+
+            MessageBox.Show($"{point.AxisLabel}\nPortföy Değeri: {amountText}", "Portföy Değeri");
+        }
+
+        // "Varlık Dağılımı" sütun grafiğindeki bir çubuğa tıklanınca o varlığın maliyet tutarını gösterir.
+        private void ColumnChart_MouseClick(object? sender, MouseEventArgs e)
+        {
+            var result = columnChart.HitTest(e.X, e.Y);
+            if (result.ChartElementType != ChartElementType.DataPoint || result.Series == null || result.PointIndex < 0) return;
+
+            var point = result.Series.Points[result.PointIndex];
+            double value = point.YValues[0];
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
+
+            MessageBox.Show($"{point.AxisLabel}\nMaliyet: {amountText}", "Varlık Bilgisi");
+        }
+
+        // Trend modundaki "Son 6 Ay: Gelir / Gider" sütun grafiğinde bir çubuğa tıklanınca o ayın
+        // gelir ya da gider tutarını (hangi seriye tıklandıysa) gösterir.
+        private void TrendChart_MouseClick(object? sender, MouseEventArgs e)
+        {
+            var result = trendChart.HitTest(e.X, e.Y);
+            if (result.ChartElementType != ChartElementType.DataPoint || result.Series == null || result.PointIndex < 0) return;
+
+            var point = result.Series.Points[result.PointIndex];
+            double value = point.YValues[0];
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
+
+            MessageBox.Show($"{point.AxisLabel} — {result.Series.Name}\nTutar: {amountText}", "Trend Bilgisi");
+        }
+
         private void BtnExportReport_Click(object? sender, EventArgs e)
         {
             if (_currentReport == null) return;
@@ -1417,6 +1462,7 @@ namespace PersonalFinanceApp
                 Font = new Font("Segoe UI", 9F)
             };
             trendChart.Legends.Add(trendLegend);
+            trendChart.MouseClick += TrendChart_MouseClick;
 
             lblTrendEmptyState.Dock = DockStyle.Fill;
             lblTrendEmptyState.ForeColor = TextMuted;
@@ -1545,6 +1591,7 @@ namespace PersonalFinanceApp
             lineArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
             lineArea.AxisX.Interval = 1;
             lineChart.ChartAreas.Add(lineArea);
+            lineChart.MouseClick += LineChart_MouseClick;
 
             lblLineEmptyState.Dock = DockStyle.Fill;
             lblLineEmptyState.ForeColor = TextMuted;
@@ -1577,6 +1624,7 @@ namespace PersonalFinanceApp
             columnArea.AxisY.LineColor = AppTheme.GridLineColor;
             columnArea.AxisY.MajorGrid.LineColor = AppTheme.GridLineColor;
             columnChart.ChartAreas.Add(columnArea);
+            columnChart.MouseClick += ColumnChart_MouseClick;
 
             lblColumnEmptyState.Dock = DockStyle.Fill;
             lblColumnEmptyState.ForeColor = TextMuted;
