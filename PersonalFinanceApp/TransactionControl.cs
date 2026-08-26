@@ -122,27 +122,29 @@ namespace PersonalFinanceApp
             txtDescription.BackColor = CardBackColor; txtDescription.ForeColor = TextLight;
             pnlDesc.Controls.Add(txtDescription);
 
-            // Tarih Aralığı Filtresi (Tip/Kategori/Tutar satırının sağında, aynı hizada)
+            // Tarih Aralığı Filtresi — tablonun (ve arama kutusunun) sağ kenarına hizalı, Ara
+            // kutusunun tam üstündeki satırda durur (bkz. PositionSearchArea/PositionDateRangeArea,
+            // pencere yeniden boyutlanınca da hizası korunur).
             // CheckBox'ın sistem-çizimli kutusu Label'lardan daha yüksek olduğu için 75→100 arasındaki
             // 25px'lik boşluğa sığmıyor, metin alttaki tarih kutusunun içine taşıyordu — Top yukarı
             // alındı. BackColor=Transparent koyu temada arkasında görünen açık dikdörtgeni kaldırır
             // (bkz. LoginForm.chkRememberMe — aynı desen).
-            chkDateFilter.Text = "Tarih Aralığı"; chkDateFilter.ForeColor = TextMuted; chkDateFilter.BackColor = Color.Transparent; chkDateFilter.Left = 540; chkDateFilter.Top = 68; chkDateFilter.AutoSize = true;
+            chkDateFilter.Text = "Tarih Aralığı"; chkDateFilter.ForeColor = TextMuted; chkDateFilter.BackColor = Color.Transparent; chkDateFilter.Top = 68; chkDateFilter.AutoSize = true;
             chkDateFilter.CheckedChanged += (s, e) =>
             {
                 dtpStart.Enabled = dtpEnd.Enabled = chkDateFilter.Checked;
                 RefreshGrid();
             };
 
-            dtpStart.Left = 540; dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Enabled = false;
+            dtpStart.Top = 100; dtpStart.Width = 145; dtpStart.Enabled = false;
             dtpStart.Value = DateTime.Today.AddMonths(-1);
             dtpStart.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
 
             // Sabit genişlikte ve ortalanmış: eskiden AutoSize ile tire karakteri beklenenden geniş
             // ölçülüp sağdaki kutunun içine taşıyordu.
-            Label lblDateSep = new Label { Text = "—", Left = 692, Top = 100, Width = 20, Height = 36, ForeColor = TextMuted, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false };
+            Label lblDateSep = new Label { Text = "—", Top = 100, Width = 20, Height = 36, ForeColor = TextMuted, TextAlign = ContentAlignment.MiddleCenter, AutoSize = false };
 
-            dtpEnd.Left = 715; dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
+            dtpEnd.Top = 100; dtpEnd.Width = 145; dtpEnd.Enabled = false;
             dtpEnd.Value = DateTime.Today;
             dtpEnd.ValueChanged += (s, e) => { if (chkDateFilter.Checked) RefreshGrid(); };
 
@@ -197,7 +199,20 @@ namespace PersonalFinanceApp
                 lblSearch.Left = pnlSearch.Left;
             }
             PositionSearchArea();
-            this.Resize += (s, e) => PositionSearchArea();
+
+            // Tarih Aralığı filtresini de aynı sağ kenara hizalar — Ara kutusunun bir üst satırında,
+            // aynı hizada durur.
+            void PositionDateRangeArea()
+            {
+                int rightEdge = pnlTop.Width - 40;
+                dtpEnd.Left = rightEdge - dtpEnd.Width;
+                lblDateSep.Left = dtpEnd.Left - lblDateSep.Width;
+                dtpStart.Left = lblDateSep.Left - dtpStart.Width;
+                chkDateFilter.Left = dtpStart.Left;
+            }
+            PositionDateRangeArea();
+
+            this.Resize += (s, e) => { PositionSearchArea(); PositionDateRangeArea(); };
 
             // --- ORTA PANEL (Tablo) ---
             pnlGrid.Dock = DockStyle.Fill;
