@@ -26,7 +26,7 @@ namespace PersonalFinanceApp
         private ComboBox cmbCategory = new ComboBox();
         private TextBox txtAmount = new TextBox();
         private TextBox txtDescription = new TextBox();
-        private DateTimePicker dtpDate = new DateTimePicker();
+        private DarkDatePicker dtpDate = new DarkDatePicker { ShowTime = true };
         private Label lblStatus = new Label();
 
         public bool WasUpdated { get; private set; }
@@ -98,27 +98,7 @@ namespace PersonalFinanceApp
             Panel pnlDate = new Panel { Left = 20, Top = 344, Width = 360, Height = 38 };
             SetupSmoothContainer(pnlDate, 8, CardBackColor);
             dtpDate.Left = 8; dtpDate.Top = 6; dtpDate.Width = 344;
-            dtpDate.Font = new Font("Segoe UI", 10F);
-            dtpDate.Format = DateTimePickerFormat.Custom;
-            dtpDate.CustomFormat = "dd.MM.yyyy HH:mm";
             dtpDate.Value = _transaction.TransactionDate;
-            // Not: aşağıdaki DisableVisualStyle+BackColor denemesi kapalı kutunun beyaz zeminini
-            // düzeltmiyor (comctl32'nin DateTimePicker'ına özgü bilinen bir sınırlama — ShowUpDown
-            // modu ve Application.SetColorMode(Dark) de denendi, ikisi de etkisiz kaldı, bkz.
-            // TransactionControl.SetupDarkDateTimePicker). Yalnızca açılır TAKVİM (Calendar* +
-            // EnableDarkCalendarPopup) gerçekten koyulaşıyor.
-            dtpDate.CalendarForeColor = TextLight;
-            dtpDate.CalendarMonthBackground = CardBackColor;
-            dtpDate.CalendarTitleBackColor = AppTheme.HeaderBackColor;
-            dtpDate.CalendarTitleForeColor = TextLight;
-            dtpDate.CalendarTrailingForeColor = TextMuted;
-            dtpDate.HandleCreated += (s, e) =>
-            {
-                DarkTitleBarHelper.DisableVisualStyle(dtpDate);
-                dtpDate.BackColor = CardBackColor;
-                dtpDate.ForeColor = TextLight;
-            };
-            DarkTitleBarHelper.EnableDarkCalendarPopup(dtpDate);
             pnlDate.Controls.Add(dtpDate);
             this.Controls.Add(lblDate); this.Controls.Add(pnlDate);
 
