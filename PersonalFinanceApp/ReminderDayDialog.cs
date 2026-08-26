@@ -74,7 +74,7 @@ namespace PersonalFinanceApp
             this.Font = new Font("Segoe UI", 9.5F);
 
             // Başlık Alanı
-            Label lblTitleField = new Label { Text = "Başlık:", Left = 20, Top = 18, ForeColor = TextMuted, AutoSize = true };
+            Label lblTitleField = new Label { Text = "Başlık:", Left = 20, Top = 18, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
 
             Panel pnlTitleWrapper = new Panel
             {
@@ -94,7 +94,7 @@ namespace PersonalFinanceApp
             pnlTitleWrapper.Controls.Add(txtTitle);
 
             // Saat Alanı
-            Label lblTimeField = new Label { Text = "Saat:", Left = 360, Top = 18, ForeColor = TextMuted, AutoSize = true };
+            Label lblTimeField = new Label { Text = "Saat:", Left = 360, Top = 18, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
 
             Panel pnlTimeWrapper = new Panel
             {
@@ -129,13 +129,15 @@ namespace PersonalFinanceApp
             btnAdd.Click += BtnAdd_Click;
 
             // Tekrar Sıklığı
-            Label lblRecurrence = new Label { Text = "Tekrar:", Left = 20, Top = 132, ForeColor = TextMuted, AutoSize = true };
+            // Top=132, btnAdd'in alt kenarına (90+36=126) sadece 6px mesafede olduğu için "Ekle"
+            // butonunun yuvarlak mavi kenarlığına görsel olarak çok yakın/üst üste biniyordu; 8px'e çıkarıldı.
+            Label lblRecurrence = new Label { Text = "Tekrar:", Left = 20, Top = 140, ForeColor = TextMuted, BackColor = Color.Transparent, AutoSize = true };
             const int recBtnW = 120, recGap = 5;
             SetupRecurrenceButton(btnRecNone, "none", "Yok", 20 + 0 * (recBtnW + recGap));
             SetupRecurrenceButton(btnRecDaily, "daily", "Günlük", 20 + 1 * (recBtnW + recGap));
             SetupRecurrenceButton(btnRecWeekly, "weekly", "Haftalık", 20 + 2 * (recBtnW + recGap));
             SetupRecurrenceButton(btnRecMonthly, "monthly", "Aylık", 20 + 3 * (recBtnW + recGap));
-            btnRecNone.Top = btnRecDaily.Top = btnRecWeekly.Top = btnRecMonthly.Top = 156;
+            btnRecNone.Top = btnRecDaily.Top = btnRecWeekly.Top = btnRecMonthly.Top = 164;
             btnRecNone.Width = btnRecDaily.Width = btnRecWeekly.Width = btnRecMonthly.Width = recBtnW;
             btnRecNone.Height = btnRecDaily.Height = btnRecWeekly.Height = btnRecMonthly.Height = 30;
 
@@ -143,7 +145,7 @@ namespace PersonalFinanceApp
             Panel pnlGridWrapper = new Panel
             {
                 Left = 20,
-                Top = 196,
+                Top = 204,
                 Width = 500,
                 Height = 300,
                 Padding = new Padding(2, 6, 2, 6)
@@ -198,7 +200,7 @@ namespace PersonalFinanceApp
             pnlGridWrapper.Controls.Add(dgvReminders);
 
             lblStatus.Left = 20;
-            lblStatus.Top = 505;
+            lblStatus.Top = 513;
             lblStatus.Width = 500;
             lblStatus.Height = 22;
             lblStatus.Font = new Font("Segoe UI", 9F);
@@ -207,7 +209,7 @@ namespace PersonalFinanceApp
             // Sil ve Ertele Butonları
             btnDelete.Text = "Seçili Hatırlatıcıyı Sil";
             btnDelete.Left = 20;
-            btnDelete.Top = 535;
+            btnDelete.Top = 543;
             btnDelete.Width = 240;
             btnDelete.Height = 38;
             btnDelete.Cursor = Cursors.Hand;
@@ -216,7 +218,7 @@ namespace PersonalFinanceApp
 
             btnSnooze.Text = "⏰ 15 dk Ertele";
             btnSnooze.Left = 280;
-            btnSnooze.Top = 535;
+            btnSnooze.Top = 543;
             btnSnooze.Width = 240;
             btnSnooze.Height = 38;
             btnSnooze.Cursor = Cursors.Hand;
