@@ -13,6 +13,8 @@
 --   2026-08-21  asset_transactions.realized_pl_try eklendi (Faz 5 — gerçekleşen kâr/zarar)
 --   2026-08-21  savings_goals.due_date/recurring_frequency/recurring_amount/last_contribution_date eklendi (Faz 6 — hedef tarihi + otomatik katkı)
 --   2026-08-21  reminders.recurrence eklendi (Faz 7 — tekrarlanan hatırlatıcı + ertele)
+--   2026-08-26  categories.budget_alerted_year/budget_alerted_month eklendi (bütçe aşım uyarısının
+--               aynı ay içinde tekrar tekrar gösterilmesini önlemek için kalıcı olarak saklanıyor)
 
 CREATE TABLE users (
     user_id               SERIAL PRIMARY KEY,
@@ -46,6 +48,9 @@ CREATE TABLE categories (
     budget_limit NUMERIC(14,2),
     color        VARCHAR(7),  -- "#RRGGBB"
     icon         VARCHAR(10), -- tek bir emoji
+    -- Bütçe aşım bildiriminin en son gösterildiği yıl/ay; aynı ay için tekrar göstermemek amaçlı.
+    budget_alerted_year  INTEGER,
+    budget_alerted_month INTEGER,
     CONSTRAINT chk_budget_limit CHECK (budget_limit IS NULL OR (type = 'expense' AND budget_limit > 0))
 );
 

@@ -794,22 +794,9 @@ namespace PersonalFinanceApp
             }
         }
 
-        // Ay değişince tekrar uyarılabilsin diye ayı da saklıyoruz; bildirim tekrarını
-        // (aynı ay içinde aynı kategori için) önlemek amaçlı bellek-içi bir küme — DB'de
-        // ayrı bir "bildirildi" sütunu tutmuyoruz, uygulama yeniden başlatılırsa bir kez
-        // daha uyarı gelmesi kabul edilebilir (bkz. plan: kalıcı fiyat-alarmı önlemesinden
-        // kasıtlı olarak farklı, çünkü bütçe aşımı devam eden bir durum, tekrar hatırlatmak zararsız).
-        private readonly HashSet<int> _budgetAlertedCategoryIds = new HashSet<int>();
-        private int _budgetAlertMonth = -1;
-
         private void CheckCategoryBudgets()
         {
             var today = DateTime.Today;
-            if (_budgetAlertMonth != today.Month)
-            {
-                _budgetAlertMonth = today.Month;
-                _budgetAlertedCategoryIds.Clear();
-            }
 
             var categoryService = new CategoryService();
             var transactionService = new TransactionService();
@@ -821,12 +808,15 @@ namespace PersonalFinanceApp
 
             foreach (var category in budgeted)
             {
-                if (_budgetAlertedCategoryIds.Contains(category.Id)) continue;
+                // Bu ay için zaten uyarıldıysa atla — DB'de kalıcı olarak saklanıyor, uygulama
+                // yeniden başlatılsa (her açılışta değil) bile aynı ay içinde tekrar uyarmaz.
+                // Ay değiştiğinde alan otomatik olarak geçen ayın değerini taşıdığı için tekrar uyarır.
+                if (category.BudgetAlertedYear == today.Year && category.BudgetAlertedMonth == today.Month) continue;
 
                 decimal spent = spentByCategory.TryGetValue(category.Id, out decimal s) ? s : 0;
                 if (spent <= category.BudgetLimit!.Value) continue;
 
-                _budgetAlertedCategoryIds.Add(category.Id);
+                categoryService.MarkBudgetAlerted(category.Id, _user.Id, today.Year, today.Month);
                 var tr = new System.Globalization.CultureInfo("tr-TR");
                 ShowTrayBalloon(
                     "Bütçe Aşıldı",
