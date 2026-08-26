@@ -97,7 +97,20 @@ namespace PersonalFinanceApp.Services
 
             if (recurrence == "monthly")
             {
-                do { next = next.AddMonths(1); } while (next <= now);
+                // Ayın 29/30/31'inde kurulan bir hatırlatıcıda düz AddMonths kullanmak, kısa ayda
+                // güne yuvarlanıp o günden itibaren kalıcı olarak kayar (örn. 31 Oca -> 28 Şub ->
+                // 28 Mar, bir daha asla 31'e dönmez). Bunun yerine her adımda orijinal günü,
+                // hedef ayın gün sayısına göre yeniden hesaplıyoruz.
+                int originalDay = current.Day;
+                int monthOffset = 0;
+                do
+                {
+                    monthOffset++;
+                    DateTime firstOfTargetMonth = new DateTime(current.Year, current.Month, 1).AddMonths(monthOffset);
+                    int daysInTargetMonth = DateTime.DaysInMonth(firstOfTargetMonth.Year, firstOfTargetMonth.Month);
+                    int day = Math.Min(originalDay, daysInTargetMonth);
+                    next = new DateTime(firstOfTargetMonth.Year, firstOfTargetMonth.Month, day, current.Hour, current.Minute, current.Second);
+                } while (next <= now);
                 return next;
             }
 

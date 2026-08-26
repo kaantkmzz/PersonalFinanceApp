@@ -76,13 +76,15 @@ namespace PersonalFinanceApp.Services
                 if (success)
                 {
                     added.Add($"{r.CategoryName} ({r.Amount:0.00} ₺)");
+                    _repository.UpdateLastProcessedDate(r.Id, userId, today);
                 }
                 else
                 {
+                    // Başarısız denemede LastProcessedDate güncellenmiyor; aksi halde işlem
+                    // "işlenmiş" sayılır ve bakiye/kategori sorunu giderilse bile bir daha
+                    // asla tekrar denenmez.
                     failed.Add($"{r.CategoryName}: {errorMessage}");
                 }
-
-                _repository.UpdateLastProcessedDate(r.Id, userId, today);
             }
 
             return (added, failed);

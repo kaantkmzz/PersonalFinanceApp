@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PersonalFinanceApp.Helpers;
 using PersonalFinanceApp.Services;
 
 namespace PersonalFinanceApp
@@ -40,6 +41,7 @@ namespace PersonalFinanceApp
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.ControlBox = false;
+            this.Load += (s, e) => DarkTitleBarHelper.SetTitleBarDarkMode(this, AppTheme.IsDark);
 
             pnlCard.Width = 480;
             pnlCard.Height = 360;
@@ -117,11 +119,15 @@ namespace PersonalFinanceApp
                 e.Graphics.Clear(CardBackColor);
                 using var brush = new SolidBrush(Color.FromArgb(40, AccentColor));
                 e.Graphics.FillEllipse(brush, 0, 0, badge.Width - 1, badge.Height - 1);
-                // Emoji glifleri genelde alt tarafa doğru fazladan boşluk bırakıyor; küçültülmüş
-                // font + birkaç piksel yukarı kaydırılmış çizim dikdörtgeni ile yuvarlağın
-                // ortasına optik olarak hizalıyoruz.
-                var iconRect = new Rectangle(0, -4, badge.Width, badge.Height);
-                TextRenderer.DrawText(e.Graphics, emoji, new Font("Segoe UI Emoji", 22F), iconRect, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                // Emoji glifinin kendi iç boşluğu (side bearing) simetrik değildir, bu yüzden
+                // HorizontalCenter bayrağıyla hesaplanan kutu ortası, gözle görülen glif ortasıyla
+                // çakışmaz (ikon dairenin ortasında değil, kaymış görünür). Gerçek glif boyutunu
+                // ölçüp dikdörtgeni buna göre elle ortalıyoruz; dikey eksende de aynı sebeple
+                // birkaç piksel yukarı kaydırma uyguluyoruz.
+                var font = new Font("Segoe UI Emoji", 22F);
+                Size glyphSize = TextRenderer.MeasureText(e.Graphics, emoji, font, badge.Size, TextFormatFlags.NoPadding);
+                var iconRect = new Rectangle((badge.Width - glyphSize.Width) / 2, (badge.Height - glyphSize.Height) / 2 - 4, glyphSize.Width, glyphSize.Height);
+                TextRenderer.DrawText(e.Graphics, emoji, font, iconRect, TextLight, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             };
             return badge;
         }
