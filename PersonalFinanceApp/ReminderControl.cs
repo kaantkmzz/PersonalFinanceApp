@@ -282,6 +282,7 @@ namespace PersonalFinanceApp
             pnlWeekdayHeader.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
                 Font wdFont = new Font("Segoe UI", 7.5F, FontStyle.Bold);
                 float colWidth = pnlWeekdayHeader.Width / 7f;
                 var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -418,6 +419,15 @@ namespace PersonalFinanceApp
             int horizontalPadding, int chipHeight, bool centered, Color bgColor, int fixedWidth = 0, int cornerRadius = -1)
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            // Varsayılan TextRenderingHint (SystemDefault), koyu zemin üzerindeki açık renkli metni
+            // ClearType alt-piksel antialiasing'i yüzünden bulanık/renk taşmalı gösteriyordu — takvim
+            // gün numaraları bu yüzden net durmuyordu. ClearTypeGridFit dikey/yatay gövdeleri piksel
+            // ızgarasına oturtarak metni belirgin şekilde netleştiriyor.
+            // ClearTypeGridFit RGB alt-piksel bilgisiyle çiziyor; bu, ~150% DPI ölçeklemesinde
+            // yeniden örneklenince (veya ekran görüntüsü alınıp ölçeklenince) kenarlarda mavi/turuncu
+            // renk taşmasına yol açıyordu. AntiAliasGridFit alt-piksel rengi kullanmadan gri tonlamalı
+            // antialiasing yapar — DPI ölçeklemesinden bağımsız olarak net kalır.
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
             int chipWidth;
             if (fixedWidth > 0)
