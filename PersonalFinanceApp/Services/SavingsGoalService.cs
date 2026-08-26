@@ -113,7 +113,7 @@ namespace PersonalFinanceApp.Services
             var (_, safe) = _accountService.GetBalances(userId);
             if (amount > safe)
             {
-                errorMessage = $"Kasanızda yeterli bakiye yok. Mevcut Kasa: {safe:N2} ₺";
+                errorMessage = "Kasanızda yeterli bakiye yok.";
                 return false;
             }
 

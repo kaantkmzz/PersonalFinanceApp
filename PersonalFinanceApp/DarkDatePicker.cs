@@ -22,7 +22,10 @@ namespace PersonalFinanceApp
             get => _value;
             set
             {
-                DateTime clamped = MinDate.HasValue && value.Date < MinDate.Value.Date ? MinDate.Value.Date : value.Date;
+                DateTime v = ShowTime ? value : value.Date;
+                DateTime clamped = MinDate.HasValue && v.Date < MinDate.Value.Date
+                    ? (ShowTime ? MinDate.Value.Date.Add(v.TimeOfDay) : MinDate.Value.Date)
+                    : v;
                 if (_value == clamped) return;
                 _value = clamped;
                 UpdateText();
@@ -32,6 +35,11 @@ namespace PersonalFinanceApp
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public DateTime? MinDate { get; set; }
+
+        // true iken kapalı kutu ve açılır takvim "dd.MM.yyyy HH:mm" saat seçimini de gösterir
+        // (bkz. TransactionEditDialog — işlem tarihi saat bileşeni de taşır).
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool ShowTime { get; set; }
 
         private static Color AppBackColor => AppTheme.AppBackColor;
         private static Color CardBackColor => AppTheme.CardBackColor;
@@ -90,7 +98,7 @@ namespace PersonalFinanceApp
             _lblValue.Height = this.Height;
         }
 
-        private void UpdateText() => _lblValue.Text = _value.ToString("dd.MM.yyyy");
+        private void UpdateText() => _lblValue.Text = _value.ToString(ShowTime ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy");
 
         private void TogglePopup()
         {
@@ -102,7 +110,7 @@ namespace PersonalFinanceApp
             }
 
             Point screenPoint = this.PointToScreen(new Point(0, this.Height + 4));
-            var popup = new CalendarPopup(_value, MinDate);
+            var popup = new CalendarPopup(_value, MinDate, ShowTime);
             popup.DateSelected += d => { Value = d; popup.Close(); };
             popup.FormClosed += (s, e) => _openPopup = null;
             popup.Location = screenPoint;
@@ -117,10 +125,13 @@ namespace PersonalFinanceApp
         public event Action<DateTime>? DateSelected;
 
         private DateTime _displayMonth;
-        private readonly DateTime _selected;
+        private DateTime _selected;
         private readonly DateTime? _minDate;
+        private readonly bool _showTime;
         private readonly Label _lblMonthYear = new Label();
         private readonly TableLayoutPanel _grid = new TableLayoutPanel();
+        private NumericUpDown? _numHour;
+        private NumericUpDown? _numMinute;
 
         private static Color CardBackColor => AppTheme.CardBackColor;
         private static Color AppBackColor => AppTheme.AppBackColor;
@@ -136,9 +147,10 @@ namespace PersonalFinanceApp
         };
         private static readonly string[] WeekdayInitials = { "Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pa" };
 
-        public CalendarPopup(DateTime selected, DateTime? minDate)
+        public CalendarPopup(DateTime selected, DateTime? minDate, bool showTime = false)
         {
-            _selected = selected.Date;
+            _showTime = showTime;
+            _selected = showTime ? selected : selected.Date;
             _minDate = minDate?.Date;
             _displayMonth = new DateTime(selected.Year, selected.Month, 1);
 
@@ -152,7 +164,7 @@ namespace PersonalFinanceApp
             this.StartPosition = FormStartPosition.Manual;
             // ~150% DPI'de dar hücreler (7 sütun × küçük Size) iki haneli gün sayılarının (10-31)
             // ikinci rakamını kırpıyordu — daha geniş bir boyut her sütuna yeterli nefes alanı bırakıyor.
-            this.Size = new Size(340, 340);
+            this.Size = new Size(340, showTime ? 340 + 52 : 340);
             this.BackColor = CardBackColor;
             this.Deactivate += (s, e) => this.Close();
 
@@ -187,7 +199,7 @@ namespace PersonalFinanceApp
             _grid.Left = 8;
             _grid.Top = 44;
             _grid.Width = this.Width - 16;
-            _grid.Height = this.Height - 52;
+            _grid.Height = 340 - 52;
             _grid.ColumnCount = 7;
             _grid.RowCount = 7;
             _grid.CellBorderStyle = TableLayoutPanelCellBorderStyle.None;
@@ -199,6 +211,55 @@ namespace PersonalFinanceApp
             this.Controls.Add(btnNext);
             this.Controls.Add(_lblMonthYear);
             this.Controls.Add(_grid);
+
+            if (_showTime)
+            {
+                int rowTop = _grid.Top + _grid.Height + 6;
+
+                Label lblTime = new Label { Text = "Saat:", Left = 8, Top = rowTop + 6, AutoSize = true, ForeColor = TextMuted, Font = new Font("Segoe UI", 9F) };
+
+                _numHour = new NumericUpDown { Left = 60, Top = rowTop, Width = 50, Height = 26, Minimum = 0, Maximum = 23, Value = _selected.Hour, TextAlign = HorizontalAlignment.Center };
+                StyleNumericUpDown(_numHour);
+                _numHour.Text = _selected.Hour.ToString("00");
+                _numHour.ValueChanged += (s, e) =>
+                {
+                    _selected = _selected.Date.Add(new TimeSpan((int)_numHour.Value, (int)(_numMinute?.Value ?? 0), 0));
+                    _numHour.Text = ((int)_numHour.Value).ToString("00");
+                };
+
+                Label lblColon = new Label { Text = ":", Left = 113, Top = rowTop + 4, AutoSize = true, ForeColor = TextLight };
+
+                _numMinute = new NumericUpDown { Left = 128, Top = rowTop, Width = 50, Height = 26, Minimum = 0, Maximum = 59, Value = _selected.Minute, TextAlign = HorizontalAlignment.Center };
+                StyleNumericUpDown(_numMinute);
+                _numMinute.Text = _selected.Minute.ToString("00");
+                _numMinute.ValueChanged += (s, e) =>
+                {
+                    _selected = _selected.Date.Add(new TimeSpan((int)(_numHour?.Value ?? 0), (int)_numMinute.Value, 0));
+                    _numMinute.Text = ((int)_numMinute.Value).ToString("00");
+                };
+
+                Button btnApply = new Button { Text = "Uygula", Left = this.Width - 96, Top = rowTop - 2, Width = 80, Height = 30, Cursor = Cursors.Hand };
+                btnApply.FlatStyle = FlatStyle.Flat;
+                btnApply.FlatAppearance.BorderSize = 0;
+                btnApply.BackColor = AccentColor;
+                btnApply.ForeColor = Color.White;
+                btnApply.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                btnApply.Click += (s, e) => DateSelected?.Invoke(_selected);
+
+                this.Controls.Add(lblTime);
+                this.Controls.Add(_numHour);
+                this.Controls.Add(lblColon);
+                this.Controls.Add(_numMinute);
+                this.Controls.Add(btnApply);
+            }
+        }
+
+        private void StyleNumericUpDown(NumericUpDown num)
+        {
+            num.BackColor = CardBackColor;
+            num.ForeColor = TextLight;
+            num.Font = new Font("Segoe UI", 9.5F);
+            num.BorderStyle = BorderStyle.FixedSingle;
         }
 
         private void StyleNavButton(Button btn)
@@ -247,7 +308,7 @@ namespace PersonalFinanceApp
 
                 int thisDay = dayCounter;
                 DateTime cellDate = new DateTime(_displayMonth.Year, _displayMonth.Month, thisDay);
-                bool isSelected = cellDate == _selected;
+                bool isSelected = cellDate == _selected.Date;
                 bool isToday = cellDate == DateTime.Today;
                 bool isDisabled = _minDate.HasValue && cellDate < _minDate.Value;
 
@@ -267,7 +328,18 @@ namespace PersonalFinanceApp
                 {
                     dayLabel.MouseEnter += (s, e) => { if (!isSelected) dayLabel.BackColor = HoverBackColor; };
                     dayLabel.MouseLeave += (s, e) => { if (!isSelected) dayLabel.BackColor = Color.Transparent; };
-                    dayLabel.Click += (s, e) => DateSelected?.Invoke(cellDate);
+                    dayLabel.Click += (s, e) =>
+                    {
+                        if (_showTime)
+                        {
+                            _selected = cellDate.Add(_selected.TimeOfDay);
+                            BuildGrid();
+                        }
+                        else
+                        {
+                            DateSelected?.Invoke(cellDate);
+                        }
+                    };
                 }
 
                 _grid.Controls.Add(dayLabel, col, row);
