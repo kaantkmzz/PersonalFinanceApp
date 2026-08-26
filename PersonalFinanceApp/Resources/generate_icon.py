@@ -170,28 +170,75 @@ simple_img.resize((32, 32), Image.LANCZOS).save(os.path.join(out_dir, "app_icon_
 # resized frame instead of keeping each custom-drawn size distinct (confirmed by
 # inspecting the ICONDIR header of a previous export: it only had 1 entry, not 9 —
 # this was the actual cause of the blurry/upscaled taskbar icon). Building the ICO
-# container by hand, with each frame stored as its own PNG blob (a format Windows
-# has supported per-frame since Vista), guarantees every requested size keeps its
-# own crisp, purpose-drawn image instead of being interpolated from one bitmap.
+# container by hand guarantees every requested size keeps its own crisp,
+# purpose-drawn image instead of being interpolated from one bitmap.
+#
+# Every frame was originally stored as a PNG blob ("a format Windows has supported
+# per-frame since Vista"). Windows Explorer/shell reads that fine (it decodes via
+# WIC), but .NET's System.Drawing.Icon — used at runtime by this app itself for its
+# window/taskbar/tray icon and notification balloons (AppIconHelper.GetAppIcon →
+# Icon.ExtractAssociatedIcon → .ToBitmap()) — has a real, reproducible decoding bug
+# for PNG-compressed icon directory entries below 256px: ToBitmap() silently returns
+# garbage/noise pixels instead of the actual image (confirmed here by round-tripping
+# both this hand-built ICO and a plain Pillow-saved one through System.Drawing.Icon —
+# both come back as noise at every size except none). This is why the balloon
+# notification's icon looked wrong even though Explorer showed the icon fine.
+# Fix: encode every frame below 256px as a classic uncompressed 32bpp BMP/DIB (the
+# format GDI+ has always handled correctly), and reserve PNG compression only for
+# the mandatory 256px frame (a raw DIB can't be addressed by the ICONDIRENTRY's
+# 1-byte width/height fields at that size, so PNG is the standard convention there).
 import io, struct
 
+def _bmp_frame(img):
+    """32bpp BGRA top-down XOR data (bottom-up per BMP convention) + a 1bpp AND mask
+    derived from alpha, wrapped in a BITMAPINFOHEADER — the classic icon DIB format
+    every version of GDI+/System.Drawing decodes correctly."""
+    img = img.convert("RGBA")
+    w, h = img.size
+    pixels = img.load()
+
+    header = struct.pack(
+        "<IiiHHIIiiII",
+        40, w, h * 2, 1, 32, 0, w * h * 4, 0, 0, 0, 0
+    )
+
+    xor = bytearray(w * h * 4)
+    row_stride = ((w + 31) // 32) * 4
+    and_mask = bytearray(row_stride * h)
+    for y in range(h):
+        src_y = h - 1 - y  # BMP rows are stored bottom-up
+        row_off = y * w * 4
+        mask_row_off = y * row_stride
+        for x in range(w):
+            r, g, b, a = pixels[x, src_y]
+            o = row_off + x * 4
+            xor[o] = b
+            xor[o + 1] = g
+            xor[o + 2] = r
+            xor[o + 3] = a
+            if a < 8:
+                and_mask[mask_row_off + (x // 8)] |= (0x80 >> (x % 8))
+
+    return bytes(header) + bytes(xor) + bytes(and_mask)
+
 def write_ico(path, frames):
-    entries = []
     images = []
     for size, img in frames:
-        buf = io.BytesIO()
-        img.convert("RGBA").save(buf, format="PNG")
-        images.append(buf.getvalue())
-        entries.append(size)
+        if size >= 256:
+            buf = io.BytesIO()
+            img.convert("RGBA").save(buf, format="PNG")
+            images.append((size, buf.getvalue()))
+        else:
+            images.append((size, _bmp_frame(img)))
 
     with open(path, "wb") as f:
-        f.write(struct.pack("<HHH", 0, 1, len(frames)))
-        offset = 6 + 16 * len(frames)
-        for size, data in zip(entries, images):
+        f.write(struct.pack("<HHH", 0, 1, len(images)))
+        offset = 6 + 16 * len(images)
+        for size, data in images:
             wh = size if size < 256 else 0
             f.write(struct.pack("<BBBBHHII", wh, wh, 0, 0, 1, 32, len(data), offset))
             offset += len(data)
-        for data in images:
+        for _, data in images:
             f.write(data)
 
 ico_path = os.path.join(out_dir, "AppIcon.ico")
