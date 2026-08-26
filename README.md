@@ -1,4 +1,4 @@
-# 💜 Finans Takip (PersonalFinanceApp)
+# Finans Takip (PersonalFinanceApp)
 
 Cüzdan ve Kasa'yı tek defterde tutan, Windows için masaüstü kişisel finans takip uygulaması. C# / WinForms ile yazıldı, PostgreSQL üzerinde çalışır.
 
