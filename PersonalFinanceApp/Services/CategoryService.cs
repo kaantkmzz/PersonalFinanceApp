@@ -17,6 +17,11 @@ namespace PersonalFinanceApp.Services
             return _repository.GetByUserId(userId).Where(c => c.Type == type).ToList();
         }
 
+        public void MarkBudgetAlerted(int categoryId, int userId, int year, int month)
+        {
+            _repository.MarkBudgetAlerted(categoryId, userId, year, month);
+        }
+
         public bool AddCategory(int userId, string name, string type, out string errorMessage)
         {
             errorMessage = string.Empty;

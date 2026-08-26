@@ -12,7 +12,7 @@ namespace PersonalFinanceApp.Data
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                string query = "SELECT category_id, user_id, name, type, budget_limit, color, icon FROM categories WHERE user_id = @userId ORDER BY type, name";
+                string query = "SELECT category_id, user_id, name, type, budget_limit, color, icon, budget_alerted_year, budget_alerted_month FROM categories WHERE user_id = @userId ORDER BY type, name";
 
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
@@ -25,6 +25,8 @@ namespace PersonalFinanceApp.Data
                             int budgetLimitOrdinal = reader.GetOrdinal("budget_limit");
                             int colorOrdinal = reader.GetOrdinal("color");
                             int iconOrdinal = reader.GetOrdinal("icon");
+                            int alertedYearOrdinal = reader.GetOrdinal("budget_alerted_year");
+                            int alertedMonthOrdinal = reader.GetOrdinal("budget_alerted_month");
                             categories.Add(new Category
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("category_id")),
@@ -33,7 +35,9 @@ namespace PersonalFinanceApp.Data
                                 Type = reader.GetString(reader.GetOrdinal("type")),
                                 BudgetLimit = reader.IsDBNull(budgetLimitOrdinal) ? null : reader.GetDecimal(budgetLimitOrdinal),
                                 Color = reader.IsDBNull(colorOrdinal) ? null : reader.GetString(colorOrdinal),
-                                Icon = reader.IsDBNull(iconOrdinal) ? null : reader.GetString(iconOrdinal)
+                                Icon = reader.IsDBNull(iconOrdinal) ? null : reader.GetString(iconOrdinal),
+                                BudgetAlertedYear = reader.IsDBNull(alertedYearOrdinal) ? null : reader.GetInt32(alertedYearOrdinal),
+                                BudgetAlertedMonth = reader.IsDBNull(alertedMonthOrdinal) ? null : reader.GetInt32(alertedMonthOrdinal)
                             });
                         }
                     }
@@ -128,6 +132,26 @@ namespace PersonalFinanceApp.Data
                 using (var cmd = new NpgsqlCommand(query, conn))
                 {
                     cmd.Parameters.AddWithValue("@budgetLimit", (object?)budgetLimit ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@categoryId", categoryId);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // Bütçe aşım uyarısının bu ay için gösterildiğini kalıcı olarak işaretler — uygulama
+        // yeniden başlatılsa bile aynı ay içinde aynı kategori için tekrar uyarılmasın diye.
+        public void MarkBudgetAlerted(int categoryId, int userId, int year, int month)
+        {
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                string query = "UPDATE categories SET budget_alerted_year = @year, budget_alerted_month = @month WHERE category_id = @categoryId AND user_id = @userId";
+
+                using (var cmd = new NpgsqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@year", year);
+                    cmd.Parameters.AddWithValue("@month", month);
                     cmd.Parameters.AddWithValue("@categoryId", categoryId);
                     cmd.Parameters.AddWithValue("@userId", userId);
                     cmd.ExecuteNonQuery();
