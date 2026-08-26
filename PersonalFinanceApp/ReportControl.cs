@@ -1301,32 +1301,31 @@ namespace PersonalFinanceApp
             }
         }
 
-        // "Portföy Değeri Gelişimi" çizgi grafiğindeki bir noktaya tıklanınca o günün toplam
-        // portföy değerini gösterir (fareyle üzerine gelmenin ToolTip'iyle aynı bilgi, dokunmatik/tık
-        // tercih edenler için).
+        // "Portföy Değeri Gelişimi" çizgi grafiğindeki bir noktaya (marker) tıklanınca o günün toplam
+        // portföy değerini gösterir. Sadece tam marker'a tıklamayı kabul ediyor. Not: SeriesChartType
+        // SplineArea olduğu için ChartElementType.DataPoint, marker'ın kendisi kadar dolgulu alanın
+        // tamamı için de dönüyor (HitTest, tıklanan X'e en yakın noktayı, Y'den bağımsız olarak
+        // eşleştiriyor) — bu yüzden DataPoint kontrolü tek başına yetmiyor, tıklanan piksel ile
+        // marker'ın gerçek ekran konumu arasındaki mesafe de ayrıca ölçülüyor.
         private void LineChart_MouseClick(object? sender, MouseEventArgs e)
         {
-            var series = lineChart.Series.FirstOrDefault();
-            if (series == null || series.Points.Count == 0) return;
-
-            // HitTest'in ChartElementType.DataPoint'i sadece tam marker/çizgi üzerine (birkaç piksellik
-            // bir şerit) tıklanınca dönmesi, dolgulu alanın büyük kısmının tıklanamaz görünmesine yol
-            // açıyordu. Bunun yerine tıklanan X pikselini eksen değerine çevirip en yakın noktayı
-            // seçiyoruz — grafiğin çizim alanı içindeki her tıklama en yakın günün değerini gösteriyor.
             var result = lineChart.HitTest(e.X, e.Y);
-            bool insidePlotArea = result.ChartElementType is ChartElementType.DataPoint or ChartElementType.PlottingArea or ChartElementType.Gridlines;
-            if (!insidePlotArea) return;
+            if (result.ChartElementType != ChartElementType.DataPoint || result.Series == null || result.PointIndex < 0) return;
 
-            double xValue = lineChart.ChartAreas["lineArea"].AxisX.PixelPositionToValue(e.X);
-            int closestIndex = 0;
-            double closestDist = double.MaxValue;
-            for (int i = 0; i < series.Points.Count; i++)
-            {
-                double dist = Math.Abs(series.Points[i].XValue - xValue);
-                if (dist < closestDist) { closestDist = dist; closestIndex = i; }
-            }
+            var point = result.Series.Points[result.PointIndex];
+            var area = lineChart.ChartAreas["lineArea"];
 
-            var point = series.Points[closestIndex];
+            // IsXValueIndexed=true olduğu için AddXY'ye string X ile eklenen noktaların gerçek
+            // XValue'su kullanılmıyor (hepsi 0) — eksen üzerindeki gerçek konumları 1 tabanlı nokta
+            // SIRASI. point.XValue'yu doğrudan kullanmak marker'ı ekseninin çok solunda, yanlış bir
+            // piksele oturtuyordu (bu yüzden hiçbir tıklama isabet etmiyordu).
+            double markerPixelX = area.AxisX.ValueToPixelPosition(result.PointIndex + 1);
+            double markerPixelY = area.AxisY.ValueToPixelPosition(point.YValues[0]);
+            double distance = Math.Sqrt(Math.Pow(e.X - markerPixelX, 2) + Math.Pow(e.Y - markerPixelY, 2));
+
+            const double markerHitRadius = 10; // MarkerSize 6px + birkaç piksellik tolerans
+            if (distance > markerHitRadius) return;
+
             double value = point.YValues[0];
             var tr = new System.Globalization.CultureInfo("tr-TR");
             string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
