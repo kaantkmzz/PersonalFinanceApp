@@ -1306,10 +1306,27 @@ namespace PersonalFinanceApp
         // tercih edenler için).
         private void LineChart_MouseClick(object? sender, MouseEventArgs e)
         {
-            var result = lineChart.HitTest(e.X, e.Y);
-            if (result.ChartElementType != ChartElementType.DataPoint || result.Series == null || result.PointIndex < 0) return;
+            var series = lineChart.Series.FirstOrDefault();
+            if (series == null || series.Points.Count == 0) return;
 
-            var point = result.Series.Points[result.PointIndex];
+            // HitTest'in ChartElementType.DataPoint'i sadece tam marker/çizgi üzerine (birkaç piksellik
+            // bir şerit) tıklanınca dönmesi, dolgulu alanın büyük kısmının tıklanamaz görünmesine yol
+            // açıyordu. Bunun yerine tıklanan X pikselini eksen değerine çevirip en yakın noktayı
+            // seçiyoruz — grafiğin çizim alanı içindeki her tıklama en yakın günün değerini gösteriyor.
+            var result = lineChart.HitTest(e.X, e.Y);
+            bool insidePlotArea = result.ChartElementType is ChartElementType.DataPoint or ChartElementType.PlottingArea or ChartElementType.Gridlines;
+            if (!insidePlotArea) return;
+
+            double xValue = lineChart.ChartAreas["lineArea"].AxisX.PixelPositionToValue(e.X);
+            int closestIndex = 0;
+            double closestDist = double.MaxValue;
+            for (int i = 0; i < series.Points.Count; i++)
+            {
+                double dist = Math.Abs(series.Points[i].XValue - xValue);
+                if (dist < closestDist) { closestDist = dist; closestIndex = i; }
+            }
+
+            var point = series.Points[closestIndex];
             double value = point.YValues[0];
             var tr = new System.Globalization.CultureInfo("tr-TR");
             string amountText = _user.HideAmountsEnabled ? "••••••" : value.ToString("#,##0", tr) + " ₺";
