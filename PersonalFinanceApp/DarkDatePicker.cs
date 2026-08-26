@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using PersonalFinanceApp.Helpers;
 
 namespace PersonalFinanceApp
 {
@@ -260,6 +261,20 @@ namespace PersonalFinanceApp
             num.ForeColor = TextLight;
             num.Font = new Font("Segoe UI", 9.5F);
             num.BorderStyle = BorderStyle.FixedSingle;
+            // Yukarı/aşağı ok düğmeleri, NumericUpDown'ın kendi penceresi değil; içinde gizli
+            // tuttuğu ayrı bir "UpDownButtons" alt denetimidir (DataGridView'in VScrollBar/HScrollBar
+            // alt denetimleriyle aynı durum, bkz. SetDataGridViewScrollBarDarkMode) — bu yüzden temayı
+            // NumericUpDown'ın kendi Handle'ına uygulamanın görsel etkisi yok, alt denetimi bulup
+            // onu boyamak gerekiyor.
+            num.HandleCreated += (s, e) =>
+            {
+                DarkTitleBarHelper.SetScrollBarDarkMode(num, true);
+                foreach (Control child in num.Controls)
+                {
+                    child.HandleCreated += (cs, ce) => DarkTitleBarHelper.SetScrollBarDarkMode(child, true);
+                    if (child.IsHandleCreated) DarkTitleBarHelper.SetScrollBarDarkMode(child, true);
+                }
+            };
         }
 
         private void StyleNavButton(Button btn)
