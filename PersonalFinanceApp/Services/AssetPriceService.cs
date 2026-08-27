@@ -11,6 +11,7 @@ namespace PersonalFinanceApp.Services
         {
             new BinancePriceProvider(),
             new TruncgilPriceProvider(),
+            new FrankfurterGoldFallbackProvider(),
         };
 
         private static readonly Dictionary<string, (decimal Price, DateTime FetchedAt)> _cache = new Dictionary<string, (decimal, DateTime)>();
@@ -24,24 +25,28 @@ namespace PersonalFinanceApp.Services
                 return cached.Price;
             }
 
-            var provider = _providers.Find(p => p.CanHandle(assetType));
-            if (provider == null) return null;
-
-            // Truncgil/Binance geçici bir ağ hatasıyla tek seferde başarısız olabiliyor;
-            // kullanıcıya hemen "alınamadı" göstermeden önce kısa bir aradan sonra bir kez daha dene.
-            decimal? price = await provider.GetPriceTryAsync(symbol);
-            if (!price.HasValue)
+            // Aynı varlık türünü işleyen birden fazla sağlayıcı olabilir (ör. Truncgil çöktüğünde
+            // currency/gold için Frankfurter+gold-api yedeği devreye giriyor) — sırayla dene, ilk
+            // başarılı sonucu kullan.
+            foreach (var provider in _providers.FindAll(p => p.CanHandle(assetType)))
             {
-                await Task.Delay(400);
-                price = await provider.GetPriceTryAsync(symbol);
+                // Geçici bir ağ hatasıyla tek seferde başarısız olabiliyor; sıradaki sağlayıcıya
+                // geçmeden önce kısa bir aradan sonra aynı sağlayıcıyı bir kez daha dene.
+                decimal? price = await provider.GetPriceTryAsync(symbol);
+                if (!price.HasValue)
+                {
+                    await Task.Delay(400);
+                    price = await provider.GetPriceTryAsync(symbol);
+                }
+
+                if (price.HasValue)
+                {
+                    _cache[symbol] = (price.Value, DateTime.UtcNow);
+                    return price;
+                }
             }
 
-            if (price.HasValue)
-            {
-                _cache[symbol] = (price.Value, DateTime.UtcNow);
-            }
-
-            return price;
+            return null;
         }
     }
 }
