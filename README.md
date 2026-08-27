@@ -2,7 +2,7 @@
 
 Cüzdan ve Kasa'yı tek defterde tutan, Windows için masaüstü kişisel finans takip uygulaması. C# / WinForms ile yazıldı, PostgreSQL üzerinde çalışır.
 
-Tanıtım sitesi: **https://kaantkmzz.github.io/PersonalFinanceApp/** — tarayıcıda çalışan canlı demoyu deneyebilir, "Canlı Demo" bölümündeki butondan gerçek uygulamayı (self-contained .exe, kurulum gerektirmez, demo veritabanına bağlı) indirebilirsiniz.
+Tanıtım sitesi: **https://kaantkmzz.github.io/PersonalFinanceApp/** — tarayıcıda çalışan canlı demoyu deneyebilir, "İndir" bölümünden uygulamanın kendisini (self-contained .exe, kurulum gerektirmez, ortak örnek veritabanına bağlı) indirebilirsiniz.
 
 ## Özellikler
 
