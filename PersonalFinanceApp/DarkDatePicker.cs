@@ -114,6 +114,15 @@ namespace PersonalFinanceApp
             var popup = new CalendarPopup(_value, MinDate, ShowTime);
             popup.DateSelected += d => { Value = d; popup.Close(); };
             popup.FormClosed += (s, e) => _openPopup = null;
+
+            // Kontrol ekranın sağ/alt kenarına yakınsa, takvim sol/üst tarafa taşıp
+            // ekran dışına çıkmasın diye çalışma alanına göre konumu esnetiyoruz.
+            Rectangle workArea = Screen.FromControl(this).WorkingArea;
+            if (screenPoint.X + popup.Width > workArea.Right)
+                screenPoint.X = Math.Max(workArea.Left, this.PointToScreen(new Point(this.Width, 0)).X - popup.Width);
+            if (screenPoint.Y + popup.Height > workArea.Bottom)
+                screenPoint.Y = this.PointToScreen(Point.Empty).Y - popup.Height - 4;
+
             popup.Location = screenPoint;
             _openPopup = popup;
             popup.Show(this.FindForm() ?? (IWin32Window)this);
