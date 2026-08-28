@@ -240,6 +240,9 @@
 
   .download-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.2rem; }
   .download-hint { font-size: 0.82rem; color: var(--ink-faint); }
+  .download-note { display: flex; gap: 0.6rem; align-items: flex-start; margin-top: 1rem; padding: 0.85rem 1rem; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 6px; font-size: 0.85rem; color: var(--ink-muted); line-height: 1.5; }
+  .download-note svg { flex: none; width: 18px; height: 18px; margin-top: 0.15rem; color: var(--accent-strong); }
+  .download-note strong { color: var(--ink); }
 
   .app-chrome { margin-top: 2.2rem; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-card); background: var(--surface); }
   .app-topbar { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.7rem 1.1rem; background: var(--surface-2); border-bottom: 1px solid var(--rule); }
@@ -897,6 +900,10 @@
         </a>
         <span class="download-hint">~45 MB · kurulum gerektirmez · internet bağlantısı gerekir · ortak örnek veritabanına bağlanır</span>
       </div>
+      <p class="download-note reveal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span><strong>Windows SmartScreen uyarısı çıkabilir:</strong> uygulama henüz bir kod imzalama sertifikasıyla imzalanmadığı için Windows "Bilinmeyen yayıncı" uyarısı gösterebilir. Bu normaldir — devam etmek için uyarı ekranında <strong>"Ek bilgi"</strong>, ardından <strong>"Yine de çalıştır"</strong> seçeneğine tıklamanız yeterli.</span>
+      </p>
     </div>
   </section>
 

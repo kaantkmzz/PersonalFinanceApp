@@ -4,6 +4,8 @@ Cüzdan ve Kasa'yı tek defterde tutan, Windows için masaüstü kişisel finans
 
 Tanıtım sitesi: **https://kaantkmzz.github.io/PersonalFinanceApp/** — tarayıcıda çalışan canlı demoyu deneyebilir, "İndir" bölümünden uygulamanın kendisini (self-contained .exe, kurulum gerektirmez, ortak örnek veritabanına bağlı — gerçek/kişisel verilerinizi bu sürümde saklamayın) indirebilirsiniz. Kendi verilerinizle kullanmak isterseniz aşağıdaki "Kurulum" adımlarıyla kendi veritabanınızı kurabilirsiniz.
 
+> **Not:** Uygulama henüz bir kod imzalama sertifikasıyla imzalanmadığı için indirip çalıştırırken Windows SmartScreen "Bilinmeyen yayıncı" uyarısı gösterebilir. Bu beklenen bir durumdur — uyarı ekranında **"Ek bilgi"** ardından **"Yine de çalıştır"** seçeneğine tıklayarak devam edebilirsiniz.
+
 ## Özellikler
 
 - **Cüzdan & Kasa** — günlük harcama gücünüz ile birikiminiz ayrı tutulur, ikisi arasında anında transfer yapılır; transfer geçmişi ayrıca izlenebilir
